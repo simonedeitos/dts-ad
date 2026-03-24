@@ -1055,8 +1055,9 @@ namespace AirDirector.Controls
 				var allMusic = DbcManager.LoadFromCsv<MusicEntry>("Music.dbc");
 				var allClips = DbcManager.LoadFromCsv<ClipEntry>("Clips.dbc");
 
-				var musicEntry = allMusic.FirstOrDefault(m => m.FilePath == filePath);
-				var clipEntry = allClips.FirstOrDefault(c => c.FilePath == filePath);
+				// Case-insensitive comparison for Windows path robustness
+				var musicEntry = allMusic.FirstOrDefault(m => string.Equals(m.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+				var clipEntry = allClips.FirstOrDefault(c => string.Equals(c.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
 
 				PlaylistQueueItem scheduledItem = null;
 
@@ -1064,6 +1065,48 @@ namespace AirDirector.Controls
 					scheduledItem = CreateMusicQueueItem(musicEntry);
 				else if (clipEntry != null)
 					scheduledItem = CreateClipQueueItem(clipEntry);
+				else
+				{
+					// File exists on disk but is not registered in Music.dbc or Clips.dbc.
+					// Create a queue item directly from the file using tag metadata.
+					Console.WriteLine($"[InsertScheduledAudioFile] ℹ️ File non in archivio, lettura diretta da file");
+
+					TimeSpan duration = GetAudioDuration(filePath);
+					string title = scheduleName;
+					string artist = "";
+
+					try
+					{
+						using (var tagFile = TagLib.File.Create(filePath))
+						{
+							if (!string.IsNullOrEmpty(tagFile.Tag.Title))
+								title = tagFile.Tag.Title;
+							if (tagFile.Tag.Performers?.Length > 0)
+								artist = tagFile.Tag.Performers[0];
+						}
+					}
+					catch (Exception tagEx)
+					{
+						Console.WriteLine($"[InsertScheduledAudioFile] ℹ️ Lettura tag non riuscita, usato nome schedulazione: {tagEx.Message}");
+					}
+
+					scheduledItem = new PlaylistQueueItem
+					{
+						Type = PlaylistItemType.Music,
+						ScheduledTime = CalculateScheduledPlayTime(),
+						Artist = artist,
+						Title = title,
+						Year = 0,
+						Duration = duration,
+						Intro = TimeSpan.Zero,
+						FilePath = filePath,
+						MarkerIN = 0,
+						MarkerINTRO = 0,
+						MarkerMIX = 0,
+						MarkerOUT = 0,
+						IsScheduled = true
+					};
+				}
 
 				if (scheduledItem != null)
 				{
@@ -1071,6 +1114,10 @@ namespace AirDirector.Controls
 					int insertPosition = GetCorrectScheduleInsertPosition();
 					InsertItem(insertPosition, scheduledItem);
 					Console.WriteLine($"[InsertScheduledAudioFile] ✅ Inserito: {scheduleName}");
+				}
+				else
+				{
+					Console.WriteLine($"[InsertScheduledAudioFile] ⚠️ Impossibile creare l'elemento per: {scheduleName}");
 				}
 			}
 			catch (Exception ex)

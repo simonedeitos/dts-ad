@@ -239,7 +239,9 @@ namespace AirDirector.Controls
 
             string icon = schedule.Type == "PlayClock" ? "🕐" :
                          schedule.Type == "PlayAudio" ? "🎵" :
-                         schedule.Type == "PlayMiniPLS" ? "📋" : "📄";
+                         schedule.Type == "PlayMiniPLS" ? "📋" :
+                         schedule.Type == "TimeSignal" ? "⏰" :
+                         schedule.Type == "URLStreaming" ? "🌐" : "📄";
 
             string target = "";
             if (schedule.Type == "PlayClock")
@@ -248,6 +250,13 @@ namespace AirDirector.Controls
                 target = System.IO.Path.GetFileNameWithoutExtension(schedule.AudioFilePath);
             else if (schedule.Type == "PlayMiniPLS")
                 target = $"MiniPLS #{schedule.MiniPLSID}";
+            else if (schedule.Type == "TimeSignal")
+                target = LanguageManager.GetString("Schedule.TimeSignalLabel", "Segnale Orario");
+            else if (schedule.Type == "URLStreaming")
+            {
+                var urlParts = schedule.ClockName?.Split('|');
+                target = urlParts?.Length > 0 ? urlParts[0] : "";
+            }
 
             Label lblTitle = new Label
             {
