@@ -41,6 +41,7 @@ namespace AirDirector.Controls
 		private Dictionary<string, DateTime> _queueSnapshotAtCreation = new Dictionary<string, DateTime>();
 
 		private HashSet<string> _executedSchedules = new HashSet<string>();
+        private string _pendingScheduleVideoBufferPath = "";
 		private string _lastArtistFirstLetter = "";
 
 		// ✅ FIX CRITICO: Aggiungi tracking reload come OverviewControl
@@ -739,7 +740,9 @@ namespace AirDirector.Controls
                                 Console.WriteLine($"");
 
                                 _isInitialStartup = false;
+                                _pendingScheduleVideoBufferPath = schedule.VideoBufferPath ?? "";
                                 ExecuteSchedule(schedule);
+                                _pendingScheduleVideoBufferPath = "";
 
                                 _executedSchedules.Add(scheduleKey);
 
@@ -786,7 +789,13 @@ namespace AirDirector.Controls
                         {
                             Console.WriteLine($"[ExecuteSchedule] ? Clock: {schedule.ClockName}");
                             ClearNonPlayingItems();
+                            int clockStartIndex = _items.Count;
                             GeneratePlaylistFromClock(schedule.ClockName, 1000);
+                            if (!string.IsNullOrEmpty(_pendingScheduleVideoBufferPath))
+                            {
+                                for (int i = clockStartIndex; i < _items.Count; i++)
+                                    ApplyScheduleVideoBuffer(_items[i]);
+                            }
                         }
                         else
                         {
@@ -901,6 +910,7 @@ namespace AirDirector.Controls
 				};
 
 				int insertPosition = GetCorrectScheduleInsertPosition();
+				ApplyScheduleVideoBuffer(timeSignalItem);
 				InsertItem(insertPosition, timeSignalItem);
 
 				Console.WriteLine($"[TimeSignal] ✅ Inserito:  {scheduleName}");
@@ -939,6 +949,14 @@ namespace AirDirector.Controls
 			{
 				return DateTime.Now;
 			}
+		}
+
+		private void ApplyScheduleVideoBuffer(PlaylistQueueItem item)
+		{
+			if (item == null || string.IsNullOrEmpty(_pendingScheduleVideoBufferPath)) return;
+			if (!string.IsNullOrEmpty(item.VideoFilePath)) return; // Don't override existing video association
+			item.VideoFilePath = _pendingScheduleVideoBufferPath;
+			item.VideoSource = "BufferVideo";
 		}
 
 		private int GetCorrectScheduleInsertPosition()
@@ -997,6 +1015,7 @@ namespace AirDirector.Controls
 				};
 
 				int insertPosition = GetCorrectScheduleInsertPosition();
+				ApplyScheduleVideoBuffer(streamingItem);
 				InsertItem(insertPosition, streamingItem);
 
 				Console.WriteLine($"[URLStreaming] ✅ Inserito: {schedule.Name}");
@@ -1055,8 +1074,9 @@ namespace AirDirector.Controls
 				var allMusic = DbcManager.LoadFromCsv<MusicEntry>("Music.dbc");
 				var allClips = DbcManager.LoadFromCsv<ClipEntry>("Clips.dbc");
 
-				var musicEntry = allMusic.FirstOrDefault(m => m.FilePath == filePath);
-				var clipEntry = allClips.FirstOrDefault(c => c.FilePath == filePath);
+				// Case-insensitive comparison for Windows path robustness
+				var musicEntry = allMusic.FirstOrDefault(m => string.Equals(m.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+				var clipEntry = allClips.FirstOrDefault(c => string.Equals(c.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
 
 				PlaylistQueueItem scheduledItem = null;
 
@@ -1064,13 +1084,60 @@ namespace AirDirector.Controls
 					scheduledItem = CreateMusicQueueItem(musicEntry);
 				else if (clipEntry != null)
 					scheduledItem = CreateClipQueueItem(clipEntry);
+				else
+				{
+					// File exists on disk but is not registered in Music.dbc or Clips.dbc.
+					// Create a queue item directly from the file using tag metadata.
+					Console.WriteLine($"[InsertScheduledAudioFile] ℹ️ File non in archivio, lettura diretta da file");
+
+					TimeSpan duration = GetAudioDuration(filePath);
+					string title = scheduleName;
+					string artist = "";
+
+					try
+					{
+						using (var tagFile = TagLib.File.Create(filePath))
+						{
+							if (!string.IsNullOrEmpty(tagFile.Tag.Title))
+								title = tagFile.Tag.Title;
+							if (tagFile.Tag.Performers?.Length > 0)
+								artist = tagFile.Tag.Performers[0];
+						}
+					}
+					catch (Exception tagEx)
+					{
+						Console.WriteLine($"[InsertScheduledAudioFile] ℹ️ Lettura tag non riuscita, usato nome schedulazione: {tagEx.Message}");
+					}
+
+					scheduledItem = new PlaylistQueueItem
+					{
+						Type = PlaylistItemType.Music,
+						ScheduledTime = CalculateScheduledPlayTime(),
+						Artist = artist,
+						Title = title,
+						Year = 0,
+						Duration = duration,
+						Intro = TimeSpan.Zero,
+						FilePath = filePath,
+						MarkerIN = 0,
+						MarkerINTRO = 0,
+						MarkerMIX = 0,
+						MarkerOUT = 0,
+						IsScheduled = true
+					};
+				}
 
 				if (scheduledItem != null)
 				{
 					scheduledItem.IsScheduled = true;
+					ApplyScheduleVideoBuffer(scheduledItem);
 					int insertPosition = GetCorrectScheduleInsertPosition();
 					InsertItem(insertPosition, scheduledItem);
 					Console.WriteLine($"[InsertScheduledAudioFile] ✅ Inserito: {scheduleName}");
+				}
+				else
+				{
+					Console.WriteLine($"[InsertScheduledAudioFile] ⚠️ Impossibile creare l'elemento per: {scheduleName}");
 				}
 			}
 			catch (Exception ex)
@@ -1119,6 +1186,7 @@ namespace AirDirector.Controls
 						if (queueItem != null)
 						{
 							queueItem.IsScheduled = true;
+							ApplyScheduleVideoBuffer(queueItem);
 							InsertItem(insertIndex, queueItem);
 							insertIndex++;
 						}
@@ -2149,7 +2217,10 @@ namespace AirDirector.Controls
 				MarkerINTRO = entry.MarkerINTRO,
 				MarkerMIX = entry.MarkerMIX,
 				MarkerOUT = entry.MarkerOUT,
-				IsScheduled = false
+				IsScheduled = false,
+				VideoFilePath = entry.VideoFilePath ?? "",
+				VideoSource = entry.VideoSource.ToString(),
+				NDISourceName = entry.NDISourceName ?? ""
 			};
 		}
 

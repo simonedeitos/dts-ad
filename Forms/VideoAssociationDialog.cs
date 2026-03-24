@@ -2,26 +2,20 @@
 using AirDirector.Services.Database;
 using AirDirector.Services.Localization;
 using AirDirector.Themes;
-using NewTek;
-using NewTek.NDI;
 using System;
 using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace AirDirector.Forms
 {
     public partial class VideoAssociationDialog : Form
     {
-        private readonly bool _isClip;
         private readonly object _entry;
 
         // UI Controls
         private RadioButton rbNone;
         private RadioButton rbStaticVideo;
-        private RadioButton rbNDISource;
         private RadioButton rbBufferVideo;
 
         private Panel pnlStaticVideo;
@@ -29,23 +23,18 @@ namespace AirDirector.Forms
         private Button btnBrowseVideo;
         private Label lblVideoInfo;
 
-        private Panel pnlNDI;
-        private ComboBox cmbNDISource;
-        private Button btnRefreshNDI;
-        private Label lblNDIInfo;
-
         private Button btnSave;
         private Button btnCancel;
 
         // Result
         public VideoSourceType SelectedVideoSource { get; private set; }
         public string SelectedVideoPath { get; private set; }
-        public string SelectedNDISource { get; private set; }
+        public string SelectedNDISource { get; private set; } = "";
 
-        public VideoAssociationDialog(object entry, bool isClip)
+        // isClip is kept for backward compatibility with existing callers; NDI is no longer supported.
+        public VideoAssociationDialog(object entry, bool isClip = false)
         {
             _entry = entry;
-            _isClip = isClip;
 
             InitializeComponent();
             LoadCurrentSettings();
@@ -53,8 +42,8 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
-            this.Text = "🎬 Associa Video/NDI";
-            this.Size = new Size(600, 550);
+            this.Text = "🎬 Associa Video";
+            this.Size = new Size(600, 430);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
             this.MaximizeBox = false;
@@ -67,7 +56,7 @@ namespace AirDirector.Forms
             // ═══════════════════════════════════════════════
             Label lblTitle = new Label
             {
-                Text = "🎬 ASSOCIA VIDEO O SORGENTE NDI",
+                Text = "🎬 ASSOCIA VIDEO",
                 Font = new Font("Segoe UI", 14, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(20, 20),
@@ -174,75 +163,6 @@ namespace AirDirector.Forms
             yPos += 90;
 
             // ═══════════════════════════════════════════════
-            // NDI (solo per Clips)
-            // ═══════════════════════════════════════════════
-            if (_isClip)
-            {
-                rbNDISource = new RadioButton
-                {
-                    Text = "📡 Sorgente NDI live (telecamera, OBS, vMix, etc.)",
-                    Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                    ForeColor = Color.White,
-                    Location = new Point(30, yPos),
-                    AutoSize = true
-                };
-                rbNDISource.CheckedChanged += RadioButton_CheckedChanged;
-                this.Controls.Add(rbNDISource);
-
-                yPos += 35;
-
-                // Panel NDI
-                pnlNDI = new Panel
-                {
-                    Location = new Point(50, yPos),
-                    Size = new Size(520, 80),
-                    BackColor = Color.FromArgb(50, 50, 50),
-                    Visible = false,
-                    BorderStyle = BorderStyle.FixedSingle
-                };
-
-                cmbNDISource = new ComboBox
-                {
-                    Location = new Point(10, 10),
-                    Size = new Size(420, 25),
-                    Font = new Font("Segoe UI", 9),
-                    DropDownStyle = ComboBoxStyle.DropDownList,
-                    BackColor = Color.FromArgb(40, 40, 40),
-                    ForeColor = Color.White
-                };
-                pnlNDI.Controls.Add(cmbNDISource);
-
-                btnRefreshNDI = new Button
-                {
-                    Text = "🔄",
-                    Location = new Point(440, 8),
-                    Size = new Size(70, 28),
-                    BackColor = Color.FromArgb(0, 120, 215),
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat,
-                    Font = new Font("Segoe UI", 12, FontStyle.Bold),
-                    Cursor = Cursors.Hand
-                };
-                btnRefreshNDI.FlatAppearance.BorderSize = 0;
-                btnRefreshNDI.Click += BtnRefreshNDI_Click;
-                pnlNDI.Controls.Add(btnRefreshNDI);
-
-                lblNDIInfo = new Label
-                {
-                    Text = "ℹ️ Latenza: ~8-16ms | Assicurati che la sorgente NDI sia attiva",
-                    Location = new Point(10, 45),
-                    Size = new Size(500, 20),
-                    Font = new Font("Segoe UI", 8),
-                    ForeColor = Color.LightGray
-                };
-                pnlNDI.Controls.Add(lblNDIInfo);
-
-                this.Controls.Add(pnlNDI);
-
-                yPos += 90;
-            }
-
-            // ═══════════════════════════════════════════════
             // BUFFER VIDEO
             // ═══════════════════════════════════════════════
             rbBufferVideo = new RadioButton
@@ -274,7 +194,7 @@ namespace AirDirector.Forms
             btnCancel = new Button
             {
                 Text = "❌ Annulla",
-                Location = new Point(350, 460),
+                Location = new Point(350, 350),
                 Size = new Size(110, 35),
                 BackColor = Color.FromArgb(220, 53, 69),
                 ForeColor = Color.White,
@@ -289,7 +209,7 @@ namespace AirDirector.Forms
             btnSave = new Button
             {
                 Text = "💾 Salva",
-                Location = new Point(470, 460),
+                Location = new Point(470, 350),
                 Size = new Size(110, 35),
                 BackColor = Color.FromArgb(40, 167, 69),
                 ForeColor = Color.White,
@@ -308,22 +228,18 @@ namespace AirDirector.Forms
         {
             VideoSourceType currentSource = VideoSourceType.None;
             string currentVideoPath = "";
-            string currentNDISourceName = "";
 
             if (_entry is MusicEntry musicEntry)
             {
                 currentSource = musicEntry.VideoSource;
                 currentVideoPath = musicEntry.VideoFilePath ?? "";
-                currentNDISourceName = musicEntry.NDISourceName ?? "";
             }
             else if (_entry is ClipEntry clipEntry)
             {
                 currentSource = clipEntry.VideoSource;
                 currentVideoPath = clipEntry.VideoFilePath ?? "";
-                currentNDISourceName = clipEntry.NDISourceName ?? "";
             }
 
-            // Imposta radio button corrente
             switch (currentSource)
             {
                 case VideoSourceType.None:
@@ -335,17 +251,12 @@ namespace AirDirector.Forms
                     txtVideoPath.Text = currentVideoPath;
                     break;
 
-                case VideoSourceType.NDISource:
-                    if (_isClip && rbNDISource != null)
-                    {
-                        rbNDISource.Checked = true;
-                        LoadNDISources();
-                        SelectNDISource(currentNDISourceName);
-                    }
-                    break;
-
                 case VideoSourceType.BufferVideo:
                     rbBufferVideo.Checked = true;
+                    break;
+
+                default:
+                    rbNone.Checked = true;
                     break;
             }
         }
@@ -355,22 +266,7 @@ namespace AirDirector.Forms
             RadioButton rb = sender as RadioButton;
             if (rb == null || !rb.Checked) return;
 
-            // Nascondi tutti i pannelli
-            pnlStaticVideo.Visible = false;
-            if (pnlNDI != null)
-                pnlNDI.Visible = false;
-
-            // Mostra pannello appropriato
-            if (rb == rbStaticVideo)
-            {
-                pnlStaticVideo.Visible = true;
-            }
-            else if (rb == rbNDISource && _isClip)
-            {
-                pnlNDI.Visible = true;
-                if (cmbNDISource.Items.Count == 0)
-                    LoadNDISources();
-            }
+            pnlStaticVideo.Visible = (rb == rbStaticVideo);
         }
 
         private void BtnBrowseVideo_Click(object sender, EventArgs e)
@@ -402,120 +298,12 @@ namespace AirDirector.Forms
             }
         }
 
-        private void BtnRefreshNDI_Click(object sender, EventArgs e)
-        {
-            LoadNDISources();
-        }
-
-        private void LoadNDISources()
-        {
-            cmbNDISource.Items.Clear();
-
-            try
-            {
-                Console.WriteLine("[VideoAssociationDialog] 🔍 Ricerca sorgenti NDI...");
-
-                if (!NDIlib.initialize())
-                {
-                    Console.WriteLine("[VideoAssociationDialog] ❌ NDI non inizializzato");
-                    cmbNDISource.Items.Add("(Errore inizializzazione NDI)");
-                    cmbNDISource.SelectedIndex = 0;
-                    lblNDIInfo.Text = "❌ NDI Runtime non disponibile";
-                    lblNDIInfo.ForeColor = Color.Orange;
-                    return;
-                }
-
-                var findSettings = new NDIlib.find_create_t()
-                {
-                    show_local_sources = true,
-                    p_groups = IntPtr.Zero,
-                    p_extra_ips = IntPtr.Zero
-                };
-
-                IntPtr findInstance = NDIlib.find_create_v2(ref findSettings);
-
-                if (findInstance == IntPtr.Zero)
-                {
-                    Console.WriteLine("[VideoAssociationDialog] ⚠️ Impossibile creare finder");
-                    cmbNDISource.Items.Add("(Errore creazione finder)");
-                    cmbNDISource.SelectedIndex = 0;
-                    return;
-                }
-
-                // Aspetta discovery
-                System.Threading.Thread.Sleep(1500);
-
-                uint numSources = 0;
-                IntPtr sourcesPtr = NDIlib.find_get_current_sources(findInstance, ref numSources);
-
-                Console.WriteLine($"[VideoAssociationDialog] 📡 Trovate {numSources} sorgenti NDI");
-
-                if (numSources == 0)
-                {
-                    cmbNDISource.Items.Add("(Nessuna sorgente NDI trovata)");
-                    lblNDIInfo.Text = "⚠️ Nessuna sorgente rilevata - Verifica che sia attiva";
-                    lblNDIInfo.ForeColor = Color.Orange;
-                }
-                else
-                {
-                    int stride = Marshal.SizeOf(typeof(NDIlib.source_t));
-
-                    for (int i = 0; i < numSources; i++)
-                    {
-                        IntPtr sourcePtr = IntPtr.Add(sourcesPtr, i * stride);
-                        NDIlib.source_t source = Marshal.PtrToStructure<NDIlib.source_t>(sourcePtr);
-
-                        string sourceName = Marshal.PtrToStringAnsi(source.p_ndi_name);
-
-                        if (!string.IsNullOrEmpty(sourceName))
-                        {
-                            cmbNDISource.Items.Add(sourceName);
-                            Console.WriteLine($"[VideoAssociationDialog]   ✓ {sourceName}");
-                        }
-                    }
-
-                    lblNDIInfo.Text = $"✅ {numSources} sorgente/i NDI disponibile/i";
-                    lblNDIInfo.ForeColor = Color.LightGreen;
-                }
-
-                NDIlib.find_destroy(findInstance);
-
-                if (cmbNDISource.Items.Count > 0)
-                    cmbNDISource.SelectedIndex = 0;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[VideoAssociationDialog] ❌ Errore:  {ex.Message}");
-                cmbNDISource.Items.Clear();
-                cmbNDISource.Items.Add($"(Errore: {ex.Message})");
-                cmbNDISource.SelectedIndex = 0;
-                lblNDIInfo.Text = "❌ Errore rilevamento sorgenti NDI";
-                lblNDIInfo.ForeColor = Color.Red;
-            }
-        }
-
-        private void SelectNDISource(string sourceName)
-        {
-            if (string.IsNullOrEmpty(sourceName)) return;
-
-            for (int i = 0; i < cmbNDISource.Items.Count; i++)
-            {
-                if (cmbNDISource.Items[i].ToString() == sourceName)
-                {
-                    cmbNDISource.SelectedIndex = i;
-                    return;
-                }
-            }
-        }
-
         private void BtnSave_Click(object sender, EventArgs e)
         {
-            // Determina selezione
             if (rbNone.Checked)
             {
                 SelectedVideoSource = VideoSourceType.None;
                 SelectedVideoPath = "";
-                SelectedNDISource = "";
             }
             else if (rbStaticVideo.Checked)
             {
@@ -541,28 +329,6 @@ namespace AirDirector.Forms
 
                 SelectedVideoSource = VideoSourceType.StaticVideo;
                 SelectedVideoPath = txtVideoPath.Text;
-                SelectedNDISource = "";
-            }
-            else if (_isClip && rbNDISource != null && rbNDISource.Checked)
-            {
-                if (cmbNDISource.SelectedIndex < 0 ||
-                    cmbNDISource.SelectedItem.ToString().StartsWith("("))
-                {
-                    MessageBox.Show(
-                        "⚠️ Seleziona una sorgente NDI valida!\n\n" +
-                        "Verifica che:\n" +
-                        "- La sorgente NDI sia attiva\n" +
-                        "- NDI Runtime sia installato\n" +
-                        "- Clicca 🔄 per aggiornare la lista",
-                        "Sorgente NDI Non Valida",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
-                    return;
-                }
-
-                SelectedVideoSource = VideoSourceType.NDISource;
-                SelectedVideoPath = "";
-                SelectedNDISource = cmbNDISource.SelectedItem.ToString();
             }
             else if (rbBufferVideo.Checked)
             {
@@ -581,7 +347,6 @@ namespace AirDirector.Forms
 
                 SelectedVideoSource = VideoSourceType.BufferVideo;
                 SelectedVideoPath = "";
-                SelectedNDISource = "";
             }
 
             this.DialogResult = DialogResult.OK;

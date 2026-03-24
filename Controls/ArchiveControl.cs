@@ -507,7 +507,7 @@ namespace AirDirector.Controls
             }
             else // Clips
             {
-                contextMenu.Items.Add("🎬 " + LanguageManager.GetString("Archive.AssociateVideoOrNDI", "Associa Video/NDI..."), null, MenuAssociateVideoNDI_Click);
+                contextMenu.Items.Add("🎬 " + LanguageManager.GetString("Archive.AssociateVideo", "Associa Video..."), null, MenuAssociateVideo_Click);
             }
 
             contextMenu.Items.Add("🗑️ " + LanguageManager.GetString("Archive.RemoveVideo", "Rimuovi Video"), null, MenuRemoveVideo_Click);
@@ -717,8 +717,6 @@ namespace AirDirector.Controls
             {
                 if (clipEntry.VideoSource == VideoSourceType.StaticVideo && !string.IsNullOrEmpty(clipEntry.VideoFilePath))
                     return "🎬";
-                else if (clipEntry.VideoSource == VideoSourceType.NDISource && !string.IsNullOrEmpty(clipEntry.NDISourceName))
-                    return "📡";
                 else if (clipEntry.VideoSource == VideoSourceType.BufferVideo)
                     return "🖼️";
                 else
@@ -909,7 +907,7 @@ namespace AirDirector.Controls
                     {
                         musicEntry.VideoSource = dialog.SelectedVideoSource;
                         musicEntry.VideoFilePath = dialog.SelectedVideoPath;
-                        musicEntry.NDISourceName = dialog.SelectedNDISource;
+                        musicEntry.NDISourceName = "";
 
                         if (DbcManager.Update("Music.dbc", musicEntry))
                         {
@@ -933,31 +931,23 @@ namespace AirDirector.Controls
                     }
                 }
             }
-        }
-
-        private void MenuAssociateVideoNDI_Click(object sender, EventArgs e)
-        {
-            if (dgvArchive.SelectedRows.Count == 0) return;
-
-            DataGridViewRow row = dgvArchive.SelectedRows[0];
-
-            if (row.Tag is ClipEntry clipEntry)
+            else if (row.Tag is ClipEntry clipEntry)
             {
-                using (var dialog = new VideoAssociationDialog(clipEntry, true))
+                using (var dialog = new VideoAssociationDialog(clipEntry, false))
                 {
                     if (dialog.ShowDialog() == DialogResult.OK)
                     {
                         clipEntry.VideoSource = dialog.SelectedVideoSource;
                         clipEntry.VideoFilePath = dialog.SelectedVideoPath;
-                        clipEntry.NDISourceName = dialog.SelectedNDISource;
+                        clipEntry.NDISourceName = "";
 
                         if (DbcManager.Update("Clips.dbc", clipEntry))
                         {
                             RefreshArchive();
-                            StatusChanged?.Invoke(this, "Associazione video/NDI aggiornata");
+                            StatusChanged?.Invoke(this, "Associazione video aggiornata");
 
                             MessageBox.Show(
-                                "✅ Associazione salvata con successo!",
+                                "✅ Associazione video salvata con successo!",
                                 "Successo",
                                 MessageBoxButtons.OK,
                                 MessageBoxIcon.Information);

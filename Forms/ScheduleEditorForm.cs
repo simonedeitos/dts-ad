@@ -191,6 +191,8 @@ namespace AirDirector.Forms
                     txtStreamDuration.Text = "01:00:00";
             }
 
+            txtVideoBufferPath.Text = _schedule.VideoBufferPath ?? "";
+
             chkMonday.Checked = _schedule.Monday == 1;
             chkTuesday.Checked = _schedule.Tuesday == 1;
             chkWednesday.Checked = _schedule.Wednesday == 1;
@@ -233,6 +235,20 @@ namespace AirDirector.Forms
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
                     txtAudioFile.Text = ofd.FileName;
+                }
+            }
+        }
+
+        private void BtnBrowseVideoBuffer_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Filter = LanguageManager.GetString("ScheduleEditor.VideoFilter", "File Video (*.mp4;*.mov;*.avi;*.mkv;*.wmv)|*.mp4;*.mov;*.avi;*.mkv;*.wmv|Tutti i file (*.*)|*.*");
+                ofd.Title = LanguageManager.GetString("ScheduleEditor.SelectVideoBufferFile", "Seleziona File Video Buffer");
+
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    txtVideoBufferPath.Text = ofd.FileName;
                 }
             }
         }
@@ -411,6 +427,8 @@ namespace AirDirector.Forms
                 _schedule.AudioFilePath = "";
                 _schedule.MiniPLSID = 0;
             }
+
+            _schedule.VideoBufferPath = txtVideoBufferPath.Text.Trim();
 
             bool success;
             if (_isNewSchedule)

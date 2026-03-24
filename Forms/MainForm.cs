@@ -770,8 +770,34 @@ namespace AirDirector.Forms
         private void MenuLicense_Click(object sender, EventArgs e)
         {
             var currentLicense = LicenseManager.GetCurrentLicense();
-            if (currentLicense.IsDemoMode) { LicenseForm licenseForm = new LicenseForm(); if (licenseForm.ShowDialog() == DialogResult.OK) { UpdateLicenseStatus(); MessageBox.Show(LanguageManager.GetString("MainForm.LicenseActivatedRestart", "Licenza attivata! Riavvia l'applicazione per applicare le modifiche."), LanguageManager.GetString("Common.Success", "Successo"), MessageBoxButtons.OK, MessageBoxIcon.Information); } }
-            else { var result = MessageBox.Show(string.Format(LanguageManager.GetString("MainForm.LicenseInfo", "Licenza attiva:\n\nProprietario: {0}\nSeriale: {1}\nAttivata: {2}\n\nVuoi rimuovere la licenza?"), !string.IsNullOrEmpty(currentLicense.OwnerName) ? currentLicense.OwnerName : currentLicense.SerialKey, currentLicense.SerialKey, currentLicense.ActivatedOn.ToString("dd/MM/yyyy HH:mm")), LanguageManager.GetString("MainForm.LicenseInfoTitle", "Informazioni Licenza"), MessageBoxButtons.YesNo, MessageBoxIcon.Question); if (result == DialogResult.Yes) { if (LicenseManager.RemoveLicense(out string error)) { UpdateLicenseStatus(); MessageBox.Show(LanguageManager.GetString("MainForm.LicenseRemoved", "Licenza rimossa con successo"), LanguageManager.GetString("Common.Success", "Successo"), MessageBoxButtons.OK, MessageBoxIcon.Information); } else { MessageBox.Show($"Errore: {error}", LanguageManager.GetString("Common.Error", "Errore"), MessageBoxButtons.OK, MessageBoxIcon.Error); } } }
+            if (currentLicense.IsDemoMode)
+            {
+                LicenseForm licenseForm = new LicenseForm();
+                if (licenseForm.ShowDialog() == DialogResult.OK)
+                {
+                    UpdateLicenseStatus();
+                    MessageBox.Show(
+                        LanguageManager.GetString("MainForm.LicenseActivatedRestart", "Licenza attivata! Riavvia l'applicazione per applicare le modifiche."),
+                        LanguageManager.GetString("Common.Success", "Successo"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+            }
+            else
+            {
+                using (var infoForm = new LicenseInfoForm())
+                {
+                    if (infoForm.ShowDialog(this) == DialogResult.OK && infoForm.LicenseRemoved)
+                    {
+                        UpdateLicenseStatus();
+                        MessageBox.Show(
+                            LanguageManager.GetString("MainForm.LicenseRemoved", "Licenza rimossa con successo"),
+                            LanguageManager.GetString("Common.Success", "Successo"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                }
+            }
         }
 
         private void MenuAbout_Click(object sender, EventArgs e) { MessageBox.Show(LanguageManager.GetString("MainForm.AboutText", "AirDirector v1.0.0\n\nPlayout Radiofonico e TV Professionale\n\n© 2025 AirDirector\nTutti i diritti riservati."), LanguageManager.GetString("MainForm.AboutTitle", "Informazioni su AirDirector"), MessageBoxButtons.OK, MessageBoxIcon.Information); }

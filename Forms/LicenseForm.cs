@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using AirDirector.Services.Licensing;
 using AirDirector.Services.Localization;
@@ -19,9 +20,8 @@ namespace AirDirector.Forms
 
         private void InitializeCustomComponents()
         {
-            // Form settings
             this.Text = LanguageManager.GetString("License_Title", "Attivazione Licenza");
-            this.Size = new Size(600, 520);
+            this.Size = new Size(580, 620);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -32,147 +32,184 @@ namespace AirDirector.Forms
             Panel headerPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 80,
+                Height = 100,
                 BackColor = AppTheme.Primary
             };
             this.Controls.Add(headerPanel);
 
+            Label lblIcon = new Label
+            {
+                Text = "🔐",
+                Font = new Font("Segoe UI", 28),
+                ForeColor = AppTheme.TextInverse,
+                Location = new Point(20, 18),
+                AutoSize = true
+            };
+            headerPanel.Controls.Add(lblIcon);
+
             Label lblTitle = new Label
             {
-                Text = "🔐 " + LanguageManager.GetString("License_Title", "Attivazione Licenza"),
-                Font = new Font("Segoe UI", 18, FontStyle.Bold),
+                Text = LanguageManager.GetString("License_Title", "Attivazione Licenza"),
+                Font = new Font("Segoe UI", 19, FontStyle.Bold),
                 ForeColor = AppTheme.TextInverse,
                 AutoSize = false,
-                Size = new Size(550, 40),
-                Location = new Point(20, 20),
+                Size = new Size(430, 38),
+                Location = new Point(78, 16),
                 TextAlign = ContentAlignment.MiddleLeft
             };
             headerPanel.Controls.Add(lblTitle);
 
-            // ===== CONTENT PANEL =====
-            Panel contentPanel = new Panel
+            Label lblSubtitle = new Label
             {
-                Location = new Point(20, 100),
-                Size = new Size(540, 320),
-                BackColor = AppTheme.Surface
+                Text = LanguageManager.GetString("License_Subtitle", "Inserisci il tuo codice seriale per sbloccare tutte le funzionalità"),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(200, 230, 255),
+                AutoSize = false,
+                Size = new Size(500, 20),
+                Location = new Point(78, 58),
+                TextAlign = ContentAlignment.MiddleLeft
             };
-            this.Controls.Add(contentPanel);
+            headerPanel.Controls.Add(lblSubtitle);
 
-            int yPos = 20;
+            // ===== MAIN CARD =====
+            Panel cardPanel = new Panel
+            {
+                Location = new Point(24, 116),
+                Size = new Size(524, 230),
+                BackColor = AppTheme.Surface,
+                Padding = new Padding(24)
+            };
+            cardPanel.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (var pen = new Pen(AppTheme.BorderLight, 1))
+                    e.Graphics.DrawRectangle(pen, 0, 0, cardPanel.Width - 1, cardPanel.Height - 1);
+            };
+            this.Controls.Add(cardPanel);
 
             // Owner Name Label
             Label lblOwner = new Label
             {
-                Text = LanguageManager.GetString("License_OwnerName", "Nome / Ragione Sociale:"),
-                Font = new Font("Segoe UI", 10, FontStyle.Regular),
-                Location = new Point(20, yPos),
+                Text = LanguageManager.GetString("License_OwnerName", "Nome / Ragione Sociale"),
+                Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                ForeColor = AppTheme.TextSecondary,
+                Location = new Point(24, 20),
                 AutoSize = true
             };
-            contentPanel.Controls.Add(lblOwner);
+            cardPanel.Controls.Add(lblOwner);
 
-            yPos += 30;
-
-            // Owner Name TextBox
             TextBox txtOwner = new TextBox
             {
                 Name = "txtOwner",
                 Font = new Font("Segoe UI", 11),
-                Location = new Point(20, yPos),
-                Size = new Size(490, 30)
+                Location = new Point(24, 40),
+                Size = new Size(472, 34),
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = AppTheme.BgLight
             };
-            contentPanel.Controls.Add(txtOwner);
-
-            yPos += 50;
+            cardPanel.Controls.Add(txtOwner);
 
             // Serial Label
             Label lblSerial = new Label
             {
-                Text = LanguageManager.GetString("License_Serial", "Codice Seriale:"),
-                Font = new Font("Segoe UI", 10, FontStyle.Regular),
-                Location = new Point(20, yPos),
+                Text = LanguageManager.GetString("License_Serial", "Codice Seriale"),
+                Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                ForeColor = AppTheme.TextSecondary,
+                Location = new Point(24, 92),
                 AutoSize = true
             };
-            contentPanel.Controls.Add(lblSerial);
+            cardPanel.Controls.Add(lblSerial);
 
-            yPos += 30;
-
-            // Serial TextBox
             TextBox txtSerial = new TextBox
             {
                 Name = "txtSerial",
-                Font = new Font("Segoe UI", 11),
-                Location = new Point(20, yPos),
-                Size = new Size(490, 30),
+                Font = new Font("Segoe UI", 13, FontStyle.Bold),
+                Location = new Point(24, 112),
+                Size = new Size(472, 36),
                 MaxLength = 18,
-                CharacterCasing = CharacterCasing.Upper
+                CharacterCasing = CharacterCasing.Upper,
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = AppTheme.BgLight
             };
-            contentPanel.Controls.Add(txtSerial);
+            cardPanel.Controls.Add(txtSerial);
 
-            // Placeholder per formato
             Label lblFormat = new Label
             {
                 Text = "Formato: ADR-XXXX-XXXX-XXXX",
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = AppTheme.TextSecondary,
-                Location = new Point(20, yPos + 35),
+                Location = new Point(24, 158),
                 AutoSize = true
             };
-            contentPanel.Controls.Add(lblFormat);
+            cardPanel.Controls.Add(lblFormat);
 
-            yPos += 70;
-
-            // Activate Button
+            // ===== ACTIVATE BUTTON =====
             Button btnActivate = new Button
             {
                 Name = "btnActivate",
-                Text = LanguageManager.GetString("License_Activate", "Attiva Licenza"),
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                Location = new Point(20, yPos),
-                Size = new Size(490, 45),
+                Text = "🔓  " + LanguageManager.GetString("License_Activate", "Attiva Licenza"),
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                Location = new Point(24, 364),
+                Size = new Size(524, 50),
                 BackColor = AppTheme.Success,
-                ForeColor = AppTheme.TextInverse,
+                ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand
             };
             btnActivate.FlatAppearance.BorderSize = 0;
             btnActivate.Click += (s, e) => BtnActivate_Click(txtOwner.Text, txtSerial.Text);
-            contentPanel.Controls.Add(btnActivate);
+            this.Controls.Add(btnActivate);
 
-            yPos += 60;
+            // ===== SEPARATOR =====
+            Panel sepPanel = new Panel
+            {
+                Location = new Point(24, 430),
+                Size = new Size(524, 1),
+                BackColor = AppTheme.BorderLight
+            };
+            this.Controls.Add(sepPanel);
 
-            // Demo Button
+            Label lblOr = new Label
+            {
+                Text = "— oppure —",
+                Font = new Font("Segoe UI", 9, FontStyle.Italic),
+                ForeColor = AppTheme.TextSecondary,
+                Location = new Point(196, 438),
+                AutoSize = true
+            };
+            this.Controls.Add(lblOr);
+
+            // ===== DEMO BUTTON =====
             Button btnDemo = new Button
             {
                 Name = "btnDemo",
-                Text = LanguageManager.GetString("License_Demo", "Continua in Modalità Demo"),
-                Font = new Font("Segoe UI", 10, FontStyle.Regular),
-                Location = new Point(20, yPos),
-                Size = new Size(490, 40),
+                Text = "⏩  " + LanguageManager.GetString("License_Demo", "Continua in Modalità Demo"),
+                Font = new Font("Segoe UI", 10),
+                Location = new Point(24, 460),
+                Size = new Size(524, 44),
                 BackColor = AppTheme.Warning,
-                ForeColor = AppTheme.TextInverse,
+                ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand
             };
             btnDemo.FlatAppearance.BorderSize = 0;
             btnDemo.Click += BtnDemo_Click;
-            contentPanel.Controls.Add(btnDemo);
+            this.Controls.Add(btnDemo);
 
-            yPos += 55;
-
-            // Demo Limits Info
+            // ===== DEMO LIMITS INFO =====
             Label lblDemoInfo = new Label
             {
-                Text = LanguageManager.GetString("License_DemoLimits", "Limiti Modalità Demo:") + "\n" +
-                       LanguageManager.GetString("License_DemoMusic", "• Massimo 50 brani musicali") + "\n" +
-                       LanguageManager.GetString("License_DemoClips", "• Massimo 15 clips") + "\n" +
-                       LanguageManager.GetString("License_DemoEncoders", "• Massimo 1 encoder streaming"),
-                Font = new Font("Segoe UI", 9, FontStyle.Italic),
+                Text = LanguageManager.GetString("License_DemoLimits", "Limiti Modalità Demo:") + "  " +
+                       LanguageManager.GetString("License_DemoMusic", "50 brani") + "  •  " +
+                       LanguageManager.GetString("License_DemoClips", "15 clips") + "  •  " +
+                       LanguageManager.GetString("License_DemoEncoders", "1 encoder"),
+                Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = AppTheme.TextSecondary,
-                Location = new Point(20, yPos),
-                Size = new Size(490, 80),
-                TextAlign = ContentAlignment.TopLeft
+                Location = new Point(24, 518),
+                Size = new Size(524, 20),
+                TextAlign = ContentAlignment.MiddleCenter
             };
-            contentPanel.Controls.Add(lblDemoInfo);
+            this.Controls.Add(lblDemoInfo);
         }
 
         private void BtnActivate_Click(string ownerName, string serial)
@@ -184,7 +221,6 @@ namespace AirDirector.Forms
                 return;
             }
 
-            // Attivazione tramite API
             bool success = LicenseManager.ActivateLicense(serial, ownerName, out string errorMessage);
 
             if (success)
@@ -235,3 +271,4 @@ namespace AirDirector.Forms
         }
     }
 }
+
