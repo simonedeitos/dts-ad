@@ -1,4 +1,5 @@
 ﻿using System;
+using AirDirector.Services.Licensing;
 
 namespace AirDirector.Models
 {
@@ -7,8 +8,8 @@ namespace AirDirector.Models
     /// </summary>
     public class LicenseInfo
     {
-        public string Email { get; set; }
         public string SerialKey { get; set; }
+        public string OwnerName { get; set; }
         public DateTime ActivatedOn { get; set; }
         public string MachineID { get; set; }
         public string ProductName { get; set; }
@@ -18,8 +19,8 @@ namespace AirDirector.Models
 
         public LicenseInfo()
         {
-            Email = string.Empty;
             SerialKey = string.Empty;
+            OwnerName = string.Empty;
             ActivatedOn = DateTime.MinValue;
             MachineID = string.Empty;
             ProductName = "AirDirector";
@@ -35,7 +36,7 @@ namespace AirDirector.Models
         {
             if (IsDemoMode) return true;
 
-            if (string.IsNullOrEmpty(Email) || string.IsNullOrEmpty(SerialKey))
+            if (string.IsNullOrEmpty(SerialKey))
                 return false;
 
             if (!IsActivated)
@@ -45,34 +46,44 @@ namespace AirDirector.Models
             if (!IsValidSerialFormat(SerialKey))
                 return false;
 
+            // Verifica che l'hardware ID corrisponda a quello corrente
+            if (!string.IsNullOrEmpty(MachineID) &&
+                MachineID != HardwareIdentifier.GetMachineID())
+                return false;
+
             return true;
         }
 
         /// <summary>
-        /// Verifica formato seriale AD-XXXX-XXXX-XXXX-XXXX
+        /// Verifica formato seriale ADR-XXXX-XXXX-XXXX
         /// </summary>
         private bool IsValidSerialFormat(string serial)
         {
             if (string.IsNullOrEmpty(serial))
                 return false;
 
-            // Formato: AD-XXXX-XXXX-XXXX-XXXX (22 caratteri)
-            if (serial.Length != 24)
-                return false;
-
-            if (!serial.StartsWith("AD-"))
+            // Formato: ADR-XXXX-XXXX-XXXX (18 caratteri)
+            if (!serial.StartsWith("ADR-"))
                 return false;
 
             string[] parts = serial.Split('-');
-            if (parts.Length != 5)
+            if (parts.Length != 4)
                 return false;
 
-            // Verifica lunghezza delle parti
-            if (parts[0] != "AD") return false;
+            if (parts[0] != "ADR") return false;
             if (parts[1].Length != 4) return false;
             if (parts[2].Length != 4) return false;
             if (parts[3].Length != 4) return false;
-            if (parts[4].Length != 4) return false;
+
+            // Verifica che le parti siano alfanumeriche
+            for (int i = 1; i < parts.Length; i++)
+            {
+                foreach (char c in parts[i])
+                {
+                    if (!char.IsLetterOrDigit(c))
+                        return false;
+                }
+            }
 
             return true;
         }
@@ -96,7 +107,8 @@ namespace AirDirector.Models
             if (IsDemoMode)
                 return "Modalità Demo";
 
-            return $"{Email} - {SerialKey} - Attivato: {ActivatedOn:dd/MM/yyyy HH:mm}";
+            string displayName = !string.IsNullOrEmpty(OwnerName) ? OwnerName : SerialKey;
+            return $"{displayName} - Attivato: {ActivatedOn:dd/MM/yyyy HH:mm}";
         }
     }
 }

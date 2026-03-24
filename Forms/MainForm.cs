@@ -419,7 +419,16 @@ namespace AirDirector.Forms
             if (LicenseManager.IsDemoMode())
                 UpdateStatus(LanguageManager.GetString("MainForm.DemoActive", "Modalità Demo attiva - Funzionalità limitate"));
             else
+            {
+                // Verifica periodica della licenza all'avvio
+                if (!LicenseManager.PeriodicCheck(out string checkMsg) && !string.IsNullOrEmpty(checkMsg))
+                {
+                    UpdateLicenseStatus();
+                    MessageBox.Show(checkMsg, LanguageManager.GetString("License_Title", "Licenza"),
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
                 UpdateStatus(LanguageManager.GetString("MainForm.Ready", "AirDirector pronto - Licenza attiva"));
+            }
 
             playlistQueue.QueueReady += PlaylistQueueControl_QueueReady;
             playlistQueue.QueueCountChanged += PlaylistQueue_QueueCountChanged;
@@ -734,7 +743,7 @@ namespace AirDirector.Forms
         }
 
         private void InitializeFileWatcher() { _fileWatcher = new FileWatcherService(); _fileWatcher.FileChanged += (s, fileName) => { BeginInvoke(new Action(() => { UpdateStatus(string.Format(LanguageManager.GetString("MainForm.DatabaseUpdated", "Database aggiornato: {0}"), fileName)); })); }; }
-        private void UpdateLicenseStatus() { if (LicenseManager.IsDemoMode()) { lblLicense.Text = LanguageManager.GetString("MainForm.DemoMode", "Modalità Demo"); lblLicense.ForeColor = Color.OrangeRed; } else { lblLicense.Text = LanguageManager.GetString("MainForm.LicenseActive", "Licenza Attiva"); lblLicense.ForeColor = Color.Green; } }
+        private void UpdateLicenseStatus() { if (LicenseManager.IsDemoMode()) { lblLicense.Text = LanguageManager.GetString("MainForm.DemoMode", "Modalità Demo"); lblLicense.ForeColor = Color.OrangeRed; } else { var lic = LicenseManager.GetCurrentLicense(); string owner = !string.IsNullOrEmpty(lic.OwnerName) ? lic.OwnerName : lic.SerialKey; lblLicense.Text = owner; lblLicense.ForeColor = Color.Green; } }
         private void UpdateStatus(string message) { if (lblStatus != null) lblStatus.Text = message; }
         private void PlaylistQueue_QueueCountChanged(object sender, int count) { Label lblCount = this.Controls.Find("lblQueueCount", true).FirstOrDefault() as Label; if (lblCount != null) lblCount.Text = count.ToString(); }
         private void PlaylistQueue_ClockChanged(object sender, string clockName) { if (lblCurrentClock != null) lblCurrentClock.Text = clockName; }
@@ -762,7 +771,7 @@ namespace AirDirector.Forms
         {
             var currentLicense = LicenseManager.GetCurrentLicense();
             if (currentLicense.IsDemoMode) { LicenseForm licenseForm = new LicenseForm(); if (licenseForm.ShowDialog() == DialogResult.OK) { UpdateLicenseStatus(); MessageBox.Show(LanguageManager.GetString("MainForm.LicenseActivatedRestart", "Licenza attivata! Riavvia l'applicazione per applicare le modifiche."), LanguageManager.GetString("Common.Success", "Successo"), MessageBoxButtons.OK, MessageBoxIcon.Information); } }
-            else { var result = MessageBox.Show(string.Format(LanguageManager.GetString("MainForm.LicenseInfo", "Licenza attiva:\n\nEmail: {0}\nSeriale: {1}\nAttivata: {2}\n\nVuoi rimuovere la licenza?"), currentLicense.Email, currentLicense.SerialKey, currentLicense.ActivatedOn.ToString("dd/MM/yyyy HH:mm")), LanguageManager.GetString("MainForm.LicenseInfoTitle", "Informazioni Licenza"), MessageBoxButtons.YesNo, MessageBoxIcon.Question); if (result == DialogResult.Yes) { if (LicenseManager.RemoveLicense(out string error)) { UpdateLicenseStatus(); MessageBox.Show(LanguageManager.GetString("MainForm.LicenseRemoved", "Licenza rimossa con successo"), LanguageManager.GetString("Common.Success", "Successo"), MessageBoxButtons.OK, MessageBoxIcon.Information); } else { MessageBox.Show($"Errore: {error}", LanguageManager.GetString("Common.Error", "Errore"), MessageBoxButtons.OK, MessageBoxIcon.Error); } } }
+            else { var result = MessageBox.Show(string.Format(LanguageManager.GetString("MainForm.LicenseInfo", "Licenza attiva:\n\nProprietario: {0}\nSeriale: {1}\nAttivata: {2}\n\nVuoi rimuovere la licenza?"), !string.IsNullOrEmpty(currentLicense.OwnerName) ? currentLicense.OwnerName : currentLicense.SerialKey, currentLicense.SerialKey, currentLicense.ActivatedOn.ToString("dd/MM/yyyy HH:mm")), LanguageManager.GetString("MainForm.LicenseInfoTitle", "Informazioni Licenza"), MessageBoxButtons.YesNo, MessageBoxIcon.Question); if (result == DialogResult.Yes) { if (LicenseManager.RemoveLicense(out string error)) { UpdateLicenseStatus(); MessageBox.Show(LanguageManager.GetString("MainForm.LicenseRemoved", "Licenza rimossa con successo"), LanguageManager.GetString("Common.Success", "Successo"), MessageBoxButtons.OK, MessageBoxIcon.Information); } else { MessageBox.Show($"Errore: {error}", LanguageManager.GetString("Common.Error", "Errore"), MessageBoxButtons.OK, MessageBoxIcon.Error); } } }
         }
 
         private void MenuAbout_Click(object sender, EventArgs e) { MessageBox.Show(LanguageManager.GetString("MainForm.AboutText", "AirDirector v1.0.0\n\nPlayout Radiofonico e TV Professionale\n\n© 2025 AirDirector\nTutti i diritti riservati."), LanguageManager.GetString("MainForm.AboutTitle", "Informazioni su AirDirector"), MessageBoxButtons.OK, MessageBoxIcon.Information); }
