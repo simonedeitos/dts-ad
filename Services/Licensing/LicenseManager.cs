@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Win32;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using AirDirector.Models;
@@ -29,36 +30,34 @@ namespace AirDirector.Services.Licensing
 
         private static readonly HttpClient _http = CreateHttpClient();
 
+        private const string REGISTRY_KEY = @"SOFTWARE\AirDirector";
+        private const string REGISTRY_VALUE_NAME = "ApiKey";
+
         /// <summary>
-        /// Carica la API key dal file config.json in %ProgramData%\AirDirector
-        /// oppure dalla variabile d'ambiente AIRDIRECTOR_API_KEY.
+        /// Carica la API key dal Registry di Windows (HKCU\SOFTWARE\AirDirector\ApiKey).
+        /// Se il valore non esiste, lo crea vuoto e restituisce stringa vuota.
         /// </summary>
         private static string LoadApiKey()
         {
-            // 1. Variabile d'ambiente
-            string? envKey = Environment.GetEnvironmentVariable("AIRDIRECTOR_API_KEY");
-            if (!string.IsNullOrWhiteSpace(envKey))
-                return envKey;
-
-            // 2. File config.json nella cartella dati
-            string configPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "AirDirector", "config.json");
-
-            if (File.Exists(configPath))
+            try
             {
-                try
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(REGISTRY_KEY))
                 {
-                    string json = File.ReadAllText(configPath);
-                    var obj = JObject.Parse(json);
-                    string? fileKey = obj["api_key"]?.Value<string>();
-                    if (!string.IsNullOrWhiteSpace(fileKey))
-                        return fileKey;
+                    object? val = key.GetValue(REGISTRY_VALUE_NAME);
+                    if (val != null)
+                    {
+                        string apiKey = val.ToString() ?? string.Empty;
+                        if (!string.IsNullOrWhiteSpace(apiKey))
+                            return apiKey;
+                    }
+
+                    // Valore non trovato → crea il campo vuoto nel registro
+                    key.SetValue(REGISTRY_VALUE_NAME, string.Empty, RegistryValueKind.String);
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Errore lettura config.json: {ex.Message}");
-                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Errore lettura ApiKey dal Registry: {ex.Message}");
             }
 
             return string.Empty;
