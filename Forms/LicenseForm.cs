@@ -21,7 +21,7 @@ namespace AirDirector.Forms
         {
             // Form settings
             this.Text = LanguageManager.GetString("License_Title", "Attivazione Licenza");
-            this.Size = new Size(600, 550);
+            this.Size = new Size(600, 520);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -53,34 +53,34 @@ namespace AirDirector.Forms
             Panel contentPanel = new Panel
             {
                 Location = new Point(20, 100),
-                Size = new Size(540, 340),
+                Size = new Size(540, 320),
                 BackColor = AppTheme.Surface
             };
             this.Controls.Add(contentPanel);
 
             int yPos = 20;
 
-            // Email Label
-            Label lblEmail = new Label
+            // Owner Name Label
+            Label lblOwner = new Label
             {
-                Text = LanguageManager.GetString("License_Email", "Email:"),
+                Text = LanguageManager.GetString("License_OwnerName", "Nome / Ragione Sociale:"),
                 Font = new Font("Segoe UI", 10, FontStyle.Regular),
                 Location = new Point(20, yPos),
                 AutoSize = true
             };
-            contentPanel.Controls.Add(lblEmail);
+            contentPanel.Controls.Add(lblOwner);
 
             yPos += 30;
 
-            // Email TextBox
-            TextBox txtEmail = new TextBox
+            // Owner Name TextBox
+            TextBox txtOwner = new TextBox
             {
-                Name = "txtEmail",
+                Name = "txtOwner",
                 Font = new Font("Segoe UI", 11),
                 Location = new Point(20, yPos),
                 Size = new Size(490, 30)
             };
-            contentPanel.Controls.Add(txtEmail);
+            contentPanel.Controls.Add(txtOwner);
 
             yPos += 50;
 
@@ -103,7 +103,7 @@ namespace AirDirector.Forms
                 Font = new Font("Segoe UI", 11),
                 Location = new Point(20, yPos),
                 Size = new Size(490, 30),
-                MaxLength = 24,
+                MaxLength = 18,
                 CharacterCasing = CharacterCasing.Upper
             };
             contentPanel.Controls.Add(txtSerial);
@@ -111,7 +111,7 @@ namespace AirDirector.Forms
             // Placeholder per formato
             Label lblFormat = new Label
             {
-                Text = "Formato: AD-XXXX-XXXX-XXXX-XXXX",
+                Text = "Formato: ADR-XXXX-XXXX-XXXX",
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = AppTheme.TextSecondary,
                 Location = new Point(20, yPos + 35),
@@ -135,7 +135,7 @@ namespace AirDirector.Forms
                 Cursor = Cursors.Hand
             };
             btnActivate.FlatAppearance.BorderSize = 0;
-            btnActivate.Click += (s, e) => BtnActivate_Click(txtEmail.Text, txtSerial.Text);
+            btnActivate.Click += (s, e) => BtnActivate_Click(txtOwner.Text, txtSerial.Text);
             contentPanel.Controls.Add(btnActivate);
 
             yPos += 60;
@@ -164,7 +164,7 @@ namespace AirDirector.Forms
             {
                 Text = LanguageManager.GetString("License_DemoLimits", "Limiti Modalità Demo:") + "\n" +
                        LanguageManager.GetString("License_DemoMusic", "• Massimo 50 brani musicali") + "\n" +
-                       LanguageManager.GetString("License_DemoClips", "• Massimo 15 clips") + "\n" +
+                       LanguageManager.GetString("License_DemoClips", "• Massimo 25 clips") + "\n" +
                        LanguageManager.GetString("License_DemoEncoders", "• Massimo 1 encoder streaming"),
                 Font = new Font("Segoe UI", 9, FontStyle.Italic),
                 ForeColor = AppTheme.TextSecondary,
@@ -175,16 +175,8 @@ namespace AirDirector.Forms
             contentPanel.Controls.Add(lblDemoInfo);
         }
 
-        private void BtnActivate_Click(string email, string serial)
+        private void BtnActivate_Click(string ownerName, string serial)
         {
-            // Validazione
-            if (string.IsNullOrWhiteSpace(email))
-            {
-                MessageBox.Show("Inserisci un indirizzo email valido", "Errore",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
             if (string.IsNullOrWhiteSpace(serial))
             {
                 MessageBox.Show("Inserisci il codice seriale", "Errore",
@@ -192,8 +184,8 @@ namespace AirDirector.Forms
                 return;
             }
 
-            // Attivazione
-            bool success = LicenseManager.ActivateLicense(email, serial, out string errorMessage);
+            // Attivazione tramite API
+            bool success = LicenseManager.ActivateLicense(serial, ownerName, out string errorMessage);
 
             if (success)
             {

@@ -425,6 +425,24 @@ namespace AirDirector.Controls
                 };
                 headerPanel.Controls.Add(lblDemoTag);
             }
+            else
+            {
+                var lic = LicenseManager.GetCurrentLicense();
+                string ownerDisplay = !string.IsNullOrEmpty(lic.OwnerName) ? lic.OwnerName : lic.SerialKey;
+                lblDemoTag = new Label
+                {
+                    Text = "✅ " + ownerDisplay,
+                    Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                    ForeColor = Color.White,
+                    BackColor = Color.FromArgb(0, 140, 70),
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    AutoSize = false,
+                    Size = new Size(220, 40),
+                    Location = new Point(headerPanel.Width - 240, 30),
+                    Anchor = AnchorStyles.Top | AnchorStyles.Right
+                };
+                headerPanel.Controls.Add(lblDemoTag);
+            }
 
             CreatePanels();
             this.Resize += OverviewControl_Resize;

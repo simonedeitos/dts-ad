@@ -1,6 +1,10 @@
 ﻿using System;
 using System.IO;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using AirDirector.Models;
 
 namespace AirDirector.Services.Licensing
@@ -10,14 +14,32 @@ namespace AirDirector.Services.Licensing
     /// </summary>
     public static class LicenseManager
     {
+        // ── Percorso file licenza ──────────────────────────────────────────────
         private static readonly string AppDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
             "AirDirector"
         );
 
-        private static readonly string LicenseFilePath = Path.Combine(AppDataPath, "license.lic");
+        private static readonly string LicenseFilePath = Path.Combine(AppDataPath, "AirDirector.lic");
 
-        private static LicenseInfo _cachedLicense = null;
+        // ── API ───────────────────────────────────────────────────────────────
+        private const string API_BASE = "https://store.airdirector.app/api/";
+        private const string API_KEY  = "YOUR_API_KEY_HERE"; // ← sostituire con la chiave reale
+
+        private static readonly HttpClient _http = CreateHttpClient();
+
+        private static HttpClient CreateHttpClient()
+        {
+            var client = new HttpClient();
+            client.DefaultRequestHeaders.Add("X-API-Key", API_KEY);
+            client.Timeout = TimeSpan.FromSeconds(15);
+            return client;
+        }
+
+        // ── Cache ─────────────────────────────────────────────────────────────
+        private static LicenseInfo? _cachedLicense = null;
+
+        // ── Lettura licenza ───────────────────────────────────────────────────
 
         /// <summary>
         /// Ottiene la licenza corrente (da cache o da file)
@@ -27,16 +49,16 @@ namespace AirDirector.Services.Licensing
             if (_cachedLicense != null)
                 return _cachedLicense;
 
-            // Carica da file
             if (File.Exists(LicenseFilePath))
             {
                 try
                 {
                     string json = File.ReadAllText(LicenseFilePath);
-                    _cachedLicense = JsonConvert.DeserializeObject<LicenseInfo>(json);
+                    var loaded = JsonConvert.DeserializeObject<LicenseInfo>(json);
 
-                    if (_cachedLicense != null && _cachedLicense.IsValid())
+                    if (loaded != null && loaded.IsValid())
                     {
+                        _cachedLicense = loaded;
                         return _cachedLicense;
                     }
                 }
@@ -46,105 +68,133 @@ namespace AirDirector.Services.Licensing
                 }
             }
 
-            // Nessuna licenza valida → Modalità demo
+            // Nessuna licenza valida → modalità demo
             _cachedLicense = LicenseInfo.CreateDemoLicense();
             return _cachedLicense;
         }
 
-        /// <summary>
-        /// Verifica se è in modalità demo
-        /// </summary>
+        /// <summary>Verifica se è in modalità demo</summary>
         public static bool IsDemoMode()
         {
-            var license = GetCurrentLicense();
-            return license.IsDemoMode;
+            return GetCurrentLicense().IsDemoMode;
         }
 
-        /// <summary>
-        /// Verifica se la licenza è attivata e valida
-        /// </summary>
+        /// <summary>Verifica se la licenza è attivata e valida</summary>
         public static bool IsLicenseValid()
         {
             var license = GetCurrentLicense();
             return license.IsActivated && !license.IsDemoMode;
         }
 
+        // ── Attivazione ───────────────────────────────────────────────────────
+
         /// <summary>
-        /// Attiva la licenza con email e seriale
+        /// Verifica e attiva la licenza tramite le API del server.
+        /// Restituisce true se l'attivazione è riuscita.
         /// </summary>
-        public static bool ActivateLicense(string email, string serialKey, out string errorMessage)
+        public static bool ActivateLicense(string serialKey, string ownerName, out string errorMessage)
         {
             errorMessage = string.Empty;
 
-            // Validazione input
-            if (string.IsNullOrWhiteSpace(email))
-            {
-                errorMessage = "Email non valida";
-                return false;
-            }
-
             if (string.IsNullOrWhiteSpace(serialKey))
             {
-                errorMessage = "Seriale non valido";
+                errorMessage = "Inserisci il codice seriale";
                 return false;
             }
 
-            // Normalizza seriale
             serialKey = serialKey.ToUpper().Trim();
 
-            // Verifica formato seriale
             if (!IsValidSerialFormat(serialKey))
             {
-                errorMessage = "Formato seriale non valido.\nFormato corretto: AD-XXXX-XXXX-XXXX-XXXX";
+                errorMessage = "Formato seriale non valido.\nFormato corretto: ADR-XXXX-XXXX-XXXX";
                 return false;
             }
 
-            // TODO: Interroga API per validare email + seriale su database remoto
-            // Per ora simuliamo validazione locale
-            bool isValidOnServer = ValidateSerialOnServer(email, serialKey, out string serverError);
+            string hwId = HardwareIdentifier.GetMachineID();
 
-            if (!isValidOnServer)
+            try
             {
-                errorMessage = serverError;
+                // 1. Verifica licenza sul server
+                var checkResult = Task.Run(() => CheckLicenseOnServerAsync(serialKey))
+                                      .GetAwaiter().GetResult();
+
+                if (!checkResult.exists)
+                {
+                    errorMessage = "Seriale non valido";
+                    return false;
+                }
+
+                if (!checkResult.orderConfirmed)
+                {
+                    errorMessage = "Ordine in attesa di conferma";
+                    return false;
+                }
+
+                if (checkResult.expired)
+                {
+                    errorMessage = "Licenza scaduta";
+                    return false;
+                }
+
+                if (checkResult.isActive && checkResult.hardwareId != hwId)
+                {
+                    errorMessage = "Licenza già attiva su un altro dispositivo.\nDisattivala prima dal tuo account.";
+                    return false;
+                }
+
+                // 2. Se non è ancora attiva su questo PC → attiva
+                if (!checkResult.isActive)
+                {
+                    var activateResult = Task.Run(() => ActivateLicenseOnServerAsync(serialKey, hwId))
+                                             .GetAwaiter().GetResult();
+                    if (!activateResult)
+                    {
+                        errorMessage = "Errore durante l'attivazione sul server";
+                        return false;
+                    }
+                }
+
+                // 3. Crea e salva la licenza locale
+                var license = new LicenseInfo
+                {
+                    SerialKey   = serialKey,
+                    OwnerName   = string.IsNullOrWhiteSpace(ownerName) ? serialKey : ownerName.Trim(),
+                    ActivatedOn = DateTime.Now,
+                    MachineID   = hwId,
+                    ProductName = "AirDirector",
+                    Version     = "1.0.0",
+                    IsActivated = true,
+                    IsDemoMode  = false
+                };
+
+                if (!SaveLicenseToFile(license, out string saveError))
+                {
+                    errorMessage = saveError;
+                    return false;
+                }
+
+                _cachedLicense = license;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Errore di connessione al server di licenze:\n{ex.Message}";
                 return false;
             }
-
-            // Crea oggetto licenza
-            var license = new LicenseInfo
-            {
-                Email = email,
-                SerialKey = serialKey,
-                ActivatedOn = DateTime.Now,
-                MachineID = HardwareIdentifier.GetMachineID(),
-                ProductName = "AirDirector",
-                Version = "1.0.0",
-                IsActivated = true,
-                IsDemoMode = false
-            };
-
-            // Salva licenza su file
-            if (!SaveLicenseToFile(license, out string saveError))
-            {
-                errorMessage = saveError;
-                return false;
-            }
-
-            // Aggiorna cache
-            _cachedLicense = license;
-
-            return true;
         }
 
+        // ── Disattivazione ────────────────────────────────────────────────────
+
         /// <summary>
-        /// Rimuove la licenza (per trasferimento su altro PC)
+        /// Rimuove la licenza locale e la disattiva sul server.
         /// </summary>
         public static bool RemoveLicense(out string errorMessage)
         {
             errorMessage = string.Empty;
 
-            var currentLicense = GetCurrentLicense();
+            var current = GetCurrentLicense();
 
-            if (currentLicense.IsDemoMode)
+            if (current.IsDemoMode)
             {
                 errorMessage = "Nessuna licenza attiva da rimuovere";
                 return false;
@@ -152,24 +202,19 @@ namespace AirDirector.Services.Licensing
 
             try
             {
-                // TODO: Chiamata API per sbloccare seriale su database remoto
-                bool unblockedOnServer = UnblockSerialOnServer(currentLicense.Email, currentLicense.SerialKey);
+                bool serverOk = Task.Run(() => DeactivateLicenseOnServerAsync(current.SerialKey))
+                                    .GetAwaiter().GetResult();
 
-                if (!unblockedOnServer)
+                if (!serverOk)
                 {
-                    errorMessage = "Errore durante lo sblocco del seriale sul server";
+                    errorMessage = "Errore durante la disattivazione sul server";
                     return false;
                 }
 
-                // Elimina file licenza locale
                 if (File.Exists(LicenseFilePath))
-                {
                     File.Delete(LicenseFilePath);
-                }
 
-                // Reset cache a demo
                 _cachedLicense = LicenseInfo.CreateDemoLicense();
-
                 return true;
             }
             catch (Exception ex)
@@ -179,31 +224,112 @@ namespace AirDirector.Services.Licensing
             }
         }
 
+        // ── Check periodico ───────────────────────────────────────────────────
+
         /// <summary>
-        /// Verifica formato seriale AD-XXXX-XXXX-XXXX-XXXX
+        /// Verifica periodica della licenza sul server (da chiamare all'avvio o ogni 24 ore).
+        /// Se la licenza risulta disattivata torna in modalità demo.
+        /// </summary>
+        public static bool PeriodicCheck(out string statusMessage)
+        {
+            statusMessage = string.Empty;
+
+            var current = GetCurrentLicense();
+            if (current.IsDemoMode)
+                return true; // niente da verificare in demo
+
+            try
+            {
+                var result = Task.Run(() => CheckLicenseOnServerAsync(current.SerialKey))
+                                  .GetAwaiter().GetResult();
+
+                if (!result.exists || !result.isActive)
+                {
+                    // Licenza non più valida → torna in demo
+                    if (File.Exists(LicenseFilePath))
+                        File.Delete(LicenseFilePath);
+                    _cachedLicense = LicenseInfo.CreateDemoLicense();
+                    statusMessage = "Licenza disattivata. Il software tornerà in modalità demo.";
+                    return false;
+                }
+
+                return true;
+            }
+            catch
+            {
+                // Nessuna connessione → continua a funzionare localmente
+                return true;
+            }
+        }
+
+        // ── Chiamate API ──────────────────────────────────────────────────────
+
+        private static async Task<(bool exists, bool orderConfirmed, bool expired, bool isActive, string hardwareId)>
+            CheckLicenseOnServerAsync(string serial)
+        {
+            var response = await _http.GetAsync($"{API_BASE}license_check.php?serial={Uri.EscapeDataString(serial)}");
+            string json = await response.Content.ReadAsStringAsync();
+            var obj = JObject.Parse(json);
+
+            bool exists        = obj["exists"]?.Value<bool>() ?? false;
+            bool orderOk       = obj["order_confirmed"]?.Value<bool>() ?? false;
+            bool expired       = obj["expired"]?.Value<bool>() ?? false;
+            bool isActive      = (obj["is_active"]?.Value<int>() ?? 0) == 1;
+            string hwId        = obj["hardware_id"]?.Value<string>() ?? string.Empty;
+
+            return (exists, orderOk, expired, isActive, hwId);
+        }
+
+        private static async Task<bool> ActivateLicenseOnServerAsync(string serial, string hardwareId)
+        {
+            var body = JsonConvert.SerializeObject(new { serial, hardware_id = hardwareId });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            var response = await _http.PostAsync($"{API_BASE}license_activate.php", content);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+                return false; // già attiva su altro PC
+
+            string json = await response.Content.ReadAsStringAsync();
+            var obj = JObject.Parse(json);
+            bool success        = obj["success"]?.Value<bool>() ?? false;
+            bool alreadyActive  = obj["already_active"]?.Value<bool>() ?? false;
+
+            return success || alreadyActive;
+        }
+
+        private static async Task<bool> DeactivateLicenseOnServerAsync(string serial)
+        {
+            var body = JsonConvert.SerializeObject(new { serial });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            var response = await _http.PostAsync($"{API_BASE}license_deactivate.php", content);
+
+            string json = await response.Content.ReadAsStringAsync();
+            var obj = JObject.Parse(json);
+            return obj["success"]?.Value<bool>() ?? false;
+        }
+
+        // ── Utilità ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Verifica formato seriale ADR-XXXX-XXXX-XXXX
         /// </summary>
         private static bool IsValidSerialFormat(string serial)
         {
             if (string.IsNullOrEmpty(serial))
                 return false;
 
-            if (serial.Length != 24)
-                return false;
-
-            if (!serial.StartsWith("AD-"))
+            if (!serial.StartsWith("ADR-"))
                 return false;
 
             string[] parts = serial.Split('-');
-            if (parts.Length != 5)
+            if (parts.Length != 4)
                 return false;
 
-            if (parts[0] != "AD") return false;
+            if (parts[0] != "ADR") return false;
             if (parts[1].Length != 4) return false;
             if (parts[2].Length != 4) return false;
             if (parts[3].Length != 4) return false;
-            if (parts[4].Length != 4) return false;
 
-            // Verifica che le parti siano alfanumeriche
             for (int i = 1; i < parts.Length; i++)
             {
                 foreach (char c in parts[i])
@@ -216,96 +342,17 @@ namespace AirDirector.Services.Licensing
             return true;
         }
 
-        /// <summary>
-        /// Valida seriale su server (PLACEHOLDER per futura API)
-        /// </summary>
-        private static bool ValidateSerialOnServer(string email, string serialKey, out string errorMessage)
-        {
-            errorMessage = string.Empty;
-
-            // TODO: Implementare chiamata API al database seriali
-            // Esempio:
-            /*
-            var client = new HttpClient();
-            var request = new
-            {
-                ProductName = "AirDirector",
-                Email = email,
-                SerialKey = serialKey,
-                MachineID = HardwareIdentifier.GetMachineID()
-            };
-            
-            var response = await client.PostAsync(
-                "https://api.airdirector.com/license/activate",
-                new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json")
-            );
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                errorMessage = "Seriale non valido o già utilizzato";
-                return false;
-            }
-            
-            return true;
-            */
-
-            // SIMULAZIONE: Accetta qualsiasi seriale con formato corretto
-            // In produzione, questa funzione interrogherà il database reale
-
-            Console.WriteLine($"[DEMO MODE] Validazione seriale: {email} - {serialKey}");
-            Console.WriteLine($"[DEMO MODE] Machine ID: {HardwareIdentifier.GetMachineID()}");
-
-            return true; // Accetta sempre in modalità sviluppo
-        }
-
-        /// <summary>
-        /// Sblocca seriale su server (PLACEHOLDER per futura API)
-        /// </summary>
-        private static bool UnblockSerialOnServer(string email, string serialKey)
-        {
-            // TODO: Implementare chiamata API per sbloccare seriale
-            /*
-            var client = new HttpClient();
-            var request = new
-            {
-                Email = email,
-                SerialKey = serialKey,
-                MachineID = HardwareIdentifier.GetMachineID()
-            };
-            
-            var response = await client.PostAsync(
-                "https://api.airdirector.com/license/deactivate",
-                new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json")
-            );
-            
-            return response.IsSuccessStatusCode;
-            */
-
-            Console.WriteLine($"[DEMO MODE] Sblocco seriale: {email} - {serialKey}");
-            return true; // Sempre OK in modalità sviluppo
-        }
-
-        /// <summary>
-        /// Salva licenza su file JSON
-        /// </summary>
         private static bool SaveLicenseToFile(LicenseInfo license, out string errorMessage)
         {
             errorMessage = string.Empty;
 
             try
             {
-                // Crea directory se non esiste
                 if (!Directory.Exists(AppDataPath))
-                {
                     Directory.CreateDirectory(AppDataPath);
-                }
 
-                // Serializza in JSON con formattazione
                 string json = JsonConvert.SerializeObject(license, Formatting.Indented);
-
-                // Salva su file
                 File.WriteAllText(LicenseFilePath, json);
-
                 return true;
             }
             catch (Exception ex)
@@ -315,17 +362,10 @@ namespace AirDirector.Services.Licensing
             }
         }
 
-        /// <summary>
-        /// Ottiene il percorso del file licenza
-        /// </summary>
-        public static string GetLicenseFilePath()
-        {
-            return LicenseFilePath;
-        }
+        /// <summary>Percorso file licenza</summary>
+        public static string GetLicenseFilePath() => LicenseFilePath;
 
-        /// <summary>
-        /// Forza il reload della licenza da file
-        /// </summary>
+        /// <summary>Forza il reload della licenza da file</summary>
         public static void ReloadLicense()
         {
             _cachedLicense = null;
