@@ -255,9 +255,10 @@ namespace AirDirector.Services.Licensing
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
                 // Nessuna connessione → continua a funzionare localmente
+                Console.WriteLine($"[LicenseManager] PeriodicCheck: connessione assente — {ex.Message}");
                 return true;
             }
         }
@@ -269,13 +270,17 @@ namespace AirDirector.Services.Licensing
         {
             var response = await _http.GetAsync($"{API_BASE}license_check.php?serial={Uri.EscapeDataString(serial)}");
             string json = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+                throw new Exception($"Errore server ({(int)response.StatusCode}): {json}");
+
             var obj = JObject.Parse(json);
 
-            bool exists        = obj["exists"]?.Value<bool>() ?? false;
-            bool orderOk       = obj["order_confirmed"]?.Value<bool>() ?? false;
-            bool expired       = obj["expired"]?.Value<bool>() ?? false;
-            bool isActive      = (obj["is_active"]?.Value<int>() ?? 0) == 1;
-            string hwId        = obj["hardware_id"]?.Value<string>() ?? string.Empty;
+            bool exists   = obj["exists"]?.Value<bool>() ?? false;
+            bool orderOk  = obj["order_confirmed"]?.Value<bool>() ?? false;
+            bool expired  = obj["expired"]?.Value<bool>() ?? false;
+            bool isActive = (obj["is_active"]?.Value<int>() ?? 0) == 1;
+            string hwId   = obj["hardware_id"]?.Value<string>() ?? string.Empty;
 
             return (exists, orderOk, expired, isActive, hwId);
         }
@@ -290,9 +295,13 @@ namespace AirDirector.Services.Licensing
                 return false; // già attiva su altro PC
 
             string json = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+                throw new Exception($"Errore attivazione ({(int)response.StatusCode}): {json}");
+
             var obj = JObject.Parse(json);
-            bool success        = obj["success"]?.Value<bool>() ?? false;
-            bool alreadyActive  = obj["already_active"]?.Value<bool>() ?? false;
+            bool success       = obj["success"]?.Value<bool>() ?? false;
+            bool alreadyActive = obj["already_active"]?.Value<bool>() ?? false;
 
             return success || alreadyActive;
         }
@@ -304,6 +313,10 @@ namespace AirDirector.Services.Licensing
             var response = await _http.PostAsync($"{API_BASE}license_deactivate.php", content);
 
             string json = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+                throw new Exception($"Errore disattivazione ({(int)response.StatusCode}): {json}");
+
             var obj = JObject.Parse(json);
             return obj["success"]?.Value<bool>() ?? false;
         }
