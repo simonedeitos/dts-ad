@@ -7,14 +7,14 @@
     {
         // Limiti archivio
         public const int MAX_MUSIC_TRACKS = 50;
-        public const int MAX_CLIPS = 25;
+        public const int MAX_CLIPS = 15;
 
         // Limiti streaming
         public const int MAX_ENCODERS = 1;
 
         // Messaggi
         public const string MSG_MUSIC_LIMIT = "Hai raggiunto il limite di 50 brani musicali in modalità demo.\n\nAttiva una licenza per rimuovere questo limite.";
-        public const string MSG_CLIPS_LIMIT = "Hai raggiunto il limite di 25 clips in modalità demo.\n\nAttiva una licenza per rimuovere questo limite.";
+        public const string MSG_CLIPS_LIMIT = "Hai raggiunto il limite di 15 clips in modalità demo.\n\nAttiva una licenza per rimuovere questo limite.";
         public const string MSG_ENCODER_LIMIT = "Hai raggiunto il limite di 1 encoder in modalità demo.\n\nAttiva una licenza per creare encoder multipli.";
 
         /// <summary>

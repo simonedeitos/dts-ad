@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Win32;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using AirDirector.Models;
@@ -24,14 +25,49 @@ namespace AirDirector.Services.Licensing
 
         // ── API ───────────────────────────────────────────────────────────────
         private const string API_BASE = "https://store.airdirector.app/api/";
-        private const string API_KEY  = "YOUR_API_KEY_HERE"; // ← sostituire con la chiave reale
+
+        private static readonly string API_KEY = LoadApiKey();
 
         private static readonly HttpClient _http = CreateHttpClient();
+
+        private const string REGISTRY_KEY = @"SOFTWARE\AirDirector";
+        private const string REGISTRY_VALUE_NAME = "ApiKey";
+
+        /// <summary>
+        /// Carica la API key dal Registry di Windows (HKCU\SOFTWARE\AirDirector\ApiKey).
+        /// Se il valore non esiste, lo crea vuoto e restituisce stringa vuota.
+        /// </summary>
+        private static string LoadApiKey()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(REGISTRY_KEY))
+                {
+                    object? val = key.GetValue(REGISTRY_VALUE_NAME);
+                    if (val != null)
+                    {
+                        string apiKey = val.ToString() ?? string.Empty;
+                        if (!string.IsNullOrWhiteSpace(apiKey))
+                            return apiKey;
+                    }
+
+                    // Valore non trovato → crea il campo vuoto nel registro
+                    key.SetValue(REGISTRY_VALUE_NAME, string.Empty, RegistryValueKind.String);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Errore lettura ApiKey dal Registry: {ex.Message}");
+            }
+
+            return string.Empty;
+        }
 
         private static HttpClient CreateHttpClient()
         {
             var client = new HttpClient();
-            client.DefaultRequestHeaders.Add("X-API-Key", API_KEY);
+            if (!string.IsNullOrEmpty(API_KEY))
+                client.DefaultRequestHeaders.Add("X-API-Key", API_KEY);
             client.Timeout = TimeSpan.FromSeconds(15);
             return client;
         }

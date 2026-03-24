@@ -1461,7 +1461,7 @@ namespace AirDirector.Controls
             if (LicenseManager.IsDemoMode())
             {
                 int currentCount = _archiveType == "Music" ? _allMusicData.Count : _allClipsData.Count;
-                int maxAllowed = _archiveType == "Music" ? 50 : 25;
+                int maxAllowed = _archiveType == "Music" ? DemoLimits.MAX_MUSIC_TRACKS : DemoLimits.MAX_CLIPS;
 
                 if (currentCount >= maxAllowed)
                 {
@@ -1555,7 +1555,7 @@ namespace AirDirector.Controls
             if (LicenseManager.IsDemoMode())
             {
                 int currentCount = _archiveType == "Music" ? _allMusicData.Count : _allClipsData.Count;
-                int maxAllowed = _archiveType == "Music" ? 50 : 25;
+                int maxAllowed = _archiveType == "Music" ? DemoLimits.MAX_MUSIC_TRACKS : DemoLimits.MAX_CLIPS;
                 int remainingSlots = maxAllowed - currentCount;
 
                 if (remainingSlots <= 0)
@@ -1599,7 +1599,7 @@ namespace AirDirector.Controls
                     if (LicenseManager.IsDemoMode())
                     {
                         int currentCount = _archiveType == "Music" ? _allMusicData.Count : _allClipsData.Count;
-                        int maxAllowed = _archiveType == "Music" ? 50 : 25;
+                        int maxAllowed = _archiveType == "Music" ? DemoLimits.MAX_MUSIC_TRACKS : DemoLimits.MAX_CLIPS;
 
                         if (currentCount + imported >= maxAllowed)
                         {
@@ -1652,7 +1652,7 @@ namespace AirDirector.Controls
                 if (LicenseManager.IsDemoMode())
                 {
                     int currentCount = _archiveType == "Music" ? _allMusicData.Count : _allClipsData.Count;
-                    int maxAllowed = _archiveType == "Music" ? 50 : 25;
+                    int maxAllowed = _archiveType == "Music" ? DemoLimits.MAX_MUSIC_TRACKS : DemoLimits.MAX_CLIPS;
                     message += $"\n\n📊 Totale:  {currentCount}/{maxAllowed}";
                 }
 
@@ -2142,10 +2142,10 @@ namespace AirDirector.Controls
                 {
                     _allClipsData = DbcManager.LoadFromCsv<ClipEntry>("Clips.dbc");
 
-                    if (LicenseManager.IsDemoMode() && _allClipsData.Count > 25)
+                    if (LicenseManager.IsDemoMode() && _allClipsData.Count > DemoLimits.MAX_CLIPS)
                     {
-                        StatusChanged?.Invoke(this, string.Format(LanguageManager.GetString("Archive.DemoShowingClips", "⚠️ DEMO: Mostrando solo 25/{0} clips (attiva licenza per vedere tutti)"), _allClipsData.Count));
-                        _allClipsData = _allClipsData.Take(25).ToList();
+                        StatusChanged?.Invoke(this, string.Format(LanguageManager.GetString("Archive.DemoShowingClips", "⚠️ DEMO: Mostrando solo {0}/{1} clips (attiva licenza per vedere tutti)"), DemoLimits.MAX_CLIPS, _allClipsData.Count));
+                        _allClipsData = _allClipsData.Take(DemoLimits.MAX_CLIPS).ToList();
                     }
 
                     LoadGenresAndCategoriesClips(_allClipsData);

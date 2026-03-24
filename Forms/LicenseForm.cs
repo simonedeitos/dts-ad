@@ -164,7 +164,7 @@ namespace AirDirector.Forms
             {
                 Text = LanguageManager.GetString("License_DemoLimits", "Limiti Modalità Demo:") + "\n" +
                        LanguageManager.GetString("License_DemoMusic", "• Massimo 50 brani musicali") + "\n" +
-                       LanguageManager.GetString("License_DemoClips", "• Massimo 25 clips") + "\n" +
+                       LanguageManager.GetString("License_DemoClips", "• Massimo 15 clips") + "\n" +
                        LanguageManager.GetString("License_DemoEncoders", "• Massimo 1 encoder streaming"),
                 Font = new Font("Segoe UI", 9, FontStyle.Italic),
                 ForeColor = AppTheme.TextSecondary,
