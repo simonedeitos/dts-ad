@@ -24,14 +24,51 @@ namespace AirDirector.Services.Licensing
 
         // ── API ───────────────────────────────────────────────────────────────
         private const string API_BASE = "https://store.airdirector.app/api/";
-        private const string API_KEY  = "YOUR_API_KEY_HERE"; // ← sostituire con la chiave reale
+
+        private static readonly string API_KEY = LoadApiKey();
 
         private static readonly HttpClient _http = CreateHttpClient();
+
+        /// <summary>
+        /// Carica la API key dal file config.json in %ProgramData%\AirDirector
+        /// oppure dalla variabile d'ambiente AIRDIRECTOR_API_KEY.
+        /// </summary>
+        private static string LoadApiKey()
+        {
+            // 1. Variabile d'ambiente
+            string? envKey = Environment.GetEnvironmentVariable("AIRDIRECTOR_API_KEY");
+            if (!string.IsNullOrWhiteSpace(envKey))
+                return envKey;
+
+            // 2. File config.json nella cartella dati
+            string configPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "AirDirector", "config.json");
+
+            if (File.Exists(configPath))
+            {
+                try
+                {
+                    string json = File.ReadAllText(configPath);
+                    var obj = JObject.Parse(json);
+                    string? fileKey = obj["api_key"]?.Value<string>();
+                    if (!string.IsNullOrWhiteSpace(fileKey))
+                        return fileKey;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Errore lettura config.json: {ex.Message}");
+                }
+            }
+
+            return string.Empty;
+        }
 
         private static HttpClient CreateHttpClient()
         {
             var client = new HttpClient();
-            client.DefaultRequestHeaders.Add("X-API-Key", API_KEY);
+            if (!string.IsNullOrEmpty(API_KEY))
+                client.DefaultRequestHeaders.Add("X-API-Key", API_KEY);
             client.Timeout = TimeSpan.FromSeconds(15);
             return client;
         }
