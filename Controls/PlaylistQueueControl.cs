@@ -41,6 +41,7 @@ namespace AirDirector.Controls
 		private Dictionary<string, DateTime> _queueSnapshotAtCreation = new Dictionary<string, DateTime>();
 
 		private HashSet<string> _executedSchedules = new HashSet<string>();
+        private string _pendingScheduleVideoBufferPath = "";
 		private string _lastArtistFirstLetter = "";
 
 		// ✅ FIX CRITICO: Aggiungi tracking reload come OverviewControl
@@ -739,7 +740,9 @@ namespace AirDirector.Controls
                                 Console.WriteLine($"");
 
                                 _isInitialStartup = false;
+                                _pendingScheduleVideoBufferPath = schedule.VideoBufferPath ?? "";
                                 ExecuteSchedule(schedule);
+                                _pendingScheduleVideoBufferPath = "";
 
                                 _executedSchedules.Add(scheduleKey);
 
@@ -786,7 +789,13 @@ namespace AirDirector.Controls
                         {
                             Console.WriteLine($"[ExecuteSchedule] ? Clock: {schedule.ClockName}");
                             ClearNonPlayingItems();
+                            int clockStartIndex = _items.Count;
                             GeneratePlaylistFromClock(schedule.ClockName, 1000);
+                            if (!string.IsNullOrEmpty(_pendingScheduleVideoBufferPath))
+                            {
+                                for (int i = clockStartIndex; i < _items.Count; i++)
+                                    ApplyScheduleVideoBuffer(_items[i]);
+                            }
                         }
                         else
                         {
@@ -901,6 +910,7 @@ namespace AirDirector.Controls
 				};
 
 				int insertPosition = GetCorrectScheduleInsertPosition();
+				ApplyScheduleVideoBuffer(timeSignalItem);
 				InsertItem(insertPosition, timeSignalItem);
 
 				Console.WriteLine($"[TimeSignal] ✅ Inserito:  {scheduleName}");
@@ -939,6 +949,14 @@ namespace AirDirector.Controls
 			{
 				return DateTime.Now;
 			}
+		}
+
+		private void ApplyScheduleVideoBuffer(PlaylistQueueItem item)
+		{
+			if (item == null || string.IsNullOrEmpty(_pendingScheduleVideoBufferPath)) return;
+			if (!string.IsNullOrEmpty(item.VideoFilePath)) return; // Don't override existing video association
+			item.VideoFilePath = _pendingScheduleVideoBufferPath;
+			item.VideoSource = "BufferVideo";
 		}
 
 		private int GetCorrectScheduleInsertPosition()
@@ -997,6 +1015,7 @@ namespace AirDirector.Controls
 				};
 
 				int insertPosition = GetCorrectScheduleInsertPosition();
+				ApplyScheduleVideoBuffer(streamingItem);
 				InsertItem(insertPosition, streamingItem);
 
 				Console.WriteLine($"[URLStreaming] ✅ Inserito: {schedule.Name}");
@@ -1111,6 +1130,7 @@ namespace AirDirector.Controls
 				if (scheduledItem != null)
 				{
 					scheduledItem.IsScheduled = true;
+					ApplyScheduleVideoBuffer(scheduledItem);
 					int insertPosition = GetCorrectScheduleInsertPosition();
 					InsertItem(insertPosition, scheduledItem);
 					Console.WriteLine($"[InsertScheduledAudioFile] ✅ Inserito: {scheduleName}");
@@ -1166,6 +1186,7 @@ namespace AirDirector.Controls
 						if (queueItem != null)
 						{
 							queueItem.IsScheduled = true;
+							ApplyScheduleVideoBuffer(queueItem);
 							InsertItem(insertIndex, queueItem);
 							insertIndex++;
 						}
@@ -2196,7 +2217,10 @@ namespace AirDirector.Controls
 				MarkerINTRO = entry.MarkerINTRO,
 				MarkerMIX = entry.MarkerMIX,
 				MarkerOUT = entry.MarkerOUT,
-				IsScheduled = false
+				IsScheduled = false,
+				VideoFilePath = entry.VideoFilePath ?? "",
+				VideoSource = entry.VideoSource.ToString(),
+				NDISourceName = entry.NDISourceName ?? ""
 			};
 		}
 

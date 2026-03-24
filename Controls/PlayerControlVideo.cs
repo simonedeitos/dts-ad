@@ -812,12 +812,12 @@ namespace AirDirector.Controls
                 }
                 else if (videoFile != null)
                 {
-                    target.Type = DeckType.AudioTrack; _bufferShouldShow = false;
-                    var vm = new Media(_libVLC, videoFile, FromType.FromPath); vm.AddOption(":no-audio"); if (item.MarkerIN > 0) vm.AddOption($":start-time={startTimeSec:F3}"); vm.AddOption(":file-caching=500");
-                    target.VlcPlayer.Media = vm; vm.Dispose(); target.VlcPlayer.Play();
-                    try { target.FileReader = new AudioFileReader(fp); if (item.MarkerIN > 0) target.FileReader.CurrentTime = TimeSpan.FromMilliseconds(item.MarkerIN); var rs = new WdlResamplingSampleProvider(target.FileReader, AUDIO_SAMPLE_RATE); target.Resampler = target.FileReader.WaveFormat.Channels == 1 ? rs.ToStereo() : (ISampleProvider)rs; target.AudioStarted = true; } catch (Exception ex) { LogErr("[PLAY] NAudio", ex); }
-                    _currentFileIsVideo = true;
-                    Log("[PLAY] Video+NAudio → " + target.Name);
+                    target.Type = DeckType.AudioTrack; _bufferShouldShow = true; hasDedVid = false;
+                    try { target.FileReader = new AudioFileReader(fp); if (item.MarkerIN > 0) target.FileReader.CurrentTime = TimeSpan.FromMilliseconds(item.MarkerIN); var rs = new WdlResamplingSampleProvider(target.FileReader, AUDIO_SAMPLE_RATE); target.Resampler = target.FileReader.WaveFormat.Channels == 1 ? rs.ToStereo() : (ISampleProvider)rs; target.AudioStarted = true; }
+                    catch (Exception ex) { LogErr("[PLAY] NAudio", ex); }
+                    _currentFileIsVideo = false;
+                    PrepareBufferVideo(videoFile);
+                    Log("[PLAY] Audio+CustomBuffer → " + target.Name);
                 }
                 else
                 {

@@ -21,6 +21,10 @@ namespace AirDirector.Forms
         private TextBox txtStreamURL;
         private MaskedTextBox txtStreamDuration;
 
+        private TextBox txtVideoBufferPath;
+        private Button btnBrowseVideoBuffer;
+        private Label lblVideoBuffer;
+
         private CheckBox chkMonday;
         private CheckBox chkTuesday;
         private CheckBox chkWednesday;
@@ -64,6 +68,9 @@ namespace AirDirector.Forms
             txtStreamURL = new TextBox();
             lblStreamDuration = new Label();
             txtStreamDuration = new MaskedTextBox();
+            lblVideoBuffer = new Label();
+            txtVideoBufferPath = new TextBox();
+            btnBrowseVideoBuffer = new Button();
             grpDays = new GroupBox();
             chkMonday = new CheckBox();
             chkTuesday = new CheckBox();
@@ -258,6 +265,34 @@ namespace AirDirector.Forms
             txtStreamDuration.TabIndex = 12;
             txtStreamDuration.Text = "010000";
             // 
+            // lblVideoBuffer
+            // 
+            lblVideoBuffer.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            lblVideoBuffer.Location = new Point(20, 252);
+            lblVideoBuffer.Name = "lblVideoBuffer";
+            lblVideoBuffer.Size = new Size(150, 20);
+            lblVideoBuffer.TabIndex = 20;
+            lblVideoBuffer.Text = "🎬 Video Buffer (opt.):";
+            // 
+            // txtVideoBufferPath
+            // 
+            txtVideoBufferPath.Font = new Font("Segoe UI", 9F);
+            txtVideoBufferPath.Location = new Point(180, 250);
+            txtVideoBufferPath.Name = "txtVideoBufferPath";
+            txtVideoBufferPath.Size = new Size(415, 23);
+            txtVideoBufferPath.TabIndex = 21;
+            // 
+            // btnBrowseVideoBuffer
+            // 
+            btnBrowseVideoBuffer.Cursor = Cursors.Hand;
+            btnBrowseVideoBuffer.FlatStyle = FlatStyle.Flat;
+            btnBrowseVideoBuffer.Location = new Point(605, 249);
+            btnBrowseVideoBuffer.Name = "btnBrowseVideoBuffer";
+            btnBrowseVideoBuffer.Size = new Size(45, 27);
+            btnBrowseVideoBuffer.TabIndex = 22;
+            btnBrowseVideoBuffer.Text = "📁";
+            btnBrowseVideoBuffer.Click += BtnBrowseVideoBuffer_Click;
+            // 
             // grpDays
             // 
             grpDays.Controls.Add(chkMonday);
@@ -269,7 +304,7 @@ namespace AirDirector.Forms
             grpDays.Controls.Add(chkSunday);
             grpDays.Controls.Add(btnAllDays);
             grpDays.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            grpDays.Location = new Point(20, 250);
+            grpDays.Location = new Point(20, 285);
             grpDays.Name = "grpDays";
             grpDays.Size = new Size(650, 60);
             grpDays.TabIndex = 3;
@@ -373,7 +408,7 @@ namespace AirDirector.Forms
             grpTimes.Controls.Add(btnRemoveTime);
             grpTimes.Controls.Add(lstTimes);
             grpTimes.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            grpTimes.Location = new Point(20, 320);
+            grpTimes.Location = new Point(20, 355);
             grpTimes.Name = "grpTimes";
             grpTimes.Size = new Size(650, 250);
             grpTimes.TabIndex = 4;
@@ -447,7 +482,7 @@ namespace AirDirector.Forms
             btnSave.FlatStyle = FlatStyle.Flat;
             btnSave.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnSave.ForeColor = Color.White;
-            btnSave.Location = new Point(480, 590);
+            btnSave.Location = new Point(480, 625);
             btnSave.Name = "btnSave";
             btnSave.Size = new Size(90, 35);
             btnSave.TabIndex = 5;
@@ -464,7 +499,7 @@ namespace AirDirector.Forms
             btnCancel.FlatStyle = FlatStyle.Flat;
             btnCancel.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnCancel.ForeColor = Color.White;
-            btnCancel.Location = new Point(580, 590);
+            btnCancel.Location = new Point(580, 625);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(90, 35);
             btnCancel.TabIndex = 6;
@@ -477,11 +512,14 @@ namespace AirDirector.Forms
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(245, 245, 245);
             CancelButton = btnCancel;
-            ClientSize = new Size(700, 650);
+            ClientSize = new Size(700, 685);
             Controls.Add(btnCancel);
             Controls.Add(btnSave);
             Controls.Add(grpTimes);
             Controls.Add(grpDays);
+            Controls.Add(btnBrowseVideoBuffer);
+            Controls.Add(txtVideoBufferPath);
+            Controls.Add(lblVideoBuffer);
             Controls.Add(grpAction);
             Controls.Add(txtName);
             Controls.Add(lblName);
