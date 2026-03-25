@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
@@ -134,6 +134,7 @@ namespace AirDirector.Controls
         private List<string> _bufferPlaylist = new List<string>();
         private readonly Random _bufferRandom = new Random();
         private volatile bool _bufferShouldShow;
+        private volatile bool _bufferIsDedicatedVideo;
         private volatile float[] _waveformPeaks; private volatile string _waveformCurrentFile = "";
         private readonly ConcurrentDictionary<string, float[]> _waveformCache = new ConcurrentDictionary<string, float[]>();
         private const int WAVEFORM_BARS = 300;
@@ -218,7 +219,6 @@ namespace AirDirector.Controls
             try
             {
                 _ndiSourceName = ConfigurationControl.GetNDISourceName();
-                // Leggi BufferVideoPath direttamente dal registro
                 try
                 {
                     using (var k = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\AirDirector"))
@@ -232,7 +232,6 @@ namespace AirDirector.Controls
                     }
                 }
                 catch { }
-                // Fallback: prova anche il metodo del ConfigurationControl
                 if (string.IsNullOrEmpty(_bufferVideoPath))
                 {
                     try { _bufferVideoPath = ConfigurationControl.GetBufferVideoPath() ?? ""; } catch { }
@@ -244,11 +243,6 @@ namespace AirDirector.Controls
         private void CalculatePipLayout() { _pipW = (int)(_ndiWidth * PROGRAM_PIP_SCALE); _pipH = (int)(_ndiHeight * PROGRAM_PIP_SCALE); _pipX = _ndiWidth - _pipW; _pipY = 0; if (_pipX + _pipW > _ndiWidth) _pipW = _ndiWidth - _pipX; if (_pipY + _pipH > _ndiHeight) _pipH = _ndiHeight - _pipY; }
         private void BuildPipLookup() { _pipSrcXLut = new int[_pipW]; for (int x = 0; x < _pipW; x++) _pipSrcXLut[x] = x * _ndiWidth / _pipW; }
 
-        /// <summary>
-        /// Controlla il registro per decidere se il Lanner interno è abilitato.
-        /// AdvLannerPlayout = "YesInternal" → abilita
-        /// AdvLannerPlayout = "NoExternal" o altro → disabilita
-        /// </summary>
         private void CheckLannerEnabled()
         {
             try
@@ -301,7 +295,7 @@ namespace AirDirector.Controls
                 int sid = deck.SessionId; deck.IsReadyForVideo = false;
                 ThreadPool.QueueUserWorkItem(_ =>
                 {
-                    if (isBuffer) _commandQueue.Enqueue(() => { if (_bufferShouldShow) PlayNextBufferVideo(); });
+                    if (isBuffer) _commandQueue.Enqueue(() => HandleBufferEnded());
                     else _commandQueue.Enqueue(() => HandleDeckEnded(deck, sid));
                 });
             };
@@ -322,6 +316,23 @@ namespace AirDirector.Controls
                     }, null, null, null, null);
             }
             return deck;
+        }
+
+        private void HandleBufferEnded()
+        {
+            if (!_bufferShouldShow) return;
+            if (_bufferIsDedicatedVideo)
+            {
+                Log("[BUFFER] Dedicated video ended → switching to generic buffer");
+                _bufferIsDedicatedVideo = false;
+                _bufferDeck.IsReadyForVideo = false;
+                _bufferDeck.FrameCount = 0;
+                PlayNextBufferVideo();
+            }
+            else
+            {
+                PlayNextBufferVideo();
+            }
         }
 
         private void ClearVideoBuffer(IntPtr buf) { unsafe { long* p = (long*)buf; int n = (_ndiWidth * _ndiHeight * 4) / 8; long blk = unchecked((long)0xFF000000FF000000); for (int i = 0; i < n; i++) p[i] = blk; } }
@@ -345,22 +356,6 @@ namespace AirDirector.Controls
 
         // ═══════════════════════════════════════════════════════════
         // ENGINE LOOP
-        //
-        // Il video program viene composto così:
-        //
-        // 1. Determina programSrc: deck attivo o buffer deck
-        //
-        // 2. Senza Lanner (o Lanner disabilitato):
-        //    - memcopy programSrc → composited (fullscreen)
-        //    - CG fullscreen con alpha → composited
-        //
-        // 3. Con Lanner attivo:
-        //    - Sfondo Lanner fullscreen (solo quando cambia immagine)
-        //    - Downscale programSrc → zona PIP di composited
-        //    - Downscale+alpha CG → zona PIP di composited
-        //
-        // In ENTRAMBI i casi, programSrc include il buffer deck
-        // quando il deck attivo non ha video (file audio puro).
         // ═══════════════════════════════════════════════════════════
         private void EngineLoop()
         {
@@ -399,7 +394,6 @@ namespace AirDirector.Controls
                 SendAudio(spf);
 
                 // ═════ VIDEO ═════
-                // Determina la sorgente video: deck attivo (se ha video) oppure buffer deck
                 IntPtr programSrc = IntPtr.Zero;
                 if (ad != null && ad.IsReadyForVideo)
                     programSrc = ad.VideoBufferPtr;
@@ -408,14 +402,11 @@ namespace AirDirector.Controls
 
                 bool lannerNow = _lannerEnabled && _lannerActive && _lannerImageBGRA != null;
 
-                // CG sempre a fullscreen
                 Array.Clear(_cgFullFrame, 0, _cgFullFrame.Length);
                 try { CGRenderer.RenderOverlay(_cgFullFrame, _ndiWidth, _ndiHeight); } catch { }
 
                 if (lannerNow)
                 {
-                    // ── LANNER ATTIVO ──
-                    // Sfondo: scrivi solo quando cambia
                     if (_lannerBgDirty)
                     {
                         byte[] li = _lannerImageBGRA;
@@ -428,24 +419,16 @@ namespace AirDirector.Controls
                     }
                     else
                     {
-                        // Ogni frame: riscrive SOLO la zona PIP dello sfondo Lanner
-                        // così il frame precedente del buffer/video non "sporca" lo sfondo
-                        // quando non c'è video (programSrc == IntPtr.Zero).
-                        // Se c'è programSrc, BlitPipDirect lo sovrascriverà subito dopo.
-                        // Costo: piccolo, solo la zona PIP (75%×75%).
                         RepaintLannerPipZone();
                     }
 
-                    // Downscale video/buffer → zona PIP
                     if (programSrc != IntPtr.Zero)
                         BlitPipDirect(programSrc, _compositedVideoPtr);
 
-                    // CG scalato al 75% nella zona PIP
                     BlitCgScaledOverPip();
                 }
                 else
                 {
-                    // ── SENZA LANNER ──
                     if (programSrc != IntPtr.Zero)
                     {
                         int sz = _ndiWidth * _ndiHeight * 4;
@@ -458,20 +441,13 @@ namespace AirDirector.Controls
             }
         }
 
-        /// <summary>
-        /// Riscrive la zona PIP dello sfondo Lanner dal buffer _lannerImageBGRA.
-        /// Chiamato ogni frame quando Lanner è attivo e _lannerBgDirty == false,
-        /// per "pulire" la zona PIP prima di blittare il nuovo frame video/buffer.
-        /// Senza questo, se programSrc è IntPtr.Zero (nessun video), la zona PIP
-        /// mostrerebbe il frame precedente del buffer che non viene più aggiornato.
-        /// </summary>
         private void RepaintLannerPipZone()
         {
             byte[] li = _lannerImageBGRA;
             if (li == null) return;
             int dstX = _pipX, dstY = _pipY, pw = _pipW, ph = _pipH;
             int outStride = _ndiWidth * 4;
-            int srcStride = _ndiWidth * 4; // Lanner è fullscreen
+            int srcStride = _ndiWidth * 4;
             unsafe
             {
                 byte* dst = (byte*)_compositedVideoPtr.ToPointer();
@@ -489,7 +465,7 @@ namespace AirDirector.Controls
 
         // ═══════════════════════════════════════════════════════════
         // CG COMPOSITING
-        // ═══════════════════════════════════════════════════════════
+        // ═══════════════════════════════��═══════════════════════════
         private void BlitCgFullscreen()
         {
             int totalPixels = _ndiWidth * _ndiHeight;
@@ -604,7 +580,7 @@ namespace AirDirector.Controls
 
         private void HandleDeckEnded(Deck deck, int sessionId) { if (deck.SessionId != sessionId || deck != _activeDeck) return; if (!TryTriggerMix()) return; Log("[END] " + deck.Name + " ended"); SafeInvoke(() => OnTrackEnded()); }
 
-        // ═══════════════════════════════════════════════════════════
+        // ═════════════════════════════��═════════════════════════════
         // POSITION
         // ═══════════════════════════════════════════════════════════
         private void UpdatePosition()
@@ -643,18 +619,37 @@ namespace AirDirector.Controls
         // ═══════════════════════════════════════════════════════════
         // PRE-BUFFER
         // ═══════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// FIX: Pre-buffer SOLO file video nativi (.mp4, .avi, .mov, ecc.)
+        /// 
+        /// I file audio (.mp3, .wav, ecc.) con VideoFilePath associato NON vengono
+        /// pre-bufferizzati, perché il pre-buffer li trattava come VideoClip (audio VLC)
+        /// mentre PlayInternal li gestisce come AudioTrack (audio NAudio).
+        /// Questa incoerenza causava il bug "video senza audio":
+        /// - PreBuffer avvia VLC con video+audio → tipo VideoClip
+        /// - PlayInternal usa il pre-buffer → MixDeckAudio legge dal Ring (VLC audio)
+        /// - Ma VLC è in pausa dal pre-buffer → Ring vuoto → silenzio
+        /// 
+        /// Soluzione: pre-bufferizzare solo file che sono video nativi (IsVideoFile=true).
+        /// I file audio con video associato sono comunque brevi (jingle) e partono velocemente.
+        /// </summary>
         private void PreBufferNext()
         {
             if (_playlistQueue == null) return;
             var items = _playlistQueue.GetAllItems();
             if (items.Count < 2) return;
 
-            // ✅ Cerca il primo file valido a partire dalla posizione 1
             int nextIndex = -1;
             for (int i = 1; i < items.Count; i++)
             {
                 string fp = items[i].FilePath;
                 if (string.IsNullOrEmpty(fp) || IsWebStream(fp)) continue;
+
+                // FIX: Pre-buffer solo file video nativi
+                // File audio con VideoFilePath non vengono pre-bufferizzati
+                // per evitare l'incoerenza audio VLC vs NAudio
+                if (!IsVideoFile(fp)) continue;
 
                 if (!File.Exists(fp))
                 {
@@ -665,7 +660,7 @@ namespace AirDirector.Controls
                 try
                 {
                     var fi = new FileInfo(fp);
-                    if (fi.Length < 20 * 1024) // < 20 KB = probabilmente corrotto
+                    if (fi.Length < 20 * 1024)
                     {
                         Log("[PREBUF] ⚠️ File troppo piccolo (" + fi.Length + " bytes), skip: " + Path.GetFileName(fp));
                         continue;
@@ -686,11 +681,6 @@ namespace AirDirector.Controls
             string nextFile = items[nextIndex].FilePath;
             if (_preBufferedFile == nextFile && _preBufferedDeck != null) return;
 
-            bool isVid = IsVideoFile(nextFile);
-            string vidFile = !string.IsNullOrEmpty(items[nextIndex].VideoFilePath) && File.Exists(items[nextIndex].VideoFilePath)
-                ? items[nextIndex].VideoFilePath : null;
-            if (!isVid && vidFile == null) { _preBufferedFile = ""; return; }
-
             Deck target = null;
             if (_deckA != _activeDeck && _deckA != _pendingDeck && !_deckA.IsPlaying) target = _deckA;
             else if (_deckB != _activeDeck && _deckB != _pendingDeck && !_deckB.IsPlaying) target = _deckB;
@@ -706,13 +696,15 @@ namespace AirDirector.Controls
             target.PreBufferReady = false;
             target.StartPointMs = items[nextIndex].MarkerIN;
 
-            var media = new Media(_libVLC, isVid ? nextFile : vidFile, FromType.FromPath);
+            var media = new Media(_libVLC, nextFile, FromType.FromPath);
             if (items[nextIndex].MarkerIN > 0) media.AddOption($":start-time={items[nextIndex].MarkerIN / 1000.0:F3}");
             media.AddOption(":file-caching=500");
             target.VlcPlayer.Media = media;
             media.Dispose();
             target.VlcPlayer.Play();
             target.CurrentItem = PlayItem.FromQueueItem(items[nextIndex]);
+
+            Log("[PREBUF] Pre-buffering VideoClip: " + Path.GetFileName(nextFile) + " → " + target.Name);
 
             ThreadPool.QueueUserWorkItem(_ =>
             {
@@ -726,7 +718,7 @@ namespace AirDirector.Controls
             _preBufferedDeck = target;
             _preBufferedFile = nextFile;
         }
-       
+
 
         // ═══════════════════════════════════════════════════════════
         // PLAY
@@ -740,7 +732,7 @@ namespace AirDirector.Controls
             SafeInvoke(() => _mixCheckTimer.Stop());
             Log("[PLAY] " + fn + " | " + item.Artist + " - " + item.Title + " | IN=" + item.MarkerIN + " MIX=" + item.MarkerMIX + " OUT=" + item.MarkerOUT + " Dur=" + item.Duration.TotalMilliseconds + "ms");
             bool isStream = IsWebStream(fp);
-            // ✅ Controlla esistenza file
+
             if (!isStream && !File.Exists(fp))
             {
                 Log("[PLAY] ⚠️ File non trovato, skip: " + fp);
@@ -749,7 +741,6 @@ namespace AirDirector.Controls
                 return;
             }
 
-            // ✅ Controlla dimensione minima (< 20KB = corrotto)
             if (!isStream)
             {
                 try
@@ -771,12 +762,15 @@ namespace AirDirector.Controls
                     return;
                 }
             }
+
             bool isVideo = !isStream && IsVideoFile(fp);
             string videoFile = !isStream && !string.IsNullOrEmpty(item.VideoFilePath) && File.Exists(item.VideoFilePath) ? item.VideoFilePath : null;
             bool hasDedVid = isVideo || videoFile != null;
             int sid = ++_globalSessionId; Deck target; bool usedPre = false;
             Interlocked.Exchange(ref _mixTriggeredFlag, 1); _mixGeneration++; _audioDelay.Reset();
             double startTimeSec = item.MarkerIN / 1000.0;
+
+            _bufferIsDedicatedVideo = false;
 
             if (isStream)
             {
@@ -793,9 +787,12 @@ namespace AirDirector.Controls
             }
             else if (_preBufferedDeck != null && _preBufferedFile == fp && _preBufferedDeck.PreBufferReady)
             {
+                // FIX: Il pre-buffer ora esiste SOLO per file video nativi (IsVideoFile=true)
+                // quindi qui siamo certi che il tipo è VideoClip con audio VLC - corretto
                 target = _preBufferedDeck; _preBufferedDeck = null; _preBufferedFile = ""; usedPre = true;
                 target.SessionId = sid; target.IsPlaying = true; target.Volume = 1.0f; target.IsPendingActivation = true; target.CurrentItem = item; target.StartPointMs = item.MarkerIN;
                 _pendingDeck = target; _bufferShouldShow = false; _currentFileIsVideo = true;
+                Log("[PLAY] Using pre-buffer (VideoClip) → " + target.Name);
             }
             else
             {
@@ -803,15 +800,17 @@ namespace AirDirector.Controls
                 if (_preBufferedDeck == target) { StopDeckInternal(_preBufferedDeck, true); _preBufferedDeck = null; _preBufferedFile = ""; }
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.StartPointMs = item.MarkerIN;
+
                 if (isVideo)
                 {
                     target.Type = DeckType.VideoClip; _bufferShouldShow = false;
                     var m = new Media(_libVLC, fp, FromType.FromPath); if (item.MarkerIN > 0) m.AddOption($":start-time={startTimeSec:F3}"); m.AddOption(":file-caching=500");
                     target.VlcPlayer.Media = m; m.Dispose(); target.VlcPlayer.Play(); _currentFileIsVideo = true;
-                    Log("[PLAY] VideoClip → " + target.Name);
+                    Log("[PLAY] VideoClip ��� " + target.Name);
                 }
                 else if (videoFile != null)
                 {
+                    // File audio con video associato: VLC per video (no-audio), NAudio per audio
                     target.Type = DeckType.AudioTrack; _bufferShouldShow = false;
                     var vm = new Media(_libVLC, videoFile, FromType.FromPath); vm.AddOption(":no-audio"); if (item.MarkerIN > 0) vm.AddOption($":start-time={startTimeSec:F3}"); vm.AddOption(":file-caching=500");
                     target.VlcPlayer.Media = vm; vm.Dispose(); target.VlcPlayer.Play();
@@ -821,26 +820,65 @@ namespace AirDirector.Controls
                 }
                 else
                 {
-                    target.Type = DeckType.AudioTrack; _bufferShouldShow = true;
-                    try { target.FileReader = new AudioFileReader(fp); if (item.MarkerIN > 0) target.FileReader.CurrentTime = TimeSpan.FromMilliseconds(item.MarkerIN); var rs = new WdlResamplingSampleProvider(target.FileReader, AUDIO_SAMPLE_RATE); target.Resampler = target.FileReader.WaveFormat.Channels == 1 ? rs.ToStereo() : (ISampleProvider)rs; target.AudioStarted = true; }
-                    catch (Exception ex) { LogErr("[PLAY] NAudio failed", ex); ResetMixTrigger(); SafeInvoke(() => AutoSkipToNext()); return; }
+                    // Audio-only: NAudio per audio, buffer video per il video
+                    target.Type = DeckType.AudioTrack;
+                    _bufferShouldShow = true;
+
+                    try
+                    {
+                        target.FileReader = new AudioFileReader(fp);
+                        if (item.MarkerIN > 0)
+                            target.FileReader.CurrentTime = TimeSpan.FromMilliseconds(item.MarkerIN);
+                        var rs = new WdlResamplingSampleProvider(target.FileReader, AUDIO_SAMPLE_RATE);
+                        target.Resampler = target.FileReader.WaveFormat.Channels == 1 ? rs.ToStereo() : (ISampleProvider)rs;
+                        target.AudioStarted = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        LogErr("[PLAY] NAudio failed", ex);
+                        ResetMixTrigger();
+                        SafeInvoke(() => AutoSkipToNext());
+                        return;
+                    }
+
                     _currentFileIsVideo = false;
-                    // Video musicale dedicato con stesso nome .mp4
+
+                    // Ferma il buffer deck corrente prima di avviarne uno nuovo
+                    StopBufferDeck();
+
+                    // Cerca video musicale dedicato con stesso nome .mp4
                     string mv = Path.ChangeExtension(fp, ".mp4");
                     if (File.Exists(mv))
                     {
-                        Log("[PLAY] AudioOnly + MusicVideo → " + target.Name);
-                        PrepareBufferVideo(mv);
+                        Log("[PLAY] AudioOnly + MusicVideo → " + target.Name + " | " + Path.GetFileName(mv));
+                        _bufferIsDedicatedVideo = true;
+                        StartBufferVideo(mv, false);
                     }
                     else
                     {
                         Log("[PLAY] AudioOnly + GenericBuffer → " + target.Name);
+                        _bufferIsDedicatedVideo = false;
                         EnsureBufferVideoPlaying();
                     }
                 }
+
                 target.Volume = 1.0f; target.IsPlaying = true; target.CurrentItem = item;
-                if (hasDedVid) { target.IsPendingActivation = true; _pendingDeck = target; }
-                else { Deck old = _activeDeck; _activeDeck = target; _pendingDeck = null; target.IsPendingActivation = false; if (old != null && old != target) StopDeckInternal(old, true); ResetMixTrigger(); SafeInvoke(() => _mixCheckTimer.Start()); }
+
+                if (hasDedVid)
+                {
+                    target.IsPendingActivation = true; _pendingDeck = target;
+                }
+                else
+                {
+                    // Audio-only: attiva subito (identico alla versione OLD)
+                    Deck old = _activeDeck;
+                    _activeDeck = target;
+                    _pendingDeck = null;
+                    target.IsPendingActivation = false;
+                    if (old != null && old != target) StopDeckInternal(old, true);
+                    ResetMixTrigger();
+                    SafeInvoke(() => _mixCheckTimer.Start());
+                }
             }
 
             _waveformPeaks = null; _waveformCurrentFile = "";
@@ -853,7 +891,7 @@ namespace AirDirector.Controls
             _introTime = item.Intro; if (_introTime.TotalMilliseconds <= 0 && _markerINTRO > 0) _introTime = TimeSpan.FromMilliseconds(_markerINTRO);
             _isPlaying = true; _isPaused = false; _positionMs = item.MarkerIN > 0 ? item.MarkerIN : 0;
             _currentFile = fp; CurrentFilePath = fp; CurrentArtist = item.Artist; CurrentTitle = item.Title;
-            Log("[PLAY] ✓ " + fn + (usedPre ? " [PREBUF]" : "") + (isStream ? " [STREAM]" : "") + " dur=" + dur.TotalSeconds.ToString("F0") + "s MIX=" + _markerMIX + " OUT=" + _markerOUT + " bufferShow=" + _bufferShouldShow + " bufferPlaying=" + _bufferDeck.IsPlaying);
+            Log("[PLAY] ✓ " + fn + (usedPre ? " [PREBUF]" : "") + (isStream ? " [STREAM]" : "") + " dur=" + dur.TotalSeconds.ToString("F0") + "s MIX=" + _markerMIX + " OUT=" + _markerOUT + " bufferShow=" + _bufferShouldShow + " bufferPlaying=" + _bufferDeck.IsPlaying + " bufferDedicated=" + _bufferIsDedicatedVideo);
             if (!isStream) LoadWaveformForCurrentFile(fp);
             SafeInvoke(() => { _updateTimer.Start(); UpdateTrackDisplay(item); UpdateBtnStates(); waveformPanel.Invalidate(); });
             TrackChanged?.Invoke(this, new TrackChangedEventArgs { FilePath = fp, Artist = CurrentArtist, Title = CurrentTitle, IsVideo = _currentFileIsVideo, ItemType = item.ItemType, VideoFilePath = item.VideoFilePath, VideoSource = item.VideoSource, NDISourceName = item.NDISourceName, MarkerIN = _markerIN, MarkerMIX = _markerMIX, MarkerOUT = _markerOUT });
@@ -862,10 +900,27 @@ namespace AirDirector.Controls
             ThreadPool.QueueUserWorkItem(_ => { Thread.Sleep(500); _commandQueue.Enqueue(() => PreBufferNext()); });
         }
 
-        /// <summary>
-        /// Assicura che il buffer video generico sia in riproduzione.
-        /// Se la playlist è vuota, la ricarica prima di avviare.
-        /// </summary>
+        private void StopBufferDeck()
+        {
+            try { if (_bufferDeck.VlcPlayer.IsPlaying) _bufferDeck.VlcPlayer.Stop(); } catch { }
+            _bufferDeck.IsPlaying = false;
+            _bufferDeck.IsReadyForVideo = false;
+            _bufferDeck.FrameCount = 0;
+            ClearVideoBuffer(_bufferDeck.VideoBufferPtr);
+        }
+
+        private void StartBufferVideo(string path, bool loop)
+        {
+            var m = new Media(_libVLC, path, FromType.FromPath);
+            m.AddOption(":no-audio");
+            if (loop) m.AddOption(":input-repeat=65535");
+            _bufferDeck.VlcPlayer.Media = m;
+            m.Dispose();
+            _bufferDeck.VlcPlayer.Play();
+            _bufferDeck.IsPlaying = true;
+            Log("[BUFFER] Started: " + Path.GetFileName(path) + " loop=" + loop);
+        }
+
         private void EnsureBufferVideoPlaying()
         {
             if (_bufferDeck.IsPlaying && _bufferDeck.IsReadyForVideo) return;
@@ -878,8 +933,7 @@ namespace AirDirector.Controls
         {
             if (_playlistQueue == null) { Stop(); return; }
 
-            // ✅ Rimuovi file corrotti/mancanti dalla coda fino a trovarne uno valido
-            int maxAttempts = 50; // sicurezza anti-loop infinito
+            int maxAttempts = 50;
             int attempts = 0;
 
             while (attempts < maxAttempts)
@@ -889,12 +943,10 @@ namespace AirDirector.Controls
 
                 if (items.Count < 2)
                 {
-                    // Solo 1 o 0 elementi rimasti, non c'è un "next"
                     Stop();
                     return;
                 }
 
-                // Rimuovi il corrente (posizione 0)
                 _playlistQueue.RemoveItem(0);
 
                 items = _playlistQueue.GetAllItems();
@@ -904,7 +956,6 @@ namespace AirDirector.Controls
                 string fp = next.FilePath ?? "";
                 bool isStream = IsWebStream(fp);
 
-                // ✅ Per gli stream, prova direttamente
                 if (isStream)
                 {
                     _playlistQueue.SetCurrentPlaying(0);
@@ -912,14 +963,12 @@ namespace AirDirector.Controls
                     return;
                 }
 
-                // ✅ Controlla che il file esista
                 if (!File.Exists(fp))
                 {
                     Log("[SKIP] ⚠️ File non trovato, skip: " + fp);
                     continue;
                 }
 
-                // ✅ Controlla che non sia troppo piccolo (< 25KB = corrotto)
                 try
                 {
                     var fi = new FileInfo(fp);
@@ -935,7 +984,6 @@ namespace AirDirector.Controls
                     continue;
                 }
 
-                // ✅ File valido, riproduci
                 _playlistQueue.SetCurrentPlaying(0);
                 LoadAndPlay(next);
                 return;
@@ -947,7 +995,7 @@ namespace AirDirector.Controls
 
         // ═══════════════════════════════════════════════════════════
         // BUFFER VIDEO
-        // ══════════════════════════════════════���════════════════════
+        // ═══════════════════════════════════════════════════════════
         private void RefreshBufferPlaylist()
         {
             _bufferPlaylist.Clear();
@@ -963,15 +1011,9 @@ namespace AirDirector.Controls
         {
             if (_bufferPlaylist.Count == 0 || !_bufferShouldShow) return;
             string f = _bufferPlaylist[_bufferRandom.Next(_bufferPlaylist.Count)];
-            Log("[BUFFER] Playing: " + Path.GetFileName(f));
+            Log("[BUFFER] Playing generic: " + Path.GetFileName(f));
+            _bufferIsDedicatedVideo = false;
             var m = new Media(_libVLC, f, FromType.FromPath); m.AddOption(":input-repeat=65535"); m.AddOption(":no-audio");
-            _bufferDeck.VlcPlayer.Media = m; m.Dispose(); _bufferDeck.VlcPlayer.Play(); _bufferDeck.IsPlaying = true;
-        }
-
-        private void PrepareBufferVideo(string path)
-        {
-            Log("[BUFFER] Music video: " + Path.GetFileName(path));
-            var m = new Media(_libVLC, path, FromType.FromPath); m.AddOption(":no-audio"); m.AddOption(":input-repeat=65535");
             _bufferDeck.VlcPlayer.Media = m; m.Dispose(); _bufferDeck.VlcPlayer.Play(); _bufferDeck.IsPlaying = true;
         }
 
@@ -987,9 +1029,8 @@ namespace AirDirector.Controls
                 if (_pendingDeck != null) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 if (_preBufferedDeck != null) { StopDeckInternal(_preBufferedDeck, true); _preBufferedDeck = null; _preBufferedFile = ""; }
                 StopDeckInternal(_deckA, true); StopDeckInternal(_deckB, true);
-                _activeDeck = null; _bufferShouldShow = false;
-                try { if (_bufferDeck.VlcPlayer.IsPlaying) _bufferDeck.VlcPlayer.Stop(); } catch { }
-                _bufferDeck.IsPlaying = false; _bufferDeck.IsReadyForVideo = false;
+                _activeDeck = null; _bufferShouldShow = false; _bufferIsDedicatedVideo = false;
+                StopBufferDeck();
                 _vuLeft = 0; _vuRight = 0; _vuLeftPeak = 0; _vuRightPeak = 0; _audioDelay.Reset();
             });
             StopRequested?.Invoke(this, EventArgs.Empty); PlayStateChanged?.Invoke(this, new PlayStateChangedEventArgs { IsPlaying = false, IsPaused = false, FilePath = CurrentFilePath });
@@ -1045,7 +1086,6 @@ namespace AirDirector.Controls
         // ═══════════════════════════════════════════════════════════
         private void LoadLannerSchedule()
         {
-            // Ricontrolla il registro ad ogni caricamento schedule
             CheckLannerEnabled();
             if (!_lannerEnabled) { Log("[LANNER] Disabled (NoExternal), skipping schedule load"); return; }
 
@@ -1114,7 +1154,7 @@ namespace AirDirector.Controls
         private void PreCacheNextWaveform() { if (_playlistQueue == null) return; var i = _playlistQueue.GetAllItems(); if (i.Count < 2) return; string nf = i[1].FilePath; if (!string.IsNullOrEmpty(nf) && !IsWebStream(nf) && !_waveformCache.ContainsKey(nf)) Task.Run(() => GenWaveform(nf, false)); }
         private void GenWaveform(string fp, bool apply) { try { if (IsWebStream(fp)) return; if (_waveformCache.ContainsKey(fp)) { if (apply && _currentFile == fp) { _waveformPeaks = _waveformCache[fp]; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } float[] pk = new float[WAVEFORM_BARS]; NAudio.Wave.WaveStream rd = null; string ext = Path.GetExtension(fp).ToLowerInvariant(); try { if (ext == ".mp3") rd = new NAudio.Wave.Mp3FileReader(fp); else if (ext == ".wav") rd = new NAudio.Wave.WaveFileReader(fp); else rd = new NAudio.Wave.AudioFileReader(fp); } catch { try { rd = new NAudio.Wave.AudioFileReader(fp); } catch { } } if (rd != null) { using (rd) { int bps = rd.WaveFormat.BitsPerSample / 8; if (bps < 1) bps = 2; long tot = rd.Length / bps; long spb = Math.Max(1, tot / WAVEFORM_BARS); int bs = (int)Math.Min(spb * bps, 65536); byte[] buf = new byte[bs]; for (int b = 0; b < WAVEFORM_BARS; b++) { int r2 = rd.Read(buf, 0, Math.Min(bs, buf.Length)); if (r2 == 0) break; float mx = 0; if (bps == 2) { for (int i = 0; i < r2 - 1; i += 2) { float a = Math.Abs(BitConverter.ToInt16(buf, i) / 32768f); if (a > mx) mx = a; } } else if (bps == 4) { for (int i = 0; i < r2 - 3; i += 4) { float a = Math.Abs(BitConverter.ToSingle(buf, i)); if (a > mx) mx = a; } } else mx = 0.3f; pk[b] = Math.Min(1f, mx); } } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } var rr = new Random(fp.GetHashCode()); for (int i = 0; i < pk.Length; i++) { float t = (float)i / pk.Length, env = 1f; if (t < 0.02f) env = t / 0.02f; if (t > 0.95f) env = (1f - t) / 0.05f; pk[i] = Math.Min(1f, (0.35f + (float)(rr.NextDouble() * 0.5)) * env); } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } } catch { } }
 
-        // ══════════════��════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════
         // UI
         // ═══════════════════════════════════════════════════════════
         private void InitPlayerUI() { Size = new Size(1400, 160); BackColor = Color.FromArgb(30, 30, 30); this.Padding = new Padding(5); Panel top = new Panel { Location = new Point(5, 5), Size = new Size(1390, 70), BackColor = Color.FromArgb(20, 20, 20) }; Controls.Add(top); Label h1 = null; MkTimer(top, 5, 5, LanguageManager.GetString("Player.TimeElapsed", "Tempo trascorso"), ref lblElapsed, AppTheme.LEDGreen, 155, 60, ref h1); _lblElapsedHeader = h1; Label h2 = null; MkTimer(top, 165, 5, "Intro", ref lblIntro, AppTheme.LEDYellow, 155, 60, ref h2); Panel tp = new Panel { Location = new Point(325, 5), Size = new Size(750, 60), BackColor = Color.FromArgb(25, 25, 25), BorderStyle = BorderStyle.FixedSingle }; top.Controls.Add(tp); lblArtist = new Label { Text = "", Font = SafeFont("Segoe UI", 16f, FontStyle.Bold), ForeColor = Color.White, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, AutoSize = false }; lblArtist.Paint += LblArtPaint; tp.Controls.Add(lblArtist); Label h3 = null; MkTimer(top, 1080, 5, LanguageManager.GetString("Player.TimeRemaining", "Tempo restante"), ref lblRemaining, AppTheme.LEDRed, 155, 60, ref h3); _lblRemainingHeader = h3; Panel cp = new Panel { Location = new Point(1240, 5), Size = new Size(145, 60), BackColor = Color.Black, BorderStyle = BorderStyle.FixedSingle }; top.Controls.Add(cp); lblDate = new Label { Text = FmtD(), Font = SafeFont("Segoe UI", 8f, FontStyle.Regular), ForeColor = Color.Gray, Location = new Point(3, 3), Size = new Size(145, 12), TextAlign = ContentAlignment.TopCenter }; cp.Controls.Add(lblDate); lblClock = new Label { Text = DateTime.Now.ToString("HH:mm:ss"), Font = SafeFont("DSEG7 Classic", 20f, FontStyle.Bold), ForeColor = AppTheme.LEDGreen, Location = new Point(3, 18), Size = new Size(140, 40), TextAlign = ContentAlignment.MiddleCenter }; cp.Controls.Add(lblClock); var clkT = new System.Windows.Forms.Timer { Interval = 1000 }; clkT.Tick += (s, e) => { lblClock.Text = DateTime.Now.ToString("HH:mm:ss"); lblDate.Text = FmtD(); }; clkT.Start(); Panel bot = new Panel { Location = new Point(5, 80), Size = new Size(1390, 75), BackColor = Color.FromArgb(20, 20, 20) }; Controls.Add(bot); MkBtns(bot, 5); Panel wfc = new Panel { Location = new Point(415, 5), Size = new Size(600, 65), BackColor = Color.Black, BorderStyle = BorderStyle.FixedSingle }; bot.Controls.Add(wfc); waveformPanel = new DoubleBufferedPanel { Dock = DockStyle.Fill, BackColor = Color.Black }; waveformPanel.Paint += WfPaint; waveformPanel.MouseClick += WfClick; wfc.Controls.Add(waveformPanel); Panel vc = new Panel { Location = new Point(1020, 5), Size = new Size(365, 65), BackColor = Color.FromArgb(25, 25, 25), BorderStyle = BorderStyle.FixedSingle }; bot.Controls.Add(vc); vc.Controls.Add(new Label { Text = "L", Font = SafeFont("Segoe UI", 11f, FontStyle.Bold), ForeColor = Color.White, Location = new Point(8, 16), Size = new Size(15, 18) }); vuMeterLeftPanel = new DoubleBufferedPanel { Location = new Point(28, 18), Size = new Size(330, 15), BackColor = Color.Black, BorderStyle = BorderStyle.FixedSingle }; vuMeterLeftPanel.Paint += (s, e) => PaintVu(e.Graphics, 330, 15, _vuLeft, _vuLeftPeak); vc.Controls.Add(vuMeterLeftPanel); vc.Controls.Add(new Label { Text = "R", Font = SafeFont("Segoe UI", 11f, FontStyle.Bold), ForeColor = Color.White, Location = new Point(8, 40), Size = new Size(15, 18) }); vuMeterRightPanel = new DoubleBufferedPanel { Location = new Point(28, 42), Size = new Size(330, 15), BackColor = Color.Black, BorderStyle = BorderStyle.FixedSingle }; vuMeterRightPanel.Paint += (s, e) => PaintVu(e.Graphics, 330, 15, _vuRight, _vuRightPeak); vc.Controls.Add(vuMeterRightPanel); }
@@ -1152,7 +1192,7 @@ namespace AirDirector.Controls
         private void LogErr(string m, Exception ex) { Log("ERR " + m + ": " + ex.Message); }
         private void LogErr(string m) { Log("ERR " + m); }
 
-        // ═══════════════════════════════════════════════════════════
+        // ═════════════════════════════════════���═════════════════════
         // DISPOSE
         // ═══════════════════════════════════════════════════════════
         protected override void Dispose(bool disposing)
