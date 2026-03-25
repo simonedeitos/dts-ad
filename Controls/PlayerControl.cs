@@ -133,6 +133,8 @@ namespace AirDirector.Controls
 
         private readonly object _waveformCtsLock = new object();
 
+        private Services.Core.DailyLogger _dailyLogger;
+
         public PlayerControl()
         {
             InitializeComponent();
@@ -146,6 +148,7 @@ namespace AirDirector.Controls
             InitializeTimer();
             InitializeAudioEngine();
             InitializeVLC();
+            try { _dailyLogger = new Services.Core.DailyLogger("PlayerAudio"); } catch { }
 
             LanguageManager.LanguageChanged += (s, e) => UpdateTimerLabels();
         }
@@ -168,13 +171,13 @@ namespace AirDirector.Controls
 
                 _vlcPlayer = new MediaPlayer(_libVLC);
 
-                _vlcPlayer.Playing += (s, e) => Console.WriteLine("[VLC] ▶️ Playing");
-                _vlcPlayer.Paused += (s, e) => Console.WriteLine("[VLC] ⏸️ Paused");
-                _vlcPlayer.Stopped += (s, e) => Console.WriteLine("[VLC] ⏹️ Stopped");
-                _vlcPlayer.EndReached += (s, e) => Console.WriteLine("[VLC] 🏁 EndReached");
-                _vlcPlayer.EncounteredError += (s, e) => Console.WriteLine("[VLC] ❌ Error");
+                _vlcPlayer.Playing += (s, e) => Log("[VLC] ▶️ Playing");
+                _vlcPlayer.Paused += (s, e) => Log("[VLC] ⏸️ Paused");
+                _vlcPlayer.Stopped += (s, e) => Log("[VLC] ⏹️ Stopped");
+                _vlcPlayer.EndReached += (s, e) => Log("[VLC] 🏁 EndReached");
+                _vlcPlayer.EncounteredError += (s, e) => Log("[VLC] ❌ Error");
 
-                Console.WriteLine("[VLC] ✅ Inizializzato con successo");
+                Log("[VLC] ✅ Inizializzato con successo");
             }
             catch (Exception ex)
             {
@@ -205,7 +208,7 @@ namespace AirDirector.Controls
                 _masterOutput.Init(_meterProvider);
                 _masterOutput.Play();
 
-                Console.WriteLine("[Audio] ✅ Engine inizializzato @ 44100Hz");
+                Log("[Audio] ✅ Engine inizializzato @ 44100Hz");
             }
             catch (Exception ex)
             {
@@ -264,7 +267,7 @@ namespace AirDirector.Controls
             // Resample se il sample rate non è 44100 (es. video a 48000Hz)
             if (audioFile.WaveFormat.SampleRate != 44100)
             {
-                Console.WriteLine($"[Audio] 🔄 Resampling da {audioFile.WaveFormat.SampleRate}Hz a 44100Hz");
+                Log($"[Audio] 🔄 Resampling da {audioFile.WaveFormat.SampleRate}Hz a 44100Hz");
                 sampleProvider = new WdlResamplingSampleProvider(sampleProvider, 44100);
             }
 
@@ -287,7 +290,7 @@ namespace AirDirector.Controls
             // Resample se il sample rate non è 44100
             if (mediaReader.WaveFormat.SampleRate != 44100)
             {
-                Console.WriteLine($"[Audio] 🔄 Resampling video da {mediaReader.WaveFormat.SampleRate}Hz a 44100Hz");
+                Log($"[Audio] 🔄 Resampling video da {mediaReader.WaveFormat.SampleRate}Hz a 44100Hz");
                 sampleProvider = new WdlResamplingSampleProvider(sampleProvider, 44100);
             }
 
@@ -753,14 +756,14 @@ namespace AirDirector.Controls
 
             if (_markerMIX > 0 && currentMs >= _markerMIX)
             {
-                Console.WriteLine($"");
-                Console.WriteLine($"╔════════════════════════════════════════════════════════════╗");
-                Console.WriteLine($"║  MIX POINT TRIGGERED                                       ║");
-                Console.WriteLine($"╚════════════════════════════════════════════════════════════╝");
-                Console.WriteLine($"[MixCheckTimer] Player attivo: {(_isPlayerAActive ? "A" : "B")}");
-                Console.WriteLine($"[MixCheckTimer] Posizione: {currentMs}ms");
-                Console.WriteLine($"[MixCheckTimer] Marker MIX: {_markerMIX}ms");
-                Console.WriteLine($"");
+                Log($"");
+                Log($"╔════════════════════════════════════════════════════════════╗");
+                Log($"║  MIX POINT TRIGGERED                                       ║");
+                Log($"╚════════════════════════════════════════════════════════════╝");
+                Log($"[MixCheckTimer] Player attivo: {(_isPlayerAActive ? "A" : "B")}");
+                Log($"[MixCheckTimer] Posizione: {currentMs}ms");
+                Log($"[MixCheckTimer] Marker MIX: {_markerMIX}ms");
+                Log($"");
 
                 _mixRequested = true;
                 _mixCheckTimer.Stop();
@@ -833,14 +836,14 @@ namespace AirDirector.Controls
                 {
                     bool nextIsStream = IsStreamUrl(nextItem.FilePath);
 
-                    Console.WriteLine($"");
-                    Console.WriteLine($"╔════════════════════════════════════════════════════════════╗");
-                    Console.WriteLine($"║  MIX POINT REACHED                                         ║");
-                    Console.WriteLine($"╚════════════════════════════════════════════════════════════╝");
-                    Console.WriteLine($"[OnMixPointReached] Player attivo PRIMA del mix: {(_isPlayerAActive ? "A" : "B")}");
-                    Console.WriteLine($"[OnMixPointReached] Prossimo:  {nextItem.Title}");
-                    Console.WriteLine($"[OnMixPointReached] È stream?  {nextIsStream}");
-                    Console.WriteLine($"");
+                    Log($"");
+                    Log($"╔════════════════════════════════════════════════════════════╗");
+                    Log($"║  MIX POINT REACHED                                         ║");
+                    Log($"╚════════════════════════════════════════════════════════════╝");
+                    Log($"[OnMixPointReached] Player attivo PRIMA del mix: {(_isPlayerAActive ? "A" : "B")}");
+                    Log($"[OnMixPointReached] Prossimo:  {nextItem.Title}");
+                    Log($"[OnMixPointReached] È stream?  {nextIsStream}");
+                    Log($"");
 
                     VolumeSampleProvider oldVolumeProvider = _isPlayerAActive ? _volumeProviderA : _volumeProviderB;
                     AudioFileReader oldAudio = _isPlayerAActive ? _audioFileA : _audioFileB;
@@ -854,7 +857,7 @@ namespace AirDirector.Controls
                         _audioFadingOut = oldAudio;
                         _fadeOutTimer.Start();
 
-                        Console.WriteLine($"[OnMixPointReached] Fade out:  da {_fadeOutStartMs}ms a {_fadeOutEndMs}ms");
+                        Log($"[OnMixPointReached] Fade out:  da {_fadeOutStartMs}ms a {_fadeOutEndMs}ms");
                     }
                     else
                     {
@@ -864,12 +867,12 @@ namespace AirDirector.Controls
                         }
                         oldAudio?.Dispose();
 
-                        Console.WriteLine($"[OnMixPointReached] Stop immediato per stream");
+                        Log($"[OnMixPointReached] Stop immediato per stream");
                     }
 
                     if (nextIsStream)
                     {
-                        Console.WriteLine($"[OnMixPointReached] 🌐 Configurazione stream VLC...");
+                        Log($"[OnMixPointReached] 🌐 Configurazione stream VLC...");
 
                         _isStreamingURL = true;
                         _streamScheduledDuration = nextItem.Duration;
@@ -912,16 +915,16 @@ namespace AirDirector.Controls
 
                         UpdateCounters();
 
-                        Console.WriteLine($"[OnMixPointReached] Player attivo DOPO il mix:  {(_isPlayerAActive ? "A" : "B")}");
-                        Console.WriteLine($"[OnMixPointReached] ✅ Stream configurato");
+                        Log($"[OnMixPointReached] Player attivo DOPO il mix:  {(_isPlayerAActive ? "A" : "B")}");
+                        Log($"[OnMixPointReached] ✅ Stream configurato");
                     }
                     else
                     {
-                        Console.WriteLine($"[OnMixPointReached] 🎵 Caricamento file audio normale...");
+                        Log($"[OnMixPointReached] 🎵 Caricamento file audio normale...");
 
                         if (_isPlayerAActive)
                         {
-                            Console.WriteLine($"[OnMixPointReached] Carico su Player B");
+                            Log($"[OnMixPointReached] Carico su Player B");
 
                             if (_volumeProviderB != null)
                             {
@@ -934,7 +937,7 @@ namespace AirDirector.Controls
                             if (nextItem.MarkerIN > 0)
                             {
                                 _audioFileB.CurrentTime = TimeSpan.FromMilliseconds(nextItem.MarkerIN);
-                                Console.WriteLine($"[OnMixPointReached] Player B: Marker IN = {nextItem.MarkerIN}ms");
+                                Log($"[OnMixPointReached] Player B: Marker IN = {nextItem.MarkerIN}ms");
                             }
 
                             // USA RESAMPLING
@@ -949,7 +952,7 @@ namespace AirDirector.Controls
                         }
                         else
                         {
-                            Console.WriteLine($"[OnMixPointReached] Carico su Player A");
+                            Log($"[OnMixPointReached] Carico su Player A");
 
                             if (_volumeProviderA != null)
                             {
@@ -962,7 +965,7 @@ namespace AirDirector.Controls
                             if (nextItem.MarkerIN > 0)
                             {
                                 _audioFileA.CurrentTime = TimeSpan.FromMilliseconds(nextItem.MarkerIN);
-                                Console.WriteLine($"[OnMixPointReached] Player A: Marker IN = {nextItem.MarkerIN}ms");
+                                Log($"[OnMixPointReached] Player A: Marker IN = {nextItem.MarkerIN}ms");
                             }
 
                             // USA RESAMPLING
@@ -986,17 +989,17 @@ namespace AirDirector.Controls
                         _mixRequested = false;
                         _mixCheckTimer.Start();
 
-                        Console.WriteLine($"[OnMixPointReached] Player attivo DOPO il mix:  {(_isPlayerAActive ? "A" : "B")}");
-                        Console.WriteLine($"[OnMixPointReached] Nuovo Marker MIX: {_markerMIX}ms");
-                        Console.WriteLine($"[OnMixPointReached] ✅ File audio caricato e MixCheckTimer riavviato");
+                        Log($"[OnMixPointReached] Player attivo DOPO il mix:  {(_isPlayerAActive ? "A" : "B")}");
+                        Log($"[OnMixPointReached] Nuovo Marker MIX: {_markerMIX}ms");
+                        Log($"[OnMixPointReached] ✅ File audio caricato e MixCheckTimer riavviato");
                     }
 
                     MixPointReached?.Invoke(this, EventArgs.Empty);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[OnMixPointReached] ❌ ERRORE: {ex.Message}");
-                    Console.WriteLine($"[OnMixPointReached] StackTrace: {ex.StackTrace}");
+                    Log($"[OnMixPointReached] ❌ ERRORE: {ex.Message}");
+                    Log($"[OnMixPointReached] StackTrace: {ex.StackTrace}");
                     MessageBox.Show($"Errore mix:  {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
@@ -1033,8 +1036,8 @@ namespace AirDirector.Controls
 
                 UpdateCounters();
 
-                Console.WriteLine($"[LoadTrackInfo] 🌐 Stream:  {item.Title}");
-                Console.WriteLine($"[LoadTrackInfo] Durata: {_totalDuration}");
+                Log($"[LoadTrackInfo] 🌐 Stream:  {item.Title}");
+                Log($"[LoadTrackInfo] Durata: {_totalDuration}");
             }
             else
             {
@@ -1050,12 +1053,12 @@ namespace AirDirector.Controls
                 _markerOUT = item.MarkerOUT > 0 ? item.MarkerOUT : (int)_totalDuration.TotalMilliseconds;
                 _mixRequested = false;
 
-                Console.WriteLine($"[LoadTrackInfo] 🎵 File: {item.Artist} - {item.Title}");
-                Console.WriteLine($"[LoadTrackInfo] Player: {(_isPlayerAActive ? "A" : "B")}");
-                Console.WriteLine($"[LoadTrackInfo] Marker IN: {_markerIN}ms");
-                Console.WriteLine($"[LoadTrackInfo] Marker MIX: {_markerMIX}ms");
-                Console.WriteLine($"[LoadTrackInfo] Marker OUT: {_markerOUT}ms");
-                Console.WriteLine($"[LoadTrackInfo] Durata totale: {_totalDuration}");
+                Log($"[LoadTrackInfo] 🎵 File: {item.Artist} - {item.Title}");
+                Log($"[LoadTrackInfo] Player: {(_isPlayerAActive ? "A" : "B")}");
+                Log($"[LoadTrackInfo] Marker IN: {_markerIN}ms");
+                Log($"[LoadTrackInfo] Marker MIX: {_markerMIX}ms");
+                Log($"[LoadTrackInfo] Marker OUT: {_markerOUT}ms");
+                Log($"[LoadTrackInfo] Durata totale: {_totalDuration}");
             }
 
             string displayText = string.IsNullOrEmpty(item.Artist)
@@ -1331,7 +1334,7 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Waveform] ⚠️ Errore:  {ex.Message}");
+                Log($"[Waveform] ⚠️ Errore:  {ex.Message}");
                 FinishWaveformGeneration();
             }
         }
@@ -2302,7 +2305,7 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PlayerControl] ⚠️ NotifyTrackChanged error: {ex.Message}");
+                Log($"[PlayerControl] ⚠️ NotifyTrackChanged error: {ex.Message}");
             }
         }
 
@@ -2553,7 +2556,7 @@ namespace AirDirector.Controls
                 return;
             }
 
-            Console.WriteLine($"[Play] 🎵 Riproduzione file audio normale");
+            Log($"[Play] 🎵 Riproduzione file audio normale");
 
             AudioFileReader activeAudio = _isPlayerAActive ? _audioFileA : _audioFileB;
 
@@ -2563,7 +2566,7 @@ namespace AirDirector.Controls
                 {
                     activeAudio.CurrentTime = TimeSpan.FromMilliseconds(_markerIN);
                     _currentPosition = TimeSpan.FromMilliseconds(_markerIN);
-                    Console.WriteLine($"[Play] Partenza da Marker IN: {_markerIN}ms");
+                    Log($"[Play] Partenza da Marker IN: {_markerIN}ms");
                 }
 
                 // USA RESAMPLING
@@ -2589,7 +2592,7 @@ namespace AirDirector.Controls
 
                 UpdateButtonStates();
 
-                Console.WriteLine($"[Play] ✅ File audio avviato su Player {(_isPlayerAActive ? "A" : "B")}");
+                Log($"[Play] ✅ File audio avviato su Player {(_isPlayerAActive ? "A" : "B")}");
 
                 // NOTIFICA RADIOTV BRIDGE
                 PlayStateChanged?.Invoke(this, new PlayStateChangedEventArgs
@@ -2804,6 +2807,10 @@ namespace AirDirector.Controls
         public bool IsPlaying => _isPlaying && !_isPaused;
         public bool IsAutoMode => _autoMode;
 
+        private void Log(string m) { _dailyLogger?.Log(m); }
+        private void LogErr(string m, Exception ex) { _dailyLogger?.LogErr(m, ex); }
+        private void LogErr(string m) { _dailyLogger?.LogErr(m); }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
@@ -2845,6 +2852,8 @@ namespace AirDirector.Controls
                     _waveformBitmap?.Dispose();
                     _waveformBitmap = null;
                 }
+
+                try { _dailyLogger?.Dispose(); } catch { }
             }
             base.Dispose(disposing);
         }

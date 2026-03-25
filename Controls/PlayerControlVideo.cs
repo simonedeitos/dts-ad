@@ -169,7 +169,7 @@ namespace AirDirector.Controls
         public event EventHandler<TrackChangedEventArgs> TrackChanged;
         public event EventHandler<PlayStateChangedEventArgs> PlayStateChanged;
 
-        private StreamWriter _logWriter; private readonly object _logLock = new object();
+        private Services.Core.DailyLogger _dailyLogger;
         private static Font SafeFont(string f, float s, FontStyle st) { try { return new Font(new FontFamily(f), s, st); } catch { return new Font(SystemFonts.DefaultFont.FontFamily, s, st); } }
         private static bool IsWebStream(string path) { if (string.IsNullOrEmpty(path)) return false; return path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("mms://", StringComparison.OrdinalIgnoreCase); }
 
@@ -1187,10 +1187,10 @@ namespace AirDirector.Controls
         // ═══════════════════════════════════════════════════════════
         // LOG
         // ═══════════════════════════════════════════════════════════
-        private void InitLog() { try { string d = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs"); Directory.CreateDirectory(d); _logWriter = new StreamWriter(Path.Combine(d, "PlayerVideo-" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt"), true) { AutoFlush = true }; } catch { } }
-        private void Log(string m) { string l = "[" + DateTime.Now.ToString("HH:mm:ss.fff") + "] " + m; Console.WriteLine(l); lock (_logLock) { try { _logWriter?.WriteLine(l); } catch { } } }
-        private void LogErr(string m, Exception ex) { Log("ERR " + m + ": " + ex.Message); }
-        private void LogErr(string m) { Log("ERR " + m); }
+        private void InitLog() { try { _dailyLogger = new Services.Core.DailyLogger("PlayerVideo"); } catch { } }
+        private void Log(string m) { _dailyLogger?.Log(m); }
+        private void LogErr(string m, Exception ex) { _dailyLogger?.LogErr(m, ex); }
+        private void LogErr(string m) { _dailyLogger?.LogErr(m); }
 
         // ═════════════════════════════════════���═════════════════════
         // DISPOSE
@@ -1207,7 +1207,7 @@ namespace AirDirector.Controls
                 if (_bufferDeck != null) { StopDeckInternal(_bufferDeck, true); Marshal.FreeHGlobal(_bufferDeck.VideoBufferPtr); }
                 if (_compositedVideoHandle.IsAllocated) _compositedVideoHandle.Free();
                 _libVLC?.Dispose(); _ndiSender?.Dispose();
-                try { _logWriter?.Dispose(); } catch { }
+                try { _dailyLogger?.Dispose(); } catch { }
             }
             base.Dispose(disposing);
         }

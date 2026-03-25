@@ -48,6 +48,8 @@ namespace AirDirector.Controls
         private readonly object _previewLock = new object();
 
         private bool _isDragging = false;
+
+        private Services.Core.DailyLogger _dailyLogger;
         private Point _dragStartPoint;
 
         public event EventHandler<string> StatusChanged;
@@ -60,6 +62,7 @@ namespace AirDirector.Controls
             _archiveType = archiveType;
             _allMusicData = new List<MusicEntry>();
             _allClipsData = new List<ClipEntry>();
+            try { _dailyLogger = new Services.Core.DailyLogger("Archive"); } catch { }
             InitializeUI();
             InitializeMiniPlayer();
 
@@ -803,21 +806,21 @@ namespace AirDirector.Controls
                     var musicList = selectedItems.OfType<MusicEntry>().ToList();
                     dragData.SetData("MusicEntryList", musicList);
 
-                    Console.WriteLine($"[ArchiveControl] Drag avviato:  {musicList.Count} brani musicali");
+                    Log($"[ArchiveControl] Drag avviato:  {musicList.Count} brani musicali");
                 }
                 else
                 {
                     var clipsList = selectedItems.OfType<ClipEntry>().ToList();
                     dragData.SetData("ClipEntryList", clipsList);
 
-                    Console.WriteLine($"[ArchiveControl] Drag avviato: {clipsList.Count} clips");
+                    Log($"[ArchiveControl] Drag avviato: {clipsList.Count} clips");
                 }
 
                 DragDropEffects result = dgvArchive.DoDragDrop(dragData, DragDropEffects.Copy);
 
                 if (result == DragDropEffects.Copy)
                 {
-                    Console.WriteLine("[ArchiveControl] ✅ Drag completato con successo");
+                    Log("[ArchiveControl] ✅ Drag completato con successo");
 
                     StatusChanged?.Invoke(this,
                         string.Format(LanguageManager.GetString("Archive.ItemsAdded", "{0} elementi aggiunti alla playlist"),
@@ -825,12 +828,12 @@ namespace AirDirector.Controls
                 }
                 else
                 {
-                    Console.WriteLine($"[ArchiveControl] ⚠️ Drag annullato o fallito:  {result}");
+                    Log($"[ArchiveControl] ⚠️ Drag annullato o fallito:  {result}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ArchiveControl] ❌ Errore drag: {ex.Message}");
+                Log($"[ArchiveControl] ❌ Errore drag: {ex.Message}");
                 MessageBox.Show(
                     $"Errore durante il trascinamento:\n{ex.Message}",
                     "Errore Drag & Drop",
@@ -868,16 +871,16 @@ namespace AirDirector.Controls
                 title = clipEntry.Title;
             }
 
-            Console.WriteLine("");
-            Console.WriteLine("========================================");
-            Console.WriteLine("[ArchiveControl] 🎧 PREVIEW RICHIESTO");
-            Console.WriteLine($"[ArchiveControl] File: {filePath}");
-            Console.WriteLine($"[ArchiveControl] Titolo: {title}");
-            Console.WriteLine($"[ArchiveControl] File esiste: {File.Exists(filePath)}");
-            Console.WriteLine($"[ArchiveControl] Player attivo: {_previewPlayer != null}");
-            Console.WriteLine($"[ArchiveControl] In riproduzione: {_isPreviewPlaying}");
-            Console.WriteLine($"[ArchiveControl] Panel visibile: {pnlMiniPlayer.Visible}");
-            Console.WriteLine("========================================");
+            Log("");
+            Log("========================================");
+            Log("[ArchiveControl] 🎧 PREVIEW RICHIESTO");
+            Log($"[ArchiveControl] File: {filePath}");
+            Log($"[ArchiveControl] Titolo: {title}");
+            Log($"[ArchiveControl] File esiste: {File.Exists(filePath)}");
+            Log($"[ArchiveControl] Player attivo: {_previewPlayer != null}");
+            Log($"[ArchiveControl] In riproduzione: {_isPreviewPlaying}");
+            Log($"[ArchiveControl] Panel visibile: {pnlMiniPlayer.Visible}");
+            Log("========================================");
 
             if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
             {
@@ -1160,7 +1163,7 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ArchiveControl] ⚠️ Errore stop preview: {ex.Message}");
+                Log($"[ArchiveControl] ⚠️ Errore stop preview: {ex.Message}");
             }
 
             int session;
@@ -1192,7 +1195,7 @@ namespace AirDirector.Controls
                     {
                         this.BeginInvoke(new Action(() =>
                         {
-                            Console.WriteLine("[ArchiveControl] ⏹️ Playback terminato");
+                            Log("[ArchiveControl] ⏹️ Playback terminato");
                             _isPreviewPlaying = false;
                             btnPlayStop.Text = "▶";
                             btnPlayStop.BackColor = Color.FromArgb(0, 200, 0);
@@ -1223,11 +1226,11 @@ namespace AirDirector.Controls
 
                 _previewTimer.Start();
 
-                Console.WriteLine($"[ArchiveControl] ▶️ Preview avviato:  {title}");
+                Log($"[ArchiveControl] ▶️ Preview avviato:  {title}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ArchiveControl] ❌ Errore avvio preview: {ex.Message}");
+                Log($"[ArchiveControl] ❌ Errore avvio preview: {ex.Message}");
                 MessageBox.Show(
                     string.Format(LanguageManager.GetString("Archive.PreviewError", "Errore preascolto:\n{0}"), ex.Message),
                     LanguageManager.GetString("Common.Error", "Errore"),
@@ -1241,7 +1244,7 @@ namespace AirDirector.Controls
         {
             try
             {
-                Console.WriteLine("[ArchiveControl] 🛑 StopPreview chiamato");
+                Log("[ArchiveControl] 🛑 StopPreview chiamato");
 
                 lock (_previewLock)
                 {
@@ -1258,22 +1261,22 @@ namespace AirDirector.Controls
                             _previewPlayer.PlaybackState == PlaybackState.Paused)
                         {
                             _previewPlayer.Stop();
-                            Console.WriteLine("[ArchiveControl]   ⏹️ Player fermato");
+                            Log("[ArchiveControl]   ⏹️ Player fermato");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[ArchiveControl]   ⚠️ Errore stop player: {ex.Message}");
+                        Log($"[ArchiveControl]   ⚠️ Errore stop player: {ex.Message}");
                     }
 
                     try
                     {
                         _previewPlayer.Dispose();
-                        Console.WriteLine("[ArchiveControl]   ♻️ Player disposed");
+                        Log("[ArchiveControl]   ♻️ Player disposed");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[ArchiveControl]   ⚠️ Errore dispose player: {ex.Message}");
+                        Log($"[ArchiveControl]   ⚠️ Errore dispose player: {ex.Message}");
                     }
 
                     _previewPlayer = null;
@@ -1284,11 +1287,11 @@ namespace AirDirector.Controls
                     try
                     {
                         _previewAudioFile.Dispose();
-                        Console.WriteLine("[ArchiveControl]   ♻️ AudioFile disposed");
+                        Log("[ArchiveControl]   ♻️ AudioFile disposed");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[ArchiveControl]   ⚠️ Errore dispose audiofile: {ex.Message}");
+                        Log($"[ArchiveControl]   ⚠️ Errore dispose audiofile: {ex.Message}");
                     }
 
                     _previewAudioFile = null;
@@ -1304,11 +1307,11 @@ namespace AirDirector.Controls
 
                 pnlMiniPlayer.Visible = false;
 
-                Console.WriteLine("[ArchiveControl] ✅ StopPreview completato");
+                Log("[ArchiveControl] ✅ StopPreview completato");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ArchiveControl] ❌ Errore critico in StopPreview: {ex.Message}");
+                Log($"[ArchiveControl] ❌ Errore critico in StopPreview: {ex.Message}");
             }
         }
 
@@ -1624,7 +1627,7 @@ namespace AirDirector.Controls
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[ArchiveControl] ❌ Errore import {filePath}: {ex.Message}");
+                        Log($"[ArchiveControl] ❌ Errore import {filePath}: {ex.Message}");
                         errors++;
                     }
                 }
@@ -1777,7 +1780,7 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ArchiveControl] ⚠️ Impossibile leggere metadata video: {ex.Message}");
+                Log($"[ArchiveControl] ⚠️ Impossibile leggere metadata video: {ex.Message}");
             }
 
             int durationMs = duration * 1000;
@@ -1897,7 +1900,7 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ArchiveControl] ⚠️ Impossibile leggere metadata video:  {ex.Message}");
+                Log($"[ArchiveControl] ⚠️ Impossibile leggere metadata video:  {ex.Message}");
             }
 
             int durationMs = duration * 1000;
@@ -2299,6 +2302,10 @@ namespace AirDirector.Controls
             }
         }
 
+        private void Log(string m) { _dailyLogger?.Log(m); }
+        private void LogErr(string m, Exception ex) { _dailyLogger?.LogErr(m, ex); }
+        private void LogErr(string m) { _dailyLogger?.LogErr(m); }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
@@ -2306,6 +2313,7 @@ namespace AirDirector.Controls
                 LanguageManager.SaveMissingKeysToFile();
                 LanguageManager.LanguageChanged -= OnLanguageChanged;
                 StopPreview();
+                try { _dailyLogger?.Dispose(); } catch { }
             }
             base.Dispose(disposing);
         }
