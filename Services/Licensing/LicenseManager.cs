@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Win32;
@@ -72,6 +73,54 @@ namespace AirDirector.Services.Licensing
             return client;
         }
 
+        // ── Cifratura file licenza (AES-256-CBC) ─────────────────────────────
+        private const string EncPassphrase = "AirDirector.Lic.2024#Secure";
+        private static readonly byte[] EncSalt =
+        {
+            0x4A, 0x69, 0x2E, 0xAC, 0x7B, 0xF3, 0x1D, 0x88,
+            0x5C, 0x40, 0xE2, 0x9A, 0x3F, 0xC1, 0x55, 0x7E
+        };
+
+        private static (byte[] key, byte[] iv) DeriveKeyAndIV()
+        {
+            using var kdf = new Rfc2898DeriveBytes(
+                EncPassphrase, EncSalt, 100_000, HashAlgorithmName.SHA256);
+            return (kdf.GetBytes(32), kdf.GetBytes(16));
+        }
+
+        private static string EncryptLicense(string plainText)
+        {
+            var (key, iv) = DeriveKeyAndIV();
+            using var aes = Aes.Create();
+            aes.Key = key;
+            aes.IV = iv;
+
+            using var ms = new MemoryStream();
+            using (var cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write))
+            using (var sw = new StreamWriter(cs, Encoding.UTF8))
+            {
+                sw.Write(plainText);
+                sw.Flush();
+            }
+
+            return Convert.ToBase64String(ms.ToArray());
+        }
+
+        private static string DecryptLicense(string cipherText)
+        {
+            var (key, iv) = DeriveKeyAndIV();
+            byte[] cipherBytes = Convert.FromBase64String(cipherText);
+
+            using var aes = Aes.Create();
+            aes.Key = key;
+            aes.IV = iv;
+
+            using var ms = new MemoryStream(cipherBytes);
+            using var cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Read);
+            using var sr = new StreamReader(cs, Encoding.UTF8);
+            return sr.ReadToEnd();
+        }
+
         // ── Cache ─────────────────────────────────────────────────────────────
         private static LicenseInfo? _cachedLicense = null;
 
@@ -89,11 +138,43 @@ namespace AirDirector.Services.Licensing
             {
                 try
                 {
-                    string json = File.ReadAllText(LicenseFilePath);
+                    string fileContent = File.ReadAllText(LicenseFilePath);
+
+                    // Prova prima come contenuto cifrato; se fallisce prova come JSON in chiaro
+                    // (compatibilità con file .lic precedenti alla cifratura)
+                    string json;
+                    bool wasEncrypted = true;
+                    try
+                    {
+                        json = DecryptLicense(fileContent);
+                    }
+                    catch (FormatException)
+                    {
+                        // fileContent non è Base64 valido → file in chiaro
+                        json = fileContent;
+                        wasEncrypted = false;
+                    }
+                    catch (CryptographicException)
+                    {
+                        // Decifrazione fallita → file in chiaro o corrotto
+                        json = fileContent;
+                        wasEncrypted = false;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[LicenseManager] Errore inatteso nella decifrazione: {ex.Message}");
+                        json = fileContent;
+                        wasEncrypted = false;
+                    }
+
                     var loaded = JsonConvert.DeserializeObject<LicenseInfo>(json);
 
                     if (loaded != null && loaded.IsValid())
                     {
+                        // Se il file era in chiaro, riscrivilo cifrato
+                        if (!wasEncrypted)
+                            SaveLicenseToFile(loaded, out _);
+
                         _cachedLicense = loaded;
                         return _cachedLicense;
                     }
@@ -401,7 +482,7 @@ namespace AirDirector.Services.Licensing
                     Directory.CreateDirectory(AppDataPath);
 
                 string json = JsonConvert.SerializeObject(license, Formatting.Indented);
-                File.WriteAllText(LicenseFilePath, json);
+                File.WriteAllText(LicenseFilePath, EncryptLicense(json));
                 return true;
             }
             catch (Exception ex)
