@@ -21,7 +21,8 @@ namespace AirDirector.Forms
         private void InitializeCustomComponents()
         {
             this.Text = LanguageManager.GetString("License_Title", "Attivazione Licenza");
-            this.Size = new Size(580, 620);
+            this.ClientSize = new Size(620, 600);
+            this.MinimumSize = new Size(640, 640);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -32,7 +33,7 @@ namespace AirDirector.Forms
             Panel headerPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 100,
+                Height = 110,
                 BackColor = AppTheme.Primary
             };
             this.Controls.Add(headerPanel);
@@ -40,9 +41,9 @@ namespace AirDirector.Forms
             Label lblIcon = new Label
             {
                 Text = "🔐",
-                Font = new Font("Segoe UI", 28),
+                Font = new Font("Segoe UI", 30),
                 ForeColor = AppTheme.TextInverse,
-                Location = new Point(20, 18),
+                Location = new Point(20, 20),
                 AutoSize = true
             };
             headerPanel.Controls.Add(lblIcon);
@@ -50,11 +51,11 @@ namespace AirDirector.Forms
             Label lblTitle = new Label
             {
                 Text = LanguageManager.GetString("License_Title", "Attivazione Licenza"),
-                Font = new Font("Segoe UI", 19, FontStyle.Bold),
+                Font = new Font("Segoe UI", 20, FontStyle.Bold),
                 ForeColor = AppTheme.TextInverse,
                 AutoSize = false,
-                Size = new Size(430, 38),
-                Location = new Point(78, 16),
+                Size = new Size(460, 42),
+                Location = new Point(82, 18),
                 TextAlign = ContentAlignment.MiddleLeft
             };
             headerPanel.Controls.Add(lblTitle);
@@ -65,17 +66,21 @@ namespace AirDirector.Forms
                 Font = new Font("Segoe UI", 9),
                 ForeColor = Color.FromArgb(200, 230, 255),
                 AutoSize = false,
-                Size = new Size(500, 20),
-                Location = new Point(78, 58),
+                Size = new Size(520, 22),
+                Location = new Point(82, 66),
                 TextAlign = ContentAlignment.MiddleLeft
             };
             headerPanel.Controls.Add(lblSubtitle);
 
             // ===== MAIN CARD =====
+            // Layout verticale: header(110) + margin(20) + card(220) + margin(20) + btnActivate(52) + margin(24) + sep(1) + margin(12) + lblOr(22) + margin(12) + btnDemo(48) + margin(14) + lblDemoInfo(22) + margin(20)
+            int margin = 20;
+            int cardTop = 110 + margin;
+
             Panel cardPanel = new Panel
             {
-                Location = new Point(24, 116),
-                Size = new Size(524, 230),
+                Location = new Point(margin, cardTop),
+                Size = new Size(580, 220),
                 BackColor = AppTheme.Surface,
                 Padding = new Padding(24)
             };
@@ -91,9 +96,9 @@ namespace AirDirector.Forms
             Label lblOwner = new Label
             {
                 Text = LanguageManager.GetString("License_OwnerName", "Nome / Ragione Sociale"),
-                Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = AppTheme.TextSecondary,
-                Location = new Point(24, 20),
+                Location = new Point(24, 18),
                 AutoSize = true
             };
             cardPanel.Controls.Add(lblOwner);
@@ -103,7 +108,7 @@ namespace AirDirector.Forms
                 Name = "txtOwner",
                 Font = new Font("Segoe UI", 11),
                 Location = new Point(24, 40),
-                Size = new Size(472, 34),
+                Size = new Size(532, 34),
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = AppTheme.BgLight
             };
@@ -113,9 +118,9 @@ namespace AirDirector.Forms
             Label lblSerial = new Label
             {
                 Text = LanguageManager.GetString("License_Serial", "Codice Seriale"),
-                Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = AppTheme.TextSecondary,
-                Location = new Point(24, 92),
+                Location = new Point(24, 90),
                 AutoSize = true
             };
             cardPanel.Controls.Add(lblSerial);
@@ -125,7 +130,7 @@ namespace AirDirector.Forms
                 Name = "txtSerial",
                 Font = new Font("Segoe UI", 13, FontStyle.Bold),
                 Location = new Point(24, 112),
-                Size = new Size(472, 36),
+                Size = new Size(532, 36),
                 MaxLength = 18,
                 CharacterCasing = CharacterCasing.Upper,
                 BorderStyle = BorderStyle.FixedSingle,
@@ -138,19 +143,20 @@ namespace AirDirector.Forms
                 Text = "Formato: ADR-XXXX-XXXX-XXXX",
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = AppTheme.TextSecondary,
-                Location = new Point(24, 158),
+                Location = new Point(24, 160),
                 AutoSize = true
             };
             cardPanel.Controls.Add(lblFormat);
 
             // ===== ACTIVATE BUTTON =====
+            int btnActivateTop = cardTop + cardPanel.Height + margin;
             Button btnActivate = new Button
             {
                 Name = "btnActivate",
                 Text = "🔓  " + LanguageManager.GetString("License_Activate", "Attiva Licenza"),
-                Font = new Font("Segoe UI", 12, FontStyle.Bold),
-                Location = new Point(24, 364),
-                Size = new Size(524, 50),
+                Font = new Font("Segoe UI", 13, FontStyle.Bold),
+                Location = new Point(margin, btnActivateTop),
+                Size = new Size(580, 52),
                 BackColor = AppTheme.Success,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -161,10 +167,11 @@ namespace AirDirector.Forms
             this.Controls.Add(btnActivate);
 
             // ===== SEPARATOR =====
+            int sepTop = btnActivateTop + btnActivate.Height + 24;
             Panel sepPanel = new Panel
             {
-                Location = new Point(24, 430),
-                Size = new Size(524, 1),
+                Location = new Point(margin, sepTop),
+                Size = new Size(580, 1),
                 BackColor = AppTheme.BorderLight
             };
             this.Controls.Add(sepPanel);
@@ -174,19 +181,20 @@ namespace AirDirector.Forms
                 Text = "— oppure —",
                 Font = new Font("Segoe UI", 9, FontStyle.Italic),
                 ForeColor = AppTheme.TextSecondary,
-                Location = new Point(196, 438),
+                Location = new Point(230, sepTop + 8),
                 AutoSize = true
             };
             this.Controls.Add(lblOr);
 
             // ===== DEMO BUTTON =====
+            int btnDemoTop = sepTop + 32;
             Button btnDemo = new Button
             {
                 Name = "btnDemo",
                 Text = "⏩  " + LanguageManager.GetString("License_Demo", "Continua in Modalità Demo"),
-                Font = new Font("Segoe UI", 10),
-                Location = new Point(24, 460),
-                Size = new Size(524, 44),
+                Font = new Font("Segoe UI", 11),
+                Location = new Point(margin, btnDemoTop),
+                Size = new Size(580, 48),
                 BackColor = AppTheme.Warning,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -197,6 +205,7 @@ namespace AirDirector.Forms
             this.Controls.Add(btnDemo);
 
             // ===== DEMO LIMITS INFO =====
+            int demoInfoTop = btnDemoTop + btnDemo.Height + 14;
             Label lblDemoInfo = new Label
             {
                 Text = LanguageManager.GetString("License_DemoLimits", "Limiti Modalità Demo:") + "  " +
@@ -205,11 +214,14 @@ namespace AirDirector.Forms
                        LanguageManager.GetString("License_DemoEncoders", "1 encoder"),
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = AppTheme.TextSecondary,
-                Location = new Point(24, 518),
-                Size = new Size(524, 20),
+                Location = new Point(margin, demoInfoTop),
+                Size = new Size(580, 22),
                 TextAlign = ContentAlignment.MiddleCenter
             };
             this.Controls.Add(lblDemoInfo);
+
+            // Aggiusta altezza client in base al contenuto
+            this.ClientSize = new Size(620, demoInfoTop + lblDemoInfo.Height + margin);
         }
 
         private void BtnActivate_Click(string ownerName, string serial)

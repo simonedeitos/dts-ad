@@ -78,6 +78,7 @@
         private System.Windows.Forms.TrackBar trkVolume;
         private System.Windows.Forms.Label lblVolumeDb;
         private System.Windows.Forms.Button btnApplyVolume;
+        private System.Windows.Forms.CheckBox chkColoredPeaks;
 
         // ✅ ZOOM
         private System.Windows.Forms.Panel zoomPanel;
@@ -107,6 +108,7 @@
             trkVolume = new System.Windows.Forms.TrackBar();
             lblVolumeDb = new System.Windows.Forms.Label();
             btnApplyVolume = new System.Windows.Forms.Button();
+            chkColoredPeaks = new System.Windows.Forms.CheckBox();
 
             leftPanel = new System.Windows.Forms.Panel();
             lblCurrentPosition = new System.Windows.Forms.Label();
@@ -264,11 +266,12 @@
             grpVolume.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold);
             grpVolume.ForeColor = System.Drawing.Color.White;
             grpVolume.Location = new System.Drawing.Point(530, 2);
-            grpVolume.Size = new System.Drawing.Size(420, 55);
+            grpVolume.Size = new System.Drawing.Size(560, 55);
             grpVolume.TabIndex = 4;
             grpVolume.Controls.Add(trkVolume);
             grpVolume.Controls.Add(lblVolumeDb);
             grpVolume.Controls.Add(btnApplyVolume);
+            grpVolume.Controls.Add(chkColoredPeaks);
 
             trkVolume.Location = new System.Drawing.Point(10, 18);
             trkVolume.Name = "trkVolume";
@@ -298,6 +301,19 @@
             btnApplyVolume.TabIndex = 1;
             btnApplyVolume.FlatAppearance.BorderSize = 0;
             btnApplyVolume.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            chkColoredPeaks.Text = "🎨 Picchi colorati";
+            chkColoredPeaks.Name = "chkColoredPeaks";
+            chkColoredPeaks.Font = new System.Drawing.Font("Segoe UI", 8F);
+            chkColoredPeaks.ForeColor = System.Drawing.Color.White;
+            chkColoredPeaks.Location = new System.Drawing.Point(420, 19);
+            chkColoredPeaks.Size = new System.Drawing.Size(130, 22);
+            chkColoredPeaks.TabIndex = 2;
+            chkColoredPeaks.Checked = false;
+            chkColoredPeaks.UseVisualStyleBackColor = false;
+            chkColoredPeaks.BackColor = System.Drawing.Color.Transparent;
+            chkColoredPeaks.Cursor = System.Windows.Forms.Cursors.Hand;
+            chkColoredPeaks.CheckedChanged += new System.EventHandler(this.ChkColoredPeaks_CheckedChanged);
 
             // ========== leftPanel ==========
             leftPanel.Controls.Add(lblCurrentPosition);

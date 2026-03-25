@@ -90,7 +90,7 @@ namespace AirDirector.Controls
 			_queueMonitorTimer.Tick += QueueMonitorTimer_Tick;
 			_queueMonitorTimer.Start();
 
-			_scheduleMonitorTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+			_scheduleMonitorTimer = new System.Windows.Forms.Timer { Interval = 60000 };
 			_scheduleMonitorTimer.Tick += ScheduleMonitorTimer_Tick;
 			_scheduleMonitorTimer.Start();
 
@@ -353,14 +353,14 @@ namespace AirDirector.Controls
 			}
 		}
 
-		// ✅ FIX:  Timer IDENTICO a OverviewControl
+		// Timer a 1 minuto: controlla se nei prossimi 60 secondi ci sono schedulazioni,
+		// le esegue immediatamente o tramite timer interno con il giusto ritardo.
 		private void ScheduleMonitorTimer_Tick(object sender, EventArgs e)
 		{
 			try
 			{
 				DateTime now = DateTime.Now;
 
-				// ✅ LOGICA IDENTICA A OVERVIEWCONTROL
 				bool shouldReload = false;
 				string reloadReason = "";
 
@@ -374,41 +374,197 @@ namespace AirDirector.Controls
 					shouldReload = true;
 					reloadReason = "Cambio data";
 				}
-				else if (now.Hour == 23 && now.Minute == 59 && now.Second >= 55 && now.Second <= 59)
+				else if (now.Hour == 23 && now.Minute == 59)
 				{
 					shouldReload = true;
-					reloadReason = "23:59:55 - Precarica domani";
+					reloadReason = "23:59 - Precarica domani";
 				}
-				else if (now.Hour == 0 && now.Minute == 0 && now.Second >= 5 && now.Second <= 10)
+				else if (now.Hour == 0 && now.Minute == 0)
 				{
 					shouldReload = true;
-					reloadReason = "00:00:05 - Fallback mezzanotte";
+					reloadReason = "00:00 - Fallback mezzanotte";
 				}
-				else if (now.Minute == 0 && now.Second >= 5 && now.Second <= 10 && now.Hour >= 1 && now.Hour <= 23)
+				else if (now.Minute == 0 && now.Hour >= 1)
 				{
-					if ((now - _lastAdvReloadTime).TotalMinutes > 1)
-					{
-						shouldReload = true;
-						reloadReason = $"{now.Hour:D2}: 00:05 - Verifica oraria";
-					}
+					shouldReload = true;
+					reloadReason = $"{now.Hour:D2}:00 - Verifica oraria";
 				}
 
 				if (shouldReload)
 				{
-					Log($"[PlaylistADV] 🔄 Ricarica palinsesto:  {reloadReason}");
+					Log($"[PlaylistADV] 🔄 Ricarica palinsesto: {reloadReason}");
 					LoadAdvCache();
 				}
 
-				if (now >= _nextDayScheduleLoadTime && now < _nextDayScheduleLoadTime.AddMinutes(1))
+				if (now >= _nextDayScheduleLoadTime && now < _nextDayScheduleLoadTime.AddMinutes(2))
 				{
 					LoadNextDaySchedules();
 					CalculateNextDayScheduleLoadTime();
 				}
 
-				CheckAndExecuteSchedules(now);
-				CheckAndExecuteADVSchedules(now);
+				LookAheadAndExecuteSchedules(now);
+				LookAheadAndExecuteADVSchedules(now);
 			}
 			catch { }
+		}
+
+		// Cerca schedulazioni nella finestra [now, now+60s] e le attiva subito o con timer interno.
+		private void LookAheadAndExecuteSchedules(DateTime now)
+		{
+			try
+			{
+				int currentDayOfWeek = (int)now.DayOfWeek;
+				var schedules = DbcManager.LoadFromCsv<ScheduleEntry>("Schedules.dbc");
+				var activeSchedules = schedules
+					.Where(s => s.IsEnabled == 1 && IsDayEnabled(s, currentDayOfWeek))
+					.ToList();
+
+				if (activeSchedules.Count == 0) return;
+
+				TimeSpan windowStart = now.TimeOfDay;
+				TimeSpan windowEnd = now.TimeOfDay.Add(TimeSpan.FromSeconds(60));
+
+				foreach (var schedule in activeSchedules)
+				{
+					var times = schedule.Times.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+
+					foreach (var timeStr in times)
+					{
+						if (!TimeSpan.TryParse(timeStr, out TimeSpan scheduleTime)) continue;
+
+						string scheduleKey = $"{schedule.Type}_{schedule.Name}_{timeStr}_{now:yyyy-MM-dd}";
+						if (_executedSchedules.Contains(scheduleKey)) continue;
+
+						bool inWindow = scheduleTime >= windowStart && scheduleTime < windowEnd;
+						if (!inWindow) continue;
+
+						double delayMs = (scheduleTime - now.TimeOfDay).TotalMilliseconds;
+
+						// Segna subito come pianificata per evitare doppie attivazioni al minuto successivo
+						_executedSchedules.Add(scheduleKey);
+
+						if (delayMs <= 500)
+						{
+							Log($"[Schedules] ▶ Esecuzione immediata: {schedule.Name} @ {timeStr}");
+							_isInitialStartup = false;
+							_pendingScheduleVideoBufferPath = schedule.VideoBufferPath ?? "";
+							ExecuteSchedule(schedule);
+							_pendingScheduleVideoBufferPath = "";
+						}
+						else
+						{
+							int intervalMs = (int)Math.Ceiling(delayMs);
+							Log($"[Schedules] ⏳ Schedulazione in attesa: {schedule.Name} @ {timeStr} (tra {intervalMs / 1000}s)");
+
+							var capturedSchedule = schedule;
+							var delayedTimer = new System.Windows.Forms.Timer { Interval = intervalMs };
+							delayedTimer.Tick += (s, ev) =>
+							{
+								delayedTimer.Stop();
+								delayedTimer.Dispose();
+								Log($"[Schedules] ▶ Esecuzione ritardata: {capturedSchedule.Name} @ {timeStr}");
+								_isInitialStartup = false;
+								_pendingScheduleVideoBufferPath = capturedSchedule.VideoBufferPath ?? "";
+								ExecuteSchedule(capturedSchedule);
+								_pendingScheduleVideoBufferPath = "";
+							};
+							delayedTimer.Start();
+						}
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Log($"[Schedules] ❌ ERRORE LookAhead: {ex.Message}");
+			}
+		}
+
+		// Cerca schedulazioni ADV nella finestra [now, now+60s] e le attiva subito o con timer interno.
+		private void LookAheadAndExecuteADVSchedules(DateTime now)
+		{
+			try
+			{
+				if (_cachedAdvItems.Count == 0 || _advCacheDate != now.Date)
+					LoadAdvCache();
+
+				if (_cachedAdvItems.Count == 0) return;
+
+				var todaySlots = _cachedAdvItems
+					.Where(a => a.Date.Date == now.Date && a.IsActive)
+					.GroupBy(a => a.SlotTime)
+					.Select(g => new { SlotTime = g.Key, Items = g.OrderBy(x => x.SequenceOrder).ToList() })
+					.ToList();
+
+				TimeSpan windowStart = now.TimeOfDay;
+				TimeSpan windowEnd = now.TimeOfDay.Add(TimeSpan.FromSeconds(60));
+
+				foreach (var slot in todaySlots)
+				{
+					if (!TimeSpan.TryParse(slot.SlotTime, out TimeSpan slotTime)) continue;
+
+					bool inWindow = slotTime >= windowStart && slotTime < windowEnd;
+					if (!inWindow) continue;
+
+					string advKey = $"ADV_{slot.SlotTime}_{now:yyyy-MM-dd}";
+					if (_executedSchedules.Contains(advKey)) continue;
+
+					double delayMs = (slotTime - now.TimeOfDay).TotalMilliseconds;
+
+					// Segna subito come pianificata per evitare doppie attivazioni
+					_executedSchedules.Add(advKey);
+
+					var capturedSlot = slot;
+
+					if (delayMs <= 500)
+					{
+						ExecuteADVSlot(now, capturedSlot.SlotTime, capturedSlot.Items);
+					}
+					else
+					{
+						int intervalMs = (int)Math.Ceiling(delayMs);
+						Log($"[PlaylistADV] ⏳ ADV in attesa: {slot.SlotTime} (tra {intervalMs / 1000}s)");
+
+						var delayedTimer = new System.Windows.Forms.Timer { Interval = intervalMs };
+						delayedTimer.Tick += (s, ev) =>
+						{
+							delayedTimer.Stop();
+							delayedTimer.Dispose();
+							ExecuteADVSlot(now, capturedSlot.SlotTime, capturedSlot.Items);
+						};
+						delayedTimer.Start();
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Log($"[PlaylistADV] ❌ Errore LookAhead ADV: {ex.Message}");
+			}
+		}
+
+		private void ExecuteADVSlot(DateTime now, string slotTime, System.Collections.Generic.List<AirDirectorPlaylistItem> items)
+		{
+			Log($"");
+			Log($"╔════════════════════════════════════════════════════════════╗");
+			Log($"║  PUBBLICITÀ ATTIVATA: {slotTime}                           ║");
+			Log($"╚════════════════════════════════════════════════════════════╝");
+
+			int insertPosition = GetCorrectScheduleInsertPosition();
+			int addedCount = 0;
+
+			foreach (var advFile in items)
+			{
+				var advSlot = CreateSingleADVSlot(advFile, slotTime);
+				if (advSlot != null)
+				{
+					InsertItem(insertPosition, advSlot);
+					insertPosition++;
+					addedCount++;
+					Log($"[PlaylistADV]   → {advFile.FileType}: {Path.GetFileName(advFile.FilePath)} ({advFile.Duration}s)");
+				}
+			}
+
+			Log($"[PlaylistADV] ✅ Inseriti {addedCount} slot ADV");
+			Log($"");
 		}
 
 		// ✅ FIX:  Metodo IDENTICO a OverviewControl
