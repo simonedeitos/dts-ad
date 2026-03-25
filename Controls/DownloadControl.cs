@@ -22,7 +22,7 @@ namespace AirDirector.Controls
         private List<DownloadTask> _downloadTasks = new List<DownloadTask>();
         private System.Windows.Forms.Timer _schedulerTimer;
         private System.Windows.Forms.Timer _countdownTimer;
-        private string _logFilePath;
+        private Services.Core.DailyLogger _dailyLogger;
         private bool _isProcessing = false;
         private bool _logVisible = true;
 
@@ -48,13 +48,7 @@ namespace AirDirector.Controls
         {
             InitializeComponent();
 
-            _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", "FileDownloader_Log.txt");
-
-            string logDir = Path.GetDirectoryName(_logFilePath);
-            if (!Directory.Exists(logDir))
-            {
-                Directory.CreateDirectory(logDir);
-            }
+            try { _dailyLogger = new Services.Core.DailyLogger("Downloader"); } catch { }
 
             _schedulerTimer = new System.Windows.Forms.Timer();
             _schedulerTimer.Interval = 1000;
@@ -601,21 +595,23 @@ namespace AirDirector.Controls
 
         private void LoadLastLogLines()
         {
-            if (File.Exists(_logFilePath))
+            try
             {
-                try
+                string today = DateTime.Now.ToString("yyyy-MM-dd");
+                string logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", today, "Downloader-" + today + ".log");
+                if (File.Exists(logFilePath))
                 {
-                    string[] logLines = File.ReadAllLines(_logFilePath);
+                    string[] logLines = File.ReadAllLines(logFilePath);
                     int maxLines = Math.Min(logLines.Length, 100);
                     for (int i = logLines.Length - maxLines; i < logLines.Length; i++)
                     {
                         txtLog.AppendText(logLines[i] + Environment.NewLine);
                     }
                 }
-                catch (Exception ex)
-                {
-                    txtLog.AppendText($"{LanguageManager.GetString("Download.LogLoadError", "Errore caricamento log")}: {ex.Message}" + Environment.NewLine);
-                }
+            }
+            catch (Exception ex)
+            {
+                txtLog.AppendText($"{LanguageManager.GetString("Download.LogLoadError", "Errore caricamento log")}: {ex.Message}" + Environment.NewLine);
             }
         }
 
@@ -1425,10 +1421,7 @@ namespace AirDirector.Controls
 
             try
             {
-                using (StreamWriter writer = File.AppendText(_logFilePath))
-                {
-                    writer.WriteLine(logEntry);
-                }
+                _dailyLogger?.Log(message);
 
                 if (txtLog.InvokeRequired)
                 {
@@ -1453,6 +1446,7 @@ namespace AirDirector.Controls
         {
             if (disposing)
             {
+                try { _dailyLogger?.Dispose(); } catch { }
                 LanguageManager.SaveMissingKeysToFile();
                 LanguageManager.LanguageChanged -= OnLanguageChanged;
 

@@ -85,43 +85,41 @@ namespace AirDirector.Forms
                     return;
 
                 DateTime cutoffDate = DateTime.Now.AddDays(-100);
-                int deleted = 0;
 
-                var oldFiles = Directory.GetFiles(logsPath, "*.*", SearchOption.AllDirectories)
-                    .Select(f => new FileInfo(f))
-                    .Where(f => f.LastWriteTime < cutoffDate)
-                    .ToList();
-
-                foreach (var file in oldFiles)
+                foreach (var dir in Directory.GetDirectories(logsPath))
                 {
                     try
                     {
-                        file.Delete();
-                        deleted++;
+                        string folderName = Path.GetFileName(dir);
+                        if (DateTime.TryParseExact(folderName, "yyyy-MM-dd",
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.None, out DateTime folderDate))
+                        {
+                            if (folderDate < cutoffDate)
+                            {
+                                Directory.Delete(dir, true);
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[MainForm] ⚠️ Impossibile eliminare log: {file.Name} - {ex.Message}");
+                        Console.WriteLine($"[MainForm] ⚠️ Impossibile eliminare cartella log: {Path.GetFileName(dir)} - {ex.Message}");
                     }
                 }
 
-                // Rimuovi sottocartelle vuote
+                // Rimuovi anche eventuali file sparsi nella root Logs (vecchio formato)
                 try
                 {
-                    foreach (var dir in Directory.GetDirectories(logsPath, "*", SearchOption.AllDirectories)
-                        .OrderByDescending(d => d.Length)) // dal più profondo
+                    foreach (var file in Directory.GetFiles(logsPath, "*.*", SearchOption.TopDirectoryOnly))
                     {
-                        if (Directory.Exists(dir) && !Directory.EnumerateFileSystemEntries(dir).Any())
+                        var fi = new FileInfo(file);
+                        if (fi.LastWriteTime < cutoffDate)
                         {
-                            Directory.Delete(dir);
+                            try { fi.Delete(); } catch { }
                         }
                     }
                 }
                 catch { }
-
-                if (deleted > 0)
-                {
-                }
             }
             catch (Exception ex)
             {

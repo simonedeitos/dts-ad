@@ -20,11 +20,14 @@ namespace AirDirector.Controls
     {
         private const string REGISTRY_KEY = @"SOFTWARE\AirDirector";
 
+        private Services.Core.DailyLogger _dailyLogger;
+
         public event EventHandler ConfigurationChanged;
 
         public ConfigurationControl()
         {
             InitializeComponent();
+            try { _dailyLogger = new Services.Core.DailyLogger("Config"); } catch { }
             LoadAudioDevicesToCombos();
             LoadConfiguration();
             ApplyLanguage();
@@ -119,17 +122,17 @@ namespace AirDirector.Controls
 
             try
             {
-                Console.WriteLine("");
-                Console.WriteLine("========================================");
-                Console.WriteLine("[NDI] 🔧 Inizializzazione NDI.. .");
-                Console.WriteLine("========================================");
+                Log("");
+                Log("========================================");
+                Log("[NDI] 🔧 Inizializzazione NDI.. .");
+                Log("========================================");
 
                 if (!NDIlib.initialize())
                 {
-                    Console.WriteLine("[NDI] ❌ ERRORE:  Inizializzazione fallita");
-                    Console.WriteLine("[NDI] 💡 Verifica che Processing.NDI. Lib.x64.dll sia presente");
-                    Console.WriteLine("========================================");
-                    Console.WriteLine("");
+                    Log("[NDI] ❌ ERRORE:  Inizializzazione fallita");
+                    Log("[NDI] 💡 Verifica che Processing.NDI. Lib.x64.dll sia presente");
+                    Log("========================================");
+                    Log("");
 
                     cmbNDISource.Items.Add("(Errore inizializzazione NDI)");
                     cmbNDISource.SelectedIndex = 0;
@@ -148,11 +151,11 @@ namespace AirDirector.Controls
                     return;
                 }
 
-                Console.WriteLine("[NDI] ✅ NDI inizializzato correttamente");
+                Log("[NDI] ✅ NDI inizializzato correttamente");
 
                 cmbNDISource.Items.Add("(Crea Nuova Sorgente NDI)");
 
-                Console.WriteLine("[NDI] 🔍 Creazione NDI Finder...");
+                Log("[NDI] 🔍 Creazione NDI Finder...");
 
                 var findSettings = new NDIlib.find_create_t()
                 {
@@ -165,23 +168,23 @@ namespace AirDirector.Controls
 
                 if (findInstance == IntPtr.Zero)
                 {
-                    Console.WriteLine("[NDI] ⚠️ Impossibile creare finder");
-                    Console.WriteLine("========================================");
-                    Console.WriteLine("");
+                    Log("[NDI] ⚠️ Impossibile creare finder");
+                    Log("========================================");
+                    Log("");
                     cmbNDISource.SelectedIndex = 0;
                     return;
                 }
 
-                Console.WriteLine("[NDI] ✅ Finder creato");
-                Console.WriteLine("[NDI] 🔍 Ricerca sorgenti NDI sulla rete...");
-                Console.WriteLine("[NDI] ⏳ Attendi 2 secondi per discovery...");
+                Log("[NDI] ✅ Finder creato");
+                Log("[NDI] 🔍 Ricerca sorgenti NDI sulla rete...");
+                Log("[NDI] ⏳ Attendi 2 secondi per discovery...");
 
                 System.Threading.Thread.Sleep(2000);
 
                 uint numSources = 0;
                 IntPtr sourcesPtr = NDIlib.find_get_current_sources(findInstance, ref numSources);
 
-                Console.WriteLine($"[NDI] 📡 Trovate {numSources} sorgenti NDI");
+                Log($"[NDI] 📡 Trovate {numSources} sorgenti NDI");
 
                 if (numSources > 0)
                 {
@@ -197,40 +200,40 @@ namespace AirDirector.Controls
                         if (!string.IsNullOrEmpty(sourceName))
                         {
                             cmbNDISource.Items.Add($"📡 {sourceName}");
-                            Console.WriteLine($"[NDI]   ✓ {sourceName}");
+                            Log($"[NDI]   ✓ {sourceName}");
                         }
                     }
                 }
                 else
                 {
-                    Console.WriteLine("[NDI] ℹ️ Nessuna sorgente NDI trovata sulla rete");
-                    Console.WriteLine("[NDI] 💡 Assicurati che altre applicazioni NDI siano attive");
+                    Log("[NDI] ℹ️ Nessuna sorgente NDI trovata sulla rete");
+                    Log("[NDI] 💡 Assicurati che altre applicazioni NDI siano attive");
                 }
 
                 NDIlib.find_destroy(findInstance);
-                Console.WriteLine("[NDI] ✅ Finder distrutto");
+                Log("[NDI] ✅ Finder distrutto");
 
-                Console.WriteLine("========================================");
-                Console.WriteLine($"[NDI] 📊 Totale sorgenti nel dropdown: {cmbNDISource.Items.Count}");
-                Console.WriteLine("========================================");
-                Console.WriteLine("");
+                Log("========================================");
+                Log($"[NDI] 📊 Totale sorgenti nel dropdown: {cmbNDISource.Items.Count}");
+                Log("========================================");
+                Log("");
 
                 if (cmbNDISource.Items.Count > 0)
                 {
                     cmbNDISource.SelectedIndex = 0;
-                    Console.WriteLine("[NDI] ✅ Selezione default: (Crea Nuova Sorgente NDI)");
+                    Log("[NDI] ✅ Selezione default: (Crea Nuova Sorgente NDI)");
                 }
             }
             catch (DllNotFoundException dllEx)
             {
-                Console.WriteLine("");
-                Console.WriteLine("========================================");
-                Console.WriteLine("[NDI] ❌❌❌ DLL NON TROVATA ❌❌❌");
-                Console.WriteLine($"[NDI] Messaggio: {dllEx.Message}");
-                Console.WriteLine($"[NDI] File: Processing.NDI. Lib.x64.dll");
-                Console.WriteLine("[NDI] Percorso atteso:  (stessa cartella di AirDirector. exe)");
-                Console.WriteLine("========================================");
-                Console.WriteLine("");
+                Log("");
+                Log("========================================");
+                Log("[NDI] ❌❌❌ DLL NON TROVATA ❌❌❌");
+                Log($"[NDI] Messaggio: {dllEx.Message}");
+                Log($"[NDI] File: Processing.NDI. Lib.x64.dll");
+                Log("[NDI] Percorso atteso:  (stessa cartella di AirDirector. exe)");
+                Log("========================================");
+                Log("");
 
                 cmbNDISource.Items.Clear();
                 cmbNDISource.Items.Add("(DLL NDI non trovata)");
@@ -250,15 +253,15 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                Console.WriteLine("");
-                Console.WriteLine("========================================");
-                Console.WriteLine("[NDI] ❌ ERRORE GENERICO");
-                Console.WriteLine($"[NDI] Messaggio:  {ex.Message}");
-                Console.WriteLine($"[NDI] Tipo: {ex.GetType().Name}");
-                Console.WriteLine($"[NDI] StackTrace:");
-                Console.WriteLine(ex.StackTrace);
-                Console.WriteLine("========================================");
-                Console.WriteLine("");
+                Log("");
+                Log("========================================");
+                Log("[NDI] ❌ ERRORE GENERICO");
+                Log($"[NDI] Messaggio:  {ex.Message}");
+                Log($"[NDI] Tipo: {ex.GetType().Name}");
+                Log($"[NDI] StackTrace:");
+                Log(ex.StackTrace);
+                Log("========================================");
+                Log("");
 
                 cmbNDISource.Items.Clear();
                 cmbNDISource.Items.Add($"(Errore:  {ex.Message})");
@@ -583,10 +586,10 @@ namespace AirDirector.Controls
 
         private void btnRefreshNDI_Click(object sender, EventArgs e)
         {
-            Console.WriteLine("");
-            Console.WriteLine("========================================");
-            Console.WriteLine("[NDI] 🔄 REFRESH MANUALE RICHIESTO");
-            Console.WriteLine("========================================");
+            Log("");
+            Log("========================================");
+            Log("[NDI] 🔄 REFRESH MANUALE RICHIESTO");
+            Log("========================================");
 
             LoadNDIDevices();
 
@@ -1067,12 +1070,17 @@ namespace AirDirector.Controls
                 MessageBoxIcon.Information);
         }
 
+        private void Log(string m) { _dailyLogger?.Log(m); }
+        private void LogErr(string m, Exception ex) { _dailyLogger?.LogErr(m, ex); }
+        private void LogErr(string m) { _dailyLogger?.LogErr(m); }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
                 LanguageManager.SaveMissingKeysToFile();
                 LanguageManager.LanguageChanged -= (s, e) => ApplyLanguage();
+                try { _dailyLogger?.Dispose(); } catch { }
             }
 
             base.Dispose(disposing);
