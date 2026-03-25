@@ -107,26 +107,13 @@ namespace AirDirector.Controls
         private IntPtr _compositedVideoPtr;
         private byte[] _cgFullFrame;
         private float[] _mixedAudioBuffer, _tempReadBuffer;
+        private byte[] _audioMirrorConvertBuffer;
+        private IWavePlayer _audioMirrorOutput;
+        private BufferedWaveProvider _audioMirrorBuffer;
         private AudioDelayLine _audioDelay;
         private long _framesSent, _audioSamplesSent;
         private int _pipW, _pipH, _pipX, _pipY;
         private int[] _pipSrcXLut;
-
-        // ═══════════════════════════════════════════════════════════
-        // AUDIO MIRROR — ring buffer lock-free per non bloccare l'engine loop
-        // L'engine scrive nel ring, un thread dedicato legge e manda a WaveOut.
-        // Così l'engine loop non subisce MAI latenza da WaveOut/AddSamples.
-        // ═══════════════════════════════════════════════════════════
-        private const int MIRROR_RING_SIZE = 1 << 18; // 256K float = ~1.3 sec
-        private const int MIRROR_RING_MASK = MIRROR_RING_SIZE - 1;
-        private float[] _mirrorRingBuf;
-        private long _mirrorWPos, _mirrorRPos;
-        private IWavePlayer _audioMirrorOutput;
-        private BufferedWaveProvider _audioMirrorBuffer;
-        private byte[] _audioMirrorConvertBuffer;
-        private float[] _mirrorReadBuf;
-        private Thread _mirrorThread;
-        private volatile bool _mirrorRunning;
 
         private volatile float _vuLeft, _vuRight, _vuLeftPeak, _vuRightPeak;
         private const float VU_DECAY = 0.93f, VU_PEAK_DECAY = 0.985f;
@@ -190,18 +177,6 @@ namespace AirDirector.Controls
         private static Font SafeFont(string f, float s, FontStyle st) { try { return new Font(new FontFamily(f), s, st); } catch { return new Font(SystemFonts.DefaultFont.FontFamily, s, st); } }
         private static bool IsWebStream(string path) { if (string.IsNullOrEmpty(path)) return false; return path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("mms://", StringComparison.OrdinalIgnoreCase); }
 
-        /// <summary>
-        /// Determina se un item è "musica da archivio" (non schedulato) e quindi
-        /// deve essere mostrato come titolazione CG e metadata.
-        /// SOLO gli item con ItemType="Music" E IsScheduled=false sono musica da archivio.
-        /// Tutto il resto (jingle, spot, schedulazioni, clip) NON mostra titolazione.
-        /// </summary>
-        private static bool IsMusicFromArchive(PlayItem i)
-        {
-            if (i == null) return false;
-            return i.ItemType.Equals("Music", StringComparison.OrdinalIgnoreCase) && !i.IsScheduled;
-        }
-
         public PlayerControlVideo()
         {
             DoubleBuffered = true;
@@ -244,126 +219,24 @@ namespace AirDirector.Controls
             catch (Exception ex) { LogErr("[INIT]", ex); }
         }
 
-        /// <summary>
-        /// Audio Mirror: riproduce l'audio mixato anche sull'uscita fisica locale.
-        /// 
-        /// ARCHITETTURA LOCK-FREE:
-        /// - L'engine loop scrive nel ring buffer (_mirrorRingBuf) con una semplice
-        ///   copia + Interlocked.Add → ZERO allocazioni, ZERO lock, ZERO chiamate WaveOut.
-        /// - Un thread dedicato (_mirrorThread) a bassa priorità legge dal ring e
-        ///   chiama AddSamples sul BufferedWaveProvider → eventuali blocchi WaveOut
-        ///   non impattano MAI l'engine loop.
-        /// 
-        /// Questo preserva il timing deterministico dell'engine loop identico alla
-        /// versione senza audio mirror, garantendo lip-sync perfetto su NDI.
-        /// </summary>
         private void InitAudioMirror()
         {
             try
             {
-                // Ring buffer lock-free tra engine e mirror thread
-                _mirrorRingBuf = new float[MIRROR_RING_SIZE];
-                _mirrorWPos = 0;
-                _mirrorRPos = 0;
-                _mirrorReadBuf = new float[AUDIO_SAMPLE_RATE / 10 * AUDIO_CHANNELS]; // ~100ms buffer di lettura
-
                 int deviceNumber = ConfigurationControl.GetMainOutputDeviceNumber();
                 var fmt = WaveFormat.CreateIeeeFloatWaveFormat(AUDIO_SAMPLE_RATE, AUDIO_CHANNELS);
                 _audioMirrorBuffer = new BufferedWaveProvider(fmt) { BufferDuration = TimeSpan.FromSeconds(2), DiscardOnBufferOverflow = true };
-                _audioMirrorConvertBuffer = new byte[_mirrorReadBuf.Length * sizeof(float)];
+                _audioMirrorConvertBuffer = new byte[AUDIO_SAMPLE_RATE * AUDIO_CHANNELS * sizeof(float)];
                 _audioMirrorOutput = new WaveOutEvent { DeviceNumber = deviceNumber, DesiredLatency = 150, NumberOfBuffers = 3 };
                 _audioMirrorOutput.Init(_audioMirrorBuffer);
                 _audioMirrorOutput.Play();
-
-                // Thread dedicato a bassa priorità per leggere dal ring → WaveOut
-                _mirrorRunning = true;
-                _mirrorThread = new Thread(MirrorThreadLoop)
-                {
-                    Name = "PCV_AudioMirror",
-                    Priority = ThreadPriority.BelowNormal,
-                    IsBackground = true
-                };
-                _mirrorThread.Start();
-
-                Log("[Audio] ✅ Mirror audio inizializzato (device=" + deviceNumber + ", ring=" + MIRROR_RING_SIZE + ")");
+                Log("[Audio] ✅ Mirror audio device inizializzato (device=" + deviceNumber + ")");
             }
             catch (Exception ex)
             {
                 Log("[Audio] ⚠️ Mirror audio non disponibile: " + ex.Message);
                 _audioMirrorOutput = null;
                 _audioMirrorBuffer = null;
-                _mirrorRingBuf = null;
-                _mirrorRunning = false;
-            }
-        }
-
-        /// <summary>
-        /// Scrive nel ring buffer mirror — chiamato dall'engine loop.
-        /// Operazione LOCK-FREE: solo array copy + Interlocked.Add.
-        /// Non chiama MAI WaveOut/AddSamples dall'engine loop.
-        /// </summary>
-        private void MirrorEnqueue(int sampleCount)
-        {
-            float[] ring = _mirrorRingBuf;
-            if (ring == null) return;
-
-            int count = sampleCount * AUDIO_CHANNELS;
-            if (count <= 0) return;
-
-            long wp = Interlocked.Read(ref _mirrorWPos);
-            long rp = Interlocked.Read(ref _mirrorRPos);
-            int available = (int)(wp - rp);
-            int free = MIRROR_RING_SIZE - available;
-
-            // Se il ring è pieno, il mirror thread è in ritardo — drop i campioni più vecchi
-            if (count > free)
-                Interlocked.Add(ref _mirrorRPos, count - free);
-
-            // Scrivi nel ring (wrap-around)
-            long writeStart = Interlocked.Read(ref _mirrorWPos);
-            for (int i = 0; i < count; i++)
-                ring[(writeStart + i) & MIRROR_RING_MASK] = _mixedAudioBuffer[i];
-
-            Interlocked.Add(ref _mirrorWPos, count);
-        }
-
-        /// <summary>
-        /// Thread dedicato: legge dal ring buffer e scrive su WaveOut.
-        /// Gira a bassa priorità, non impatta l'engine loop.
-        /// </summary>
-        private void MirrorThreadLoop()
-        {
-            while (_mirrorRunning)
-            {
-                try
-                {
-                    float[] ring = _mirrorRingBuf;
-                    if (ring == null || _audioMirrorBuffer == null) { Thread.Sleep(10); continue; }
-
-                    long wp = Interlocked.Read(ref _mirrorWPos);
-                    long rp = Interlocked.Read(ref _mirrorRPos);
-                    int avail = (int)(wp - rp);
-
-                    if (avail <= 0) { Thread.Sleep(2); continue; }
-
-                    // Leggi fino a _mirrorReadBuf.Length campioni
-                    int toRead = Math.Min(avail, _mirrorReadBuf.Length);
-                    long readStart = Interlocked.Read(ref _mirrorRPos);
-                    for (int i = 0; i < toRead; i++)
-                        _mirrorReadBuf[i] = ring[(readStart + i) & MIRROR_RING_MASK];
-                    Interlocked.Add(ref _mirrorRPos, toRead);
-
-                    // Converti float→byte e scrivi nel BufferedWaveProvider
-                    int byteCount = toRead * sizeof(float);
-                    if (byteCount <= _audioMirrorConvertBuffer.Length)
-                    {
-                        Buffer.BlockCopy(_mirrorReadBuf, 0, _audioMirrorConvertBuffer, 0, byteCount);
-                        _audioMirrorBuffer.AddSamples(_audioMirrorConvertBuffer, 0, byteCount);
-                    }
-                }
-                catch { }
-
-                Thread.Sleep(5); // ~200 wakeup/sec, latenza media +5ms — impercettibile per il monitor
             }
         }
 
@@ -544,12 +417,7 @@ namespace AirDirector.Controls
                 for (int i = 0; i < spf; i++) { float l = Math.Abs(_mixedAudioBuffer[i * 2]); float r = Math.Abs(_mixedAudioBuffer[i * 2 + 1]); if (l > fl) fl = l; if (r > fr) fr = r; }
                 _vuLeft = Math.Max(fl, _vuLeft * VU_DECAY); _vuRight = Math.Max(fr, _vuRight * VU_DECAY);
                 _vuLeftPeak = Math.Max(fl, _vuLeftPeak * VU_PEAK_DECAY); _vuRightPeak = Math.Max(fr, _vuRightPeak * VU_PEAK_DECAY);
-
-                // NDI send — identico alla versione OLD senza mirror
                 SendAudio(spf);
-
-                // Mirror: enqueue lock-free nel ring — il mirror thread lo consumerà
-                MirrorEnqueue(spf);
 
                 // ═════ VIDEO ═════
                 IntPtr programSrc = IntPtr.Zero;
@@ -623,7 +491,7 @@ namespace AirDirector.Controls
 
         // ═══════════════════════════════════════════════════════════
         // CG COMPOSITING
-        // ═══════════════════════════════════════════════════════════
+        // ═══════════════════════════════��═══════════════════════════
         private void BlitCgFullscreen()
         {
             int totalPixels = _ndiWidth * _ndiHeight;
@@ -708,10 +576,23 @@ namespace AirDirector.Controls
             }
         }
 
-        // ═══════════════════════════════════════���═══════════════════
-        // NDI SEND — identico alla versione OLD, senza mirror inline
         // ═══════════════════════════════════════════════════════════
-        private void SendAudio(int ns) { if (_ndiSender == null) return; try { using (var f = new AudioFrame(ns, AUDIO_SAMPLE_RATE, AUDIO_CHANNELS)) { unsafe { float* dest = (float*)f.AudioBuffer.ToPointer(), pL = dest, pR = dest + ns; for (int i = 0; i < ns; i++) { float l = _mixedAudioBuffer[i * 2], r = _mixedAudioBuffer[i * 2 + 1]; if (l > 1) l = 1; else if (l < -1) l = -1; if (r > 1) r = 1; else if (r < -1) r = -1; *pL++ = l; *pR++ = r; } } f.TimeStamp = (_audioSamplesSent * 10_000_000L) / AUDIO_SAMPLE_RATE; _ndiSender.Send(f); _audioSamplesSent += ns; } } catch { } }
+        // NDI SEND
+        // ═══════════════════════════════════════════════════════════
+        private void SendAudio(int ns) { if (_ndiSender == null) return; try { using (var f = new AudioFrame(ns, AUDIO_SAMPLE_RATE, AUDIO_CHANNELS)) { unsafe { float* dest = (float*)f.AudioBuffer.ToPointer(), pL = dest, pR = dest + ns; for (int i = 0; i < ns; i++) { float l = _mixedAudioBuffer[i * 2], r = _mixedAudioBuffer[i * 2 + 1]; if (l > 1) l = 1; else if (l < -1) l = -1; if (r > 1) r = 1; else if (r < -1) r = -1; *pL++ = l; *pR++ = r; } } f.TimeStamp = (_audioSamplesSent * 10_000_000L) / AUDIO_SAMPLE_RATE; _ndiSender.Send(f); _audioSamplesSent += ns; } } catch { } MirrorAudio(ns); }
+
+        private void MirrorAudio(int ns)
+        {
+            if (_audioMirrorBuffer == null || _audioMirrorConvertBuffer == null) return;
+            try
+            {
+                int byteCount = ns * AUDIO_CHANNELS * sizeof(float);
+                if (byteCount > _audioMirrorConvertBuffer.Length) return;
+                Buffer.BlockCopy(_mixedAudioBuffer, 0, _audioMirrorConvertBuffer, 0, byteCount);
+                _audioMirrorBuffer.AddSamples(_audioMirrorConvertBuffer, 0, byteCount);
+            }
+            catch { }
+        }
         private void SendVideo() { if (_ndiSender == null) return; try { using (var f = new VideoFrame(_compositedVideoPtr, _ndiWidth, _ndiHeight, _ndiWidth * 4, NDIlib.FourCC_type_e.FourCC_type_BGRX, (float)_ndiWidth / _ndiHeight, _ndiFrameRate, 1, NDIlib.frame_format_type_e.frame_format_type_progressive)) { f.TimeStamp = (_framesSent * 10_000_000L) / _ndiFrameRate; _ndiSender.Send(f); _framesSent++; } } catch { } }
 
         // ═══════════════════════════════════════════════════════════
@@ -738,7 +619,7 @@ namespace AirDirector.Controls
 
         private void HandleDeckEnded(Deck deck, int sessionId) { if (deck.SessionId != sessionId || deck != _activeDeck) return; if (!TryTriggerMix()) return; Log("[END] " + deck.Name + " ended"); SafeInvoke(() => OnTrackEnded()); }
 
-        // ═══════════════════════════════════════════════════════════
+        // ═════════════════════════════��═════════════════════════════
         // POSITION
         // ═══════════════════════════════════════════════════════════
         private void UpdatePosition()
@@ -777,6 +658,21 @@ namespace AirDirector.Controls
         // ═══════════════════════════════════════════════════════════
         // PRE-BUFFER
         // ═══════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// FIX: Pre-buffer SOLO file video nativi (.mp4, .avi, .mov, ecc.)
+        /// 
+        /// I file audio (.mp3, .wav, ecc.) con VideoFilePath associato NON vengono
+        /// pre-bufferizzati, perché il pre-buffer li trattava come VideoClip (audio VLC)
+        /// mentre PlayInternal li gestisce come AudioTrack (audio NAudio).
+        /// Questa incoerenza causava il bug "video senza audio":
+        /// - PreBuffer avvia VLC con video+audio → tipo VideoClip
+        /// - PlayInternal usa il pre-buffer → MixDeckAudio legge dal Ring (VLC audio)
+        /// - Ma VLC è in pausa dal pre-buffer → Ring vuoto → silenzio
+        /// 
+        /// Soluzione: pre-bufferizzare solo file che sono video nativi (IsVideoFile=true).
+        /// I file audio con video associato sono comunque brevi (jingle) e partono velocemente.
+        /// </summary>
         private void PreBufferNext()
         {
             if (_playlistQueue == null) return;
@@ -788,6 +684,10 @@ namespace AirDirector.Controls
             {
                 string fp = items[i].FilePath;
                 if (string.IsNullOrEmpty(fp) || IsWebStream(fp)) continue;
+
+                // FIX: Pre-buffer solo file video nativi
+                // File audio con VideoFilePath non vengono pre-bufferizzati
+                // per evitare l'incoerenza audio VLC vs NAudio
                 if (!IsVideoFile(fp)) continue;
 
                 if (!File.Exists(fp))
@@ -869,7 +769,7 @@ namespace AirDirector.Controls
         {
             string fp = item.FilePath, fn = Path.GetFileName(fp);
             SafeInvoke(() => _mixCheckTimer.Stop());
-            Log("[PLAY] " + fn + " | " + item.Artist + " - " + item.Title + " | IN=" + item.MarkerIN + " MIX=" + item.MarkerMIX + " OUT=" + item.MarkerOUT + " Dur=" + item.Duration.TotalMilliseconds + "ms Sched=" + item.IsScheduled);
+            Log("[PLAY] " + fn + " | " + item.Artist + " - " + item.Title + " | IN=" + item.MarkerIN + " MIX=" + item.MarkerMIX + " OUT=" + item.MarkerOUT + " Dur=" + item.Duration.TotalMilliseconds + "ms");
             bool isStream = IsWebStream(fp);
 
             if (!isStream && !File.Exists(fp))
@@ -926,6 +826,8 @@ namespace AirDirector.Controls
             }
             else if (_preBufferedDeck != null && _preBufferedFile == fp && _preBufferedDeck.PreBufferReady)
             {
+                // FIX: Il pre-buffer ora esiste SOLO per file video nativi (IsVideoFile=true)
+                // quindi qui siamo certi che il tipo è VideoClip con audio VLC - corretto
                 target = _preBufferedDeck; _preBufferedDeck = null; _preBufferedFile = ""; usedPre = true;
                 target.SessionId = sid; target.IsPlaying = true; target.Volume = 1.0f; target.IsPendingActivation = true; target.CurrentItem = item; target.StartPointMs = item.MarkerIN;
                 _pendingDeck = target; _bufferShouldShow = false; _currentFileIsVideo = true;
@@ -943,10 +845,11 @@ namespace AirDirector.Controls
                     target.Type = DeckType.VideoClip; _bufferShouldShow = false;
                     var m = new Media(_libVLC, fp, FromType.FromPath); if (item.MarkerIN > 0) m.AddOption($":start-time={startTimeSec:F3}"); m.AddOption(":file-caching=500");
                     target.VlcPlayer.Media = m; m.Dispose(); target.VlcPlayer.Play(); _currentFileIsVideo = true;
-                    Log("[PLAY] VideoClip → " + target.Name);
+                    Log("[PLAY] VideoClip ��� " + target.Name);
                 }
                 else if (videoFile != null)
                 {
+                    // File audio con video associato: VLC per video (no-audio), NAudio per audio
                     target.Type = DeckType.AudioTrack; _bufferShouldShow = false;
                     var vm = new Media(_libVLC, videoFile, FromType.FromPath); vm.AddOption(":no-audio"); if (item.MarkerIN > 0) vm.AddOption($":start-time={startTimeSec:F3}"); vm.AddOption(":file-caching=500");
                     target.VlcPlayer.Media = vm; vm.Dispose(); target.VlcPlayer.Play();
@@ -956,6 +859,7 @@ namespace AirDirector.Controls
                 }
                 else
                 {
+                    // Audio-only: NAudio per audio, buffer video per il video
                     target.Type = DeckType.AudioTrack;
                     _bufferShouldShow = true;
 
@@ -978,8 +882,10 @@ namespace AirDirector.Controls
 
                     _currentFileIsVideo = false;
 
+                    // Ferma il buffer deck corrente prima di avviarne uno nuovo
                     StopBufferDeck();
 
+                    // Cerca video musicale dedicato con stesso nome .mp4
                     string mv = Path.ChangeExtension(fp, ".mp4");
                     if (File.Exists(mv))
                     {
@@ -1003,6 +909,7 @@ namespace AirDirector.Controls
                 }
                 else
                 {
+                    // Audio-only: attiva subito (identico alla versione OLD)
                     Deck old = _activeDeck;
                     _activeDeck = target;
                     _pendingDeck = null;
@@ -1311,55 +1218,10 @@ namespace AirDirector.Controls
         public void SetManualMode() { SetAutoMode(false); }
         private static bool IsVideoFile(string p) { if (string.IsNullOrEmpty(p)) return false; string ext = Path.GetExtension(p).ToLowerInvariant(); return ext == ".mp4" || ext == ".avi" || ext == ".mov" || ext == ".mkv" || ext == ".wmv" || ext == ".webm" || ext == ".m4v"; }
         private void SafeInvoke(Action a) { if (IsDisposed || _isDisposed) return; try { if (InvokeRequired) BeginInvoke(a); else a(); } catch { } }
-        private void UpdateTrackDisplay(PlayItem i)
-        {
-            if (i == null) return;
-            // FIX: Mostra titolazione SOLO per musica da archivio (non schedulata)
-            string d = IsMusicFromArchive(i)
-                ? (string.IsNullOrEmpty(i.Artist) ? (i.Title ?? "").ToUpper() : i.Artist.ToUpper() + " - " + (i.Title ?? "").ToUpper())
-                : "";
-            lblArtist.Text = d.Replace("&&", "&");
-            lblArtist.Invalidate();
-            if (i.Intro.TotalMilliseconds > 0) { lblIntro.Text = i.Intro.ToString(@"mm\:ss"); lblIntro.ForeColor = Color.White; lblIntro.BackColor = Color.Red; }
-            else { lblIntro.Text = ""; lblIntro.BackColor = Color.Black; }
-        }
+        private void UpdateTrackDisplay(PlayItem i) { if (i == null) return; bool isMusicArchive = i.ItemType.Equals("Music", StringComparison.OrdinalIgnoreCase) && !i.IsScheduled; string d = isMusicArchive ? (string.IsNullOrEmpty(i.Artist) ? (i.Title ?? "").ToUpper() : i.Artist.ToUpper() + " - " + (i.Title ?? "").ToUpper()) : ""; lblArtist.Text = d.Replace("&&", "&"); lblArtist.Invalidate(); if (i.Intro.TotalMilliseconds > 0) { lblIntro.Text = i.Intro.ToString(@"mm\:ss"); lblIntro.ForeColor = Color.White; lblIntro.BackColor = Color.Red; } else { lblIntro.Text = ""; lblIntro.BackColor = Color.Black; } }
         private void ClearPlayer() { SafeInvoke(() => { lblArtist.Text = ""; lblArtist.Invalidate(); lblIntro.Text = "--:--"; lblIntro.BackColor = Color.Black; lblIntro.ForeColor = AppTheme.LEDYellow; lblElapsed.Text = "--:--"; lblRemaining.Text = "--:--"; lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed; _waveformPeaks = null; _waveformCurrentFile = ""; waveformPanel.Invalidate(); UpdateBtnStates(); }); _totalDuration = TimeSpan.Zero; _introTime = TimeSpan.Zero; _markerIN = 0; _markerINTRO = 0; _markerMIX = 0; _markerOUT = 0; _positionMs = 0; ResetMixTrigger(); CurrentFilePath = ""; CurrentArtist = ""; CurrentTitle = ""; _playlistQueue?.SetCurrentPlaying(-1); }
-
-        /// <summary>
-        /// FIX: CG mostra titolazione SOLO per musica da archivio (Music + non schedulata).
-        /// Per tutto il resto (jingle, spot, schedulazioni, clip) → stringa vuota nel CG.
-        /// </summary>
-        private void UpdateCG(PlayItem i)
-        {
-            try
-            {
-                if (IsMusicFromArchive(i))
-                    CGRenderer.OnTrackChanged(i.Artist ?? "", i.Title ?? "", "Music", _totalDuration);
-                else
-                    CGRenderer.OnTrackChanged("", "", i?.ItemType ?? "Other", TimeSpan.Zero);
-            }
-            catch { }
-        }
-
-        /// <summary>
-        /// FIX: Metadata inviati SOLO per musica da archivio.
-        /// Schedulazioni e altri tipi non inviano metadata.
-        /// </summary>
-        private void SendMeta(PlayItem i)
-        {
-            try
-            {
-                string s = ConfigurationControl.GetMetadataSource();
-                bool isMusicArchive = IsMusicFromArchive(i);
-                bool shouldSend = (s == "MusicAndClips" && isMusicArchive) ||
-                                  (s == "MusicOnly" && isMusicArchive);
-                if (shouldSend)
-                    MetadataManager.UpdateMetadata(i?.Artist ?? "", i?.Title ?? "", "Music");
-                else if (s == "MusicAndClips" && !isMusicArchive)
-                    MetadataManager.UpdateMetadata("", "", i?.ItemType ?? "Other");
-            }
-            catch { }
-        }
+        private void UpdateCG(PlayItem i) { try { string t = i?.ItemType ?? "Music"; if (t.Equals("Music", StringComparison.OrdinalIgnoreCase)) CGRenderer.OnTrackChanged(i.Artist ?? "", i.Title ?? "", "Music", _totalDuration); else CGRenderer.OnTrackChanged("", "", t, TimeSpan.Zero); } catch { } }
+        private void SendMeta(PlayItem i) { try { string s = ConfigurationControl.GetMetadataSource(); bool sn = s == "MusicAndClips" || (s == "MusicOnly" && (i?.ItemType ?? "Music") == "Music"); if (sn) MetadataManager.UpdateMetadata(i?.Artist ?? "", i?.Title ?? "", i?.ItemType ?? "Music"); } catch { } }
 
         // ═══════════════════════════════════════════════════════════
         // LOG
@@ -1369,17 +1231,16 @@ namespace AirDirector.Controls
         private void LogErr(string m, Exception ex) { _dailyLogger?.LogErr(m, ex); }
         private void LogErr(string m) { _dailyLogger?.LogErr(m); }
 
-        // ═══════════════════════════════════════════════════════════
+        // ═════════════════════════════════════���═════════════════════
         // DISPOSE
         // ═══════════════════════════════════════════════════════════
         protected override void Dispose(bool disposing)
         {
             if (disposing && !_isDisposed)
             {
-                _isDisposed = true; _engineRunning = false; _mirrorRunning = false;
+                _isDisposed = true; _engineRunning = false;
                 _updateTimer?.Stop(); _updateTimer?.Dispose(); _mixCheckTimer?.Stop(); _mixCheckTimer?.Dispose(); _blinkTimer?.Stop(); _blinkTimer?.Dispose();
                 if (_engineThread != null && _engineThread.IsAlive) _engineThread.Join(2000);
-                if (_mirrorThread != null && _mirrorThread.IsAlive) _mirrorThread.Join(1000);
                 if (_deckA != null) { StopDeckInternal(_deckA, true); Marshal.FreeHGlobal(_deckA.VideoBufferPtr); }
                 if (_deckB != null) { StopDeckInternal(_deckB, true); Marshal.FreeHGlobal(_deckB.VideoBufferPtr); }
                 if (_bufferDeck != null) { StopDeckInternal(_bufferDeck, true); Marshal.FreeHGlobal(_bufferDeck.VideoBufferPtr); }
