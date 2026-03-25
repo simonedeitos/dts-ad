@@ -23,6 +23,8 @@ namespace AirDirector.Forms
         private const int ROW_HEIGHT = 108;
         private const int ROW_MARGIN = 6;
         private const string REGISTRY_PATH = @"SOFTWARE\AirDirector";
+        private const int VBR_BITRATE_TOLERANCE_KBPS = 10;
+        private const double SILENCE_MIN_DURATION_SEC = 0.01;
 
         private static readonly HashSet<string> AudioExtensions = new HashSet<string>(
             new[] { ".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma", ".m4a", ".aif", ".aiff", ".opus" },
@@ -185,6 +187,7 @@ namespace AirDirector.Forms
             public bool IsAudio;
             public bool Skip;
             public bool Succeeded;
+            public bool IsCompleted;       // true when done, errored, or cancelled
             public int LastReportedPct;    // monotonic progress tracking
         }
 
@@ -227,7 +230,10 @@ namespace AirDirector.Forms
                     }
                 }
             }
-            catch { /* ignore registry errors */ }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VideoConversionForm] Registry read error: {ex.Message}");
+            }
 
             _pnlPreEditing = new Panel
             {
@@ -321,7 +327,10 @@ namespace AirDirector.Forms
                     }
                 }
             }
-            catch { /* ignore registry errors */ }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VideoConversionForm] Registry write error: {ex.Message}");
+            }
         }
 
         // ═════════════════════════════════════════════════════════════════
@@ -369,7 +378,7 @@ namespace AirDirector.Forms
                     // For marker IN: we want the silence_end of the first silence period starting at 0
                     // For marker OUT: we want the silence_start of the last silence period ending at EOF
                     string args = $"-hide_banner -i \"{filePath}\" " +
-                                  $"-af \"silencedetect=noise={thresholdDb}:d=0.01\" " +
+                                  $"-af \"silencedetect=noise={thresholdDb}:d={SILENCE_MIN_DURATION_SEC}\" " +
                                   $"-f null -";
 
                     var psi = new ProcessStartInfo
@@ -713,7 +722,7 @@ namespace AirDirector.Forms
                         int globalBr;
                         int.TryParse(mGlobalBr.Groups[1].Value, out globalBr);
                         // If global bitrate differs significantly from stream bitrate, it might be VBR
-                        if (globalBr > 0 && Math.Abs(globalBr - spec.Bitrate) > 10)
+                        if (globalBr > 0 && Math.Abs(globalBr - spec.Bitrate) > VBR_BITRATE_TOLERANCE_KBPS)
                             spec.IsVariableBitrate = true;
                     }
                 }
@@ -1227,8 +1236,8 @@ namespace AirDirector.Forms
             int panW = Math.Max(pnlScroll.ClientSize.Width - 8, 400);
 
             bool compatible = spec.AlreadyCompatible;
-            // VBR files should have conversion pre-enabled
-            bool needsConvert = !compatible || spec.IsVariableBitrate;
+            // VBR files should have conversion pre-enabled even if format is compatible
+            bool defaultChecked = !compatible || spec.IsVariableBitrate;
 
             Panel container = new Panel
             {
@@ -1246,7 +1255,7 @@ namespace AirDirector.Forms
                 Text = "",
                 Location = new Point(7, 5),
                 Size = new Size(18, 18),
-                Checked = needsConvert,
+                Checked = defaultChecked,
                 FlatStyle = FlatStyle.Flat
             };
             chkConvert.CheckedChanged += (s, ev) =>
@@ -1343,7 +1352,7 @@ namespace AirDirector.Forms
             // progress label
             Label lblProg = new Label
             {
-                Text = needsConvert ? "Waiting…" : "Skip (toggle ON to convert)",
+                Text = defaultChecked ? "Waiting…" : "Skip (toggle ON to convert)",
                 Location = new Point(pb.Right + 8, 70),
                 Size = new Size(panW - pb.Right - 20, 18),
                 Font = new Font("Segoe UI", 8),
@@ -1374,7 +1383,7 @@ namespace AirDirector.Forms
                 Spec = null,
                 AudioSpec = spec,
                 IsAudio = true,
-                Skip = !needsConvert,
+                Skip = !defaultChecked,
                 Succeeded = false,
                 LastReportedPct = 0
             });
@@ -1514,6 +1523,7 @@ namespace AirDirector.Forms
             foreach (var row in skipRows)
             {
                 row.Succeeded = true;
+                row.IsCompleted = true;
                 row.OutputPath = row.InputPath; // pass original path to archive
                 SetRowStatus(row, "Skipped ✅", Color.LightGreen, 100);
             }
@@ -1621,6 +1631,7 @@ namespace AirDirector.Forms
             catch (Exception ex)
             {
                 SetRowStatus(row, $"Rename error: {ex.Message}", Color.OrangeRed, 0);
+                row.IsCompleted = true;
                 Interlocked.Increment(ref _errorCount);
                 BumpOverall();
                 return;
@@ -1695,6 +1706,7 @@ namespace AirDirector.Forms
             if (ct.IsCancellationRequested)
             {
                 SetRowStatus(row, "Cancelled", Color.Orange, 0);
+                row.IsCompleted = true;
                 Interlocked.Increment(ref _errorCount);
                 BumpOverall();
                 return;
@@ -1703,6 +1715,7 @@ namespace AirDirector.Forms
             if (!ok)
             {
                 SetRowStatus(row, "Error ❌", Color.OrangeRed, 0);
+                row.IsCompleted = true;
                 Interlocked.Increment(ref _errorCount);
                 BumpOverall();
                 return;
@@ -1723,6 +1736,7 @@ namespace AirDirector.Forms
             }
 
             row.Succeeded = true;
+            row.IsCompleted = true;
             SetRowStatus(row, "Done ✅", Color.LightGreen, 100);
             UpdateOutputLabel(row, "✅  Conversion complete – will be imported as MP4");
             BumpOverall();
@@ -1748,6 +1762,7 @@ namespace AirDirector.Forms
             catch (Exception ex)
             {
                 SetRowStatus(row, $"Rename error: {ex.Message}", Color.OrangeRed, 0);
+                row.IsCompleted = true;
                 Interlocked.Increment(ref _errorCount);
                 BumpOverall();
                 return;
@@ -1791,6 +1806,7 @@ namespace AirDirector.Forms
             if (ct.IsCancellationRequested)
             {
                 SetRowStatus(row, "Cancelled", Color.Orange, 0);
+                row.IsCompleted = true;
                 Interlocked.Increment(ref _errorCount);
                 BumpOverall();
                 return;
@@ -1799,6 +1815,7 @@ namespace AirDirector.Forms
             if (!ok)
             {
                 SetRowStatus(row, "Error ❌", Color.OrangeRed, 0);
+                row.IsCompleted = true;
                 Interlocked.Increment(ref _errorCount);
                 BumpOverall();
                 return;
@@ -1820,6 +1837,7 @@ namespace AirDirector.Forms
 
             string fmt = isTargetWav ? "WAV" : "MP3";
             row.Succeeded = true;
+            row.IsCompleted = true;
             SetRowStatus(row, "Done ✅", Color.LightGreen, 100);
             UpdateOutputLabel(row, $"✅  Conversion complete – will be imported as {fmt}");
             BumpOverall();
@@ -1942,7 +1960,7 @@ namespace AirDirector.Forms
             int doneFiles = 0;
             foreach (var row in _fileRows)
             {
-                if (row.Succeeded || (row.LblStatus.Text.Contains("Error") || row.LblStatus.Text.Contains("Cancelled")))
+                if (row.IsCompleted)
                 {
                     totalWeight += 100;
                     doneFiles++;
