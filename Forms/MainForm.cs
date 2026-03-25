@@ -552,7 +552,7 @@ namespace AirDirector.Forms
             if (tabControl.TabPages.Count > idx) tabControl.TabPages[idx++].Text = "📊 " + LanguageManager.GetString("MainForm.TabReport", "Report");
             for (int i = idx; i < tabControl.TabPages.Count; i++)
             {
-                if (tabControl.TabPages[i].Text.Contains("WhatsApp")) tabControl.TabPages[i].Text = "��� WhatsApp";
+                if (tabControl.TabPages[i].Text.Contains("WhatsApp")) tabControl.TabPages[i].Text = "💬 WhatsApp";
                 else if (tabControl.TabPages[i].Text.Contains("Config")) tabControl.TabPages[i].Text = "⚙️ " + LanguageManager.GetString("MainForm.TabConfig", "Config");
             }
         }
