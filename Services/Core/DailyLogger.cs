@@ -33,7 +33,7 @@ namespace AirDirector.Services.Core
                     EnsureWriter();
                     _writer?.WriteLine(line);
                 }
-                catch { }
+                catch (Exception ex) { Console.Error.WriteLine($"[{_prefix}] Log write error: {ex.Message}"); }
             }
         }
 
@@ -56,7 +56,7 @@ namespace AirDirector.Services.Core
                     EnsureWriter();
                     _writer?.WriteLine(line);
                 }
-                catch { }
+                catch (Exception ex) { Console.Error.WriteLine($"[{_prefix}] WriteRaw error: {ex.Message}"); }
             }
         }
 
@@ -81,8 +81,9 @@ namespace AirDirector.Services.Core
                 _writer = new StreamWriter(filePath, true) { AutoFlush = true };
                 _currentDate = today;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.Error.WriteLine($"[{_prefix}] Failed to create log file: {ex.Message}");
                 _writer = null;
             }
         }
