@@ -556,12 +556,15 @@ namespace AirDirector.Controls
 				var advSlot = CreateSingleADVSlot(advFile, slotTime);
 				if (advSlot != null)
 				{
-					InsertItem(insertPosition, advSlot);
+					InsertItemBatch(insertPosition, advSlot);
 					insertPosition++;
 					addedCount++;
 					Log($"[PlaylistADV]   → {advFile.FileType}: {Path.GetFileName(advFile.FilePath)} ({advFile.Duration}s)");
 				}
 			}
+
+			if (addedCount > 0)
+				FinalizeBatchModification();
 
 			Log($"[PlaylistADV] ✅ Inseriti {addedCount} slot ADV");
 			Log($"");
@@ -616,12 +619,15 @@ namespace AirDirector.Controls
 
 								if (advSlot != null)
 								{
-									InsertItem(insertPosition, advSlot);
+									InsertItemBatch(insertPosition, advSlot);
 									insertPosition++;
 									addedCount++;
 									Log($"[PlaylistADV]   → {advFile.FileType}:  {Path.GetFileName(advFile.FilePath)} ({advFile.Duration}s)");
 								}
 							}
+
+							if (addedCount > 0)
+								FinalizeBatchModification();
 
 							_executedSchedules.Add(advKey);
 
@@ -1320,6 +1326,7 @@ namespace AirDirector.Controls
 				var allClips = DbcManager.LoadFromCsv<ClipEntry>("Clips.dbc");
 
 				int insertIndex = GetCorrectScheduleInsertPosition();
+				int addedCount = 0;
 
 				foreach (var itemStr in items)
 				{
@@ -1346,11 +1353,15 @@ namespace AirDirector.Controls
 						{
 							queueItem.IsScheduled = true;
 							ApplyScheduleVideoBuffer(queueItem);
-							InsertItem(insertIndex, queueItem);
+							InsertItemBatch(insertIndex, queueItem);
 							insertIndex++;
+							addedCount++;
 						}
 					}
 				}
+
+				if (addedCount > 0)
+					FinalizeBatchModification();
 			}
 			catch { }
 		}
@@ -1624,7 +1635,7 @@ namespace AirDirector.Controls
 
                         if (queueItem != null)
                         {
-                            AddItem(queueItem);
+                            AddItemBatch(queueItem);
                             addedCount++;
                             addedForThisItem++;
                         }
@@ -1636,6 +1647,9 @@ namespace AirDirector.Controls
 
                     Log($"[GenerateClock] ✅ Aggiunti {addedForThisItem}/{itemsToAdd} per questo elemento");
                 }
+
+                if (addedCount > 0)
+                    FinalizeBatchModification();
 
                 _currentClockName = clockName;
                 DbcManager.SetConfigValue("LastUsedClock", clockName);
@@ -2868,6 +2882,25 @@ namespace AirDirector.Controls
 			NotifyQueueCountChanged();
 		}
 
+		private void AddItemBatch(PlaylistQueueItem item)
+		{
+			_items.Add(item);
+		}
+
+		private void InsertItemBatch(int index, PlaylistQueueItem item)
+		{
+			if (index >= 0 && index <= _items.Count)
+				_items.Insert(index, item);
+		}
+
+		private void FinalizeBatchModification()
+		{
+			RecalculateScheduledTimes();
+			UpdateScrollBar();
+			this.Invalidate();
+			NotifyQueueCountChanged();
+		}
+
 		public void InsertItem(int index, PlaylistQueueItem item)
 		{
 			if (index >= 0 && index <= _items.Count)
@@ -2926,7 +2959,9 @@ namespace AirDirector.Controls
 
 		public List<PlaylistQueueItem> GetAllItems()
 		{
-			return new List<PlaylistQueueItem>(_items);
+			try { return new List<PlaylistQueueItem>(_items); }
+			catch (InvalidOperationException) { return new List<PlaylistQueueItem>(); }
+			catch (ArgumentException) { return new List<PlaylistQueueItem>(); }
 		}
 
 		public PlaylistQueueItem GetCurrentPlayingItem()

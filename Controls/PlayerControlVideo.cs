@@ -173,6 +173,7 @@ namespace AirDirector.Controls
         private LannerSlot _lannerSlot; private string _lannerDbPath = "";
         private readonly object _lannerLock = new object();
         private volatile bool _lannerEnabled = false;
+        private byte[] _lannerBufA, _lannerBufB; private volatile int _lannerBufSelect;
 
         private PlaylistQueueControl _playlistQueue;
         private System.Windows.Forms.Timer _updateTimer, _mixCheckTimer, _blinkTimer;
@@ -266,13 +267,21 @@ namespace AirDirector.Controls
                 _audioMirrorOutput = new WaveOutEvent
                 {
                     DeviceNumber = deviceNumber,
-                    DesiredLatency = 100,
+                    DesiredLatency = 150,
                     NumberOfBuffers = 8
                 };
                 _audioMirrorOutput.Init(_audioMirrorBuffer);
+
+                // Pre-fill con 4 frame di silenzio (~133ms) per creare un margine di buffer
+                // che assorba brevi pause del engine (GC, I/O, lanner, scheduling)
+                int preFrames = 4;
+                int silenceBytes = preFrames * (AUDIO_SAMPLE_RATE / _ndiFrameRate * AUDIO_CHANNELS * sizeof(float));
+                byte[] silence = new byte[silenceBytes];
+                _audioMirrorBuffer.AddSamples(silence, 0, silenceBytes);
+
                 _audioMirrorOutput.Play();
 
-                Log("[Audio] ✅ Mirror audio inizializzato (device=" + deviceNumber + ", latency=100ms, buffers=8, frameSize=" + _audioMirrorConvertBuffer.Length + "B)");
+                Log("[Audio] ✅ Mirror audio inizializzato (device=" + deviceNumber + ", latency=150ms, buffers=8, prefill=" + preFrames + " frames, frameSize=" + _audioMirrorConvertBuffer.Length + "B)");
             }
             catch (Exception ex)
             {
@@ -757,10 +766,15 @@ namespace AirDirector.Controls
         /// Soluzione: pre-bufferizzare solo file che sono video nativi (IsVideoFile=true).
         /// I file audio con video associato sono comunque brevi (jingle) e partono velocemente.
         /// </summary>
-        private void PreBufferNext()
+        /// <summary>
+        /// Fase 1 (ThreadPool): valida il prossimo file da pre-bufferizzare.
+        /// Solo la validazione file (I/O) avviene qui, poi enqueue del setup al command queue.
+        /// </summary>
+        private void PreBufferNextAsync()
         {
             if (_playlistQueue == null) return;
-            var items = _playlistQueue.GetAllItems();
+            List<PlaylistQueueItem> items;
+            try { items = _playlistQueue.GetAllItems(); } catch (Exception ex) { Log("[PREBUF] GetAllItems failed: " + ex.Message); return; }
             if (items.Count < 2) return;
 
             int nextIndex = -1;
@@ -798,7 +812,18 @@ namespace AirDirector.Controls
 
             if (nextIndex < 0) return;
 
-            string nextFile = items[nextIndex].FilePath;
+            int capturedIdx = nextIndex;
+            var capturedItem = items[capturedIdx];
+            string capturedFile = capturedItem.FilePath;
+            _commandQueue.Enqueue(() => PreBufferNextSetup(capturedFile, capturedItem));
+        }
+
+        /// <summary>
+        /// Fase 2 (Engine thread): setup deck per il pre-buffer.
+        /// Nessun I/O su disco, solo operazioni in memoria e VLC.
+        /// </summary>
+        private void PreBufferNextSetup(string nextFile, PlaylistQueueItem nextItem)
+        {
             if (_preBufferedFile == nextFile && _preBufferedDeck != null) return;
 
             Deck target = null;
@@ -814,15 +839,15 @@ namespace AirDirector.Controls
             target.Type = DeckType.VideoClip;
             target.IsPreBuffered = true;
             target.PreBufferReady = false;
-            target.StartPointMs = items[nextIndex].MarkerIN;
+            target.StartPointMs = nextItem.MarkerIN;
 
             var media = new Media(_libVLC, nextFile, FromType.FromPath);
-            if (items[nextIndex].MarkerIN > 0) media.AddOption($":start-time={items[nextIndex].MarkerIN / 1000.0:F3}");
+            if (nextItem.MarkerIN > 0) media.AddOption($":start-time={nextItem.MarkerIN / 1000.0:F3}");
             media.AddOption(":file-caching=500");
             target.VlcPlayer.Media = media;
             media.Dispose();
             target.VlcPlayer.Play();
-            target.CurrentItem = PlayItem.FromQueueItem(items[nextIndex]);
+            target.CurrentItem = PlayItem.FromQueueItem(nextItem);
 
             Log("[PREBUF] Pre-buffering VideoClip: " + Path.GetFileName(nextFile) + " → " + target.Name);
 
@@ -1009,7 +1034,7 @@ namespace AirDirector.Controls
             TrackChanged?.Invoke(this, new TrackChangedEventArgs { FilePath = fp, Artist = CurrentArtist, Title = CurrentTitle, IsVideo = _currentFileIsVideo, ItemType = item.ItemType, VideoFilePath = item.VideoFilePath, VideoSource = item.VideoSource, NDISourceName = item.NDISourceName, MarkerIN = _markerIN, MarkerMIX = _markerMIX, MarkerOUT = _markerOUT });
             PlayStateChanged?.Invoke(this, new PlayStateChangedEventArgs { IsPlaying = true, IsPaused = false, FilePath = fp });
             UpdateCG(item); SendMeta(item); if (!isStream) PreCacheNextWaveform();
-            ThreadPool.QueueUserWorkItem(_ => { Thread.Sleep(500); _commandQueue.Enqueue(() => PreBufferNext()); });
+            ThreadPool.QueueUserWorkItem(_ => { Thread.Sleep(500); PreBufferNextAsync(); });
         }
 
         private void StopBufferDeck()
@@ -1237,8 +1262,10 @@ namespace AirDirector.Controls
         private void UpdateLannerState()
         {
             if (!_lannerEnabled) return;
-            DateTime n = DateTime.Now; if (n.Date != _lastDateCheck) LoadLannerSchedule();
-            lock (_lannerLock)
+            DateTime n = DateTime.Now;
+            if (n.Date != _lastDateCheck) { _lastDateCheck = n.Date; ThreadPool.QueueUserWorkItem(_ => LoadLannerSchedule()); return; }
+            if (!Monitor.TryEnter(_lannerLock)) return;
+            try
             {
                 TimeSpan ct = n.TimeOfDay;
                 if (_lannerActive)
@@ -1254,10 +1281,11 @@ namespace AirDirector.Controls
                         { _lannerSlot = slot; _lannerImgIdx = 0; _lannerSlotStart = n; _lannerImgStart = n; _lannerImgDurSec = slot.ImagePaths.Count > 1 ? (slot.DurationMinutes * 60) / slot.ImagePaths.Count : slot.DurationMinutes * 60; _lannerActive = true; Log("[LANNER] ON: " + string.Join(", ", slot.CampaignNames)); string lp = slot.ImagePaths[0]; ThreadPool.QueueUserWorkItem(_ => { LoadLannerImg(lp); _lannerBgDirty = true; }); break; }
                 }
             }
+            finally { Monitor.Exit(_lannerLock); }
         }
 
-        private void LoadLannerImg(string p) { try { if (!File.Exists(p)) { _lannerImageBGRA = null; return; } int fw = _ndiWidth, fh = _ndiHeight; using (var orig = Image.FromFile(p)) using (var bmp = new Bitmap(fw, fh, PixelFormat.Format32bppArgb)) using (var g = Graphics.FromImage(bmp)) { g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.SmoothingMode = SmoothingMode.HighQuality; g.CompositingQuality = CompositingQuality.HighQuality; g.Clear(Color.Black); float ir = (float)orig.Width / orig.Height, ar = (float)fw / fh; int dw, dh, dx, dy; if (ir > ar) { dw = fw; dh = (int)(fw / ir); dx = 0; dy = (fh - dh) / 2; } else { dh = fh; dw = (int)(fh * ir); dx = (fw - dw) / 2; dy = 0; } g.DrawImage(orig, dx, dy, dw, dh); var bd = bmp.LockBits(new Rectangle(0, 0, fw, fh), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb); byte[] buf = new byte[fw * fh * 4]; Marshal.Copy(bd.Scan0, buf, 0, buf.Length); bmp.UnlockBits(bd); _lannerImageBGRA = buf; } } catch { _lannerImageBGRA = null; } }
-        public void ReloadLannerSchedule() => _commandQueue.Enqueue(() => LoadLannerSchedule());
+        private void LoadLannerImg(string p) { try { if (!File.Exists(p)) { _lannerImageBGRA = null; return; } int fw = _ndiWidth, fh = _ndiHeight; int needed = fw * fh * 4; if (_lannerBufA == null || _lannerBufA.Length != needed) _lannerBufA = new byte[needed]; if (_lannerBufB == null || _lannerBufB.Length != needed) _lannerBufB = new byte[needed]; int sel = Interlocked.Increment(ref _lannerBufSelect); byte[] buf = (sel & 1) == 0 ? _lannerBufA : _lannerBufB; using (var orig = Image.FromFile(p)) using (var bmp = new Bitmap(fw, fh, PixelFormat.Format32bppArgb)) using (var g = Graphics.FromImage(bmp)) { g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.SmoothingMode = SmoothingMode.HighQuality; g.CompositingQuality = CompositingQuality.HighQuality; g.Clear(Color.Black); float ir = (float)orig.Width / orig.Height, ar = (float)fw / fh; int dw, dh, dx, dy; if (ir > ar) { dw = fw; dh = (int)(fw / ir); dx = 0; dy = (fh - dh) / 2; } else { dh = fh; dw = (int)(fh * ir); dx = (fw - dw) / 2; dy = 0; } g.DrawImage(orig, dx, dy, dw, dh); var bd = bmp.LockBits(new Rectangle(0, 0, fw, fh), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb); Marshal.Copy(bd.Scan0, buf, 0, buf.Length); bmp.UnlockBits(bd); _lannerImageBGRA = buf; } } catch { _lannerImageBGRA = null; } }
+        public void ReloadLannerSchedule() => ThreadPool.QueueUserWorkItem(_ => LoadLannerSchedule());
 
         // ═══════════════════════════════════════════════════════════
         // WAVEFORM
