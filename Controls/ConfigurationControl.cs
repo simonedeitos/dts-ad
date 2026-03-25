@@ -315,6 +315,7 @@ namespace AirDirector.Controls
             lblBufferVideoPath.Text = LanguageManager.GetString("Configuration.BufferVideoPath", "Cartella Video Tampone:");
             lblBufferMode.Text = LanguageManager.GetString("Configuration.BufferMode", "Modalità Riproduzione:");
             lblAdvLanner.Text = LanguageManager.GetString("Configuration.AdvLanner", "ADV Lanner Video on Output Playout:");
+            chkLocalAudioOutput.Text = "🔊 " + LanguageManager.GetString("Configuration.LocalAudioOutput", "Abilita riproduzione audio anche su uscita locale");
             btnBrowseBufferVideo.Text = "📁";
             btnRefreshNDI.Text = "🔄 " + LanguageManager.GetString("Configuration.Refresh", "Aggiorna");
             btnSaveVideo.Text = "💾 " + LanguageManager.GetString("Common.Save", "Salva");
@@ -523,6 +524,9 @@ namespace AirDirector.Controls
                     // ADV Lanner
                     string advLanner = key.GetValue("AdvLannerPlayout", "YesInternal").ToString();
                     cmbAdvLanner.SelectedIndex = advLanner == "NoExternal" ? 1 : 0;
+
+                    // Local Audio Output
+                    chkLocalAudioOutput.Checked = Convert.ToBoolean(key.GetValue("LocalAudioEnabled", 0));
 
                     // Forza selezione "(Crea Nuova Sorgente NDI)" se modalità RadioTV
                     if (cmbMode.SelectedIndex == 1 && cmbVideoOutputType.SelectedIndex == 0)
@@ -1019,6 +1023,9 @@ namespace AirDirector.Controls
                         // ADV Lanner
                         string advLanner = cmbAdvLanner.SelectedIndex == 1 ? "NoExternal" : "YesInternal";
                         key.SetValue("AdvLannerPlayout", advLanner);
+
+                        // Local Audio Output
+                        key.SetValue("LocalAudioEnabled", chkLocalAudioOutput.Checked ? 1 : 0);
                     }
                 }
 
@@ -1120,6 +1127,7 @@ namespace AirDirector.Controls
         public static string GetSDIDeviceName() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return key?.GetValue("SDI_DeviceName", "").ToString() ?? ""; } } catch { return ""; } }
         public static string GetAdvLannerPlayout() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return key?.GetValue("AdvLannerPlayout", "YesInternal").ToString() ?? "YesInternal"; } } catch { return "YesInternal"; } }
         public static bool IsAdvLannerInternal() { return GetAdvLannerPlayout() == "YesInternal"; }
+        public static bool IsLocalAudioEnabled() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return Convert.ToBoolean(key?.GetValue("LocalAudioEnabled", 0) ?? 0); } } catch { return false; } }
 
         private void lblLogoPath_Click(object sender, EventArgs e) { }
     }

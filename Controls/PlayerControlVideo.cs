@@ -110,6 +110,10 @@ namespace AirDirector.Controls
         private byte[] _audioMirrorConvertBuffer;
         private IWavePlayer _audioMirrorOutput;
         private BufferedWaveProvider _audioMirrorBuffer;
+        private AudioRing _audioMirrorRing;
+        private Thread _audioMirrorThread;
+        private volatile bool _audioMirrorRunning;
+        private volatile bool _localAudioEnabled;
         private AudioDelayLine _audioDelay;
         private long _framesSent, _audioSamplesSent;
         private int _pipW, _pipH, _pipX, _pipY;
@@ -214,7 +218,8 @@ namespace AirDirector.Controls
                 ThreadPool.QueueUserWorkItem(_ => { RefreshBufferPlaylist(); if (_lannerEnabled) LoadLannerSchedule(); });
                 _engineReady = true;
                 Log("[INIT] ✓ " + sw.ElapsedMilliseconds + "ms | " + _ndiWidth + "x" + _ndiHeight + "@" + _ndiFrameRate + " PIP=" + _pipW + "x" + _pipH + " Lanner=" + (_lannerEnabled ? "YesInternal" : "Disabled"));
-                InitAudioMirror();
+                if (_localAudioEnabled) InitAudioMirror();
+                else Log("[Audio] Local audio output disabled (registry flag)");
             }
             catch (Exception ex) { LogErr("[INIT]", ex); }
         }
@@ -227,16 +232,46 @@ namespace AirDirector.Controls
                 var fmt = WaveFormat.CreateIeeeFloatWaveFormat(AUDIO_SAMPLE_RATE, AUDIO_CHANNELS);
                 _audioMirrorBuffer = new BufferedWaveProvider(fmt) { BufferDuration = TimeSpan.FromSeconds(2), DiscardOnBufferOverflow = true };
                 _audioMirrorConvertBuffer = new byte[AUDIO_SAMPLE_RATE * AUDIO_CHANNELS * sizeof(float)];
+                _audioMirrorRing = new AudioRing();
                 _audioMirrorOutput = new WaveOutEvent { DeviceNumber = deviceNumber, DesiredLatency = 150, NumberOfBuffers = 3 };
                 _audioMirrorOutput.Init(_audioMirrorBuffer);
                 _audioMirrorOutput.Play();
-                Log("[Audio] ✅ Mirror audio device inizializzato (device=" + deviceNumber + ")");
+                _audioMirrorRunning = true;
+                _audioMirrorThread = new Thread(AudioMirrorLoop) { Name = "PCV_AudioMirror", Priority = ThreadPriority.BelowNormal, IsBackground = true };
+                _audioMirrorThread.Start();
+                Log("[Audio] ✅ Mirror audio device inizializzato (device=" + deviceNumber + ") su thread separato");
             }
             catch (Exception ex)
             {
                 Log("[Audio] ⚠️ Mirror audio non disponibile: " + ex.Message);
                 _audioMirrorOutput = null;
                 _audioMirrorBuffer = null;
+                _audioMirrorRing = null;
+                _audioMirrorRunning = false;
+            }
+        }
+
+        private void AudioMirrorLoop()
+        {
+            var localBuf = new float[AUDIO_SAMPLE_RATE / 10 * AUDIO_CHANNELS];
+            var convertBuf = new byte[localBuf.Length * sizeof(float)];
+            while (_audioMirrorRunning)
+            {
+                var ring = _audioMirrorRing;
+                var provider = _audioMirrorBuffer;
+                if (ring == null || provider == null) { Thread.Sleep(10); continue; }
+                int avail = ring.Available;
+                if (avail < AUDIO_SAMPLE_RATE / 100 * AUDIO_CHANNELS) { Thread.Sleep(2); continue; }
+                int toRead = Math.Min(avail, localBuf.Length);
+                int read = ring.Read(localBuf, 0, toRead);
+                if (read <= 0) { Thread.Sleep(2); continue; }
+                try
+                {
+                    int byteCount = read * sizeof(float);
+                    Buffer.BlockCopy(localBuf, 0, convertBuf, 0, byteCount);
+                    provider.AddSamples(convertBuf, 0, byteCount);
+                }
+                catch { }
             }
         }
 
@@ -245,6 +280,7 @@ namespace AirDirector.Controls
             try
             {
                 _ndiSourceName = ConfigurationControl.GetNDISourceName();
+                _localAudioEnabled = ConfigurationControl.IsLocalAudioEnabled();
                 try
                 {
                     using (var k = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\AirDirector"))
@@ -579,20 +615,8 @@ namespace AirDirector.Controls
         // ═══════════════════════════════════════════════════════════
         // NDI SEND
         // ═══════════════════════════════════════════════════════════
-        private void SendAudio(int ns) { if (_ndiSender == null) return; try { using (var f = new AudioFrame(ns, AUDIO_SAMPLE_RATE, AUDIO_CHANNELS)) { unsafe { float* dest = (float*)f.AudioBuffer.ToPointer(), pL = dest, pR = dest + ns; for (int i = 0; i < ns; i++) { float l = _mixedAudioBuffer[i * 2], r = _mixedAudioBuffer[i * 2 + 1]; if (l > 1) l = 1; else if (l < -1) l = -1; if (r > 1) r = 1; else if (r < -1) r = -1; *pL++ = l; *pR++ = r; } } f.TimeStamp = (_audioSamplesSent * 10_000_000L) / AUDIO_SAMPLE_RATE; _ndiSender.Send(f); _audioSamplesSent += ns; } } catch { } MirrorAudio(ns); }
+        private void SendAudio(int ns) { if (_ndiSender == null) return; try { using (var f = new AudioFrame(ns, AUDIO_SAMPLE_RATE, AUDIO_CHANNELS)) { unsafe { float* dest = (float*)f.AudioBuffer.ToPointer(), pL = dest, pR = dest + ns; for (int i = 0; i < ns; i++) { float l = _mixedAudioBuffer[i * 2], r = _mixedAudioBuffer[i * 2 + 1]; if (l > 1) l = 1; else if (l < -1) l = -1; if (r > 1) r = 1; else if (r < -1) r = -1; *pL++ = l; *pR++ = r; } } f.TimeStamp = (_audioSamplesSent * 10_000_000L) / AUDIO_SAMPLE_RATE; _ndiSender.Send(f); _audioSamplesSent += ns; } } catch { } _audioMirrorRing?.Write(_mixedAudioBuffer, 0, ns * AUDIO_CHANNELS); }
 
-        private void MirrorAudio(int ns)
-        {
-            if (_audioMirrorBuffer == null || _audioMirrorConvertBuffer == null) return;
-            try
-            {
-                int byteCount = ns * AUDIO_CHANNELS * sizeof(float);
-                if (byteCount > _audioMirrorConvertBuffer.Length) return;
-                Buffer.BlockCopy(_mixedAudioBuffer, 0, _audioMirrorConvertBuffer, 0, byteCount);
-                _audioMirrorBuffer.AddSamples(_audioMirrorConvertBuffer, 0, byteCount);
-            }
-            catch { }
-        }
         private void SendVideo() { if (_ndiSender == null) return; try { using (var f = new VideoFrame(_compositedVideoPtr, _ndiWidth, _ndiHeight, _ndiWidth * 4, NDIlib.FourCC_type_e.FourCC_type_BGRX, (float)_ndiWidth / _ndiHeight, _ndiFrameRate, 1, NDIlib.frame_format_type_e.frame_format_type_progressive)) { f.TimeStamp = (_framesSent * 10_000_000L) / _ndiFrameRate; _ndiSender.Send(f); _framesSent++; } } catch { } }
 
         // ═══════════════════════════════════════════════════════════
@@ -1220,7 +1244,7 @@ namespace AirDirector.Controls
         private void SafeInvoke(Action a) { if (IsDisposed || _isDisposed) return; try { if (InvokeRequired) BeginInvoke(a); else a(); } catch { } }
         private void UpdateTrackDisplay(PlayItem i) { if (i == null) return; bool isMusicArchive = i.ItemType.Equals("Music", StringComparison.OrdinalIgnoreCase) && !i.IsScheduled; string d = isMusicArchive ? (string.IsNullOrEmpty(i.Artist) ? (i.Title ?? "").ToUpper() : i.Artist.ToUpper() + " - " + (i.Title ?? "").ToUpper()) : ""; lblArtist.Text = d.Replace("&&", "&"); lblArtist.Invalidate(); if (i.Intro.TotalMilliseconds > 0) { lblIntro.Text = i.Intro.ToString(@"mm\:ss"); lblIntro.ForeColor = Color.White; lblIntro.BackColor = Color.Red; } else { lblIntro.Text = ""; lblIntro.BackColor = Color.Black; } }
         private void ClearPlayer() { SafeInvoke(() => { lblArtist.Text = ""; lblArtist.Invalidate(); lblIntro.Text = "--:--"; lblIntro.BackColor = Color.Black; lblIntro.ForeColor = AppTheme.LEDYellow; lblElapsed.Text = "--:--"; lblRemaining.Text = "--:--"; lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed; _waveformPeaks = null; _waveformCurrentFile = ""; waveformPanel.Invalidate(); UpdateBtnStates(); }); _totalDuration = TimeSpan.Zero; _introTime = TimeSpan.Zero; _markerIN = 0; _markerINTRO = 0; _markerMIX = 0; _markerOUT = 0; _positionMs = 0; ResetMixTrigger(); CurrentFilePath = ""; CurrentArtist = ""; CurrentTitle = ""; _playlistQueue?.SetCurrentPlaying(-1); }
-        private void UpdateCG(PlayItem i) { try { string t = i?.ItemType ?? "Music"; if (t.Equals("Music", StringComparison.OrdinalIgnoreCase)) CGRenderer.OnTrackChanged(i.Artist ?? "", i.Title ?? "", "Music", _totalDuration); else CGRenderer.OnTrackChanged("", "", t, TimeSpan.Zero); } catch { } }
+        private void UpdateCG(PlayItem i) { try { string t = i?.ItemType ?? "Music"; bool isMusicArchive = t.Equals("Music", StringComparison.OrdinalIgnoreCase) && !(i?.IsScheduled ?? false); if (isMusicArchive) CGRenderer.OnTrackChanged(i.Artist ?? "", i.Title ?? "", "Music", _totalDuration); else CGRenderer.OnTrackChanged("", "", t, TimeSpan.Zero); } catch { } }
         private void SendMeta(PlayItem i) { try { string s = ConfigurationControl.GetMetadataSource(); bool sn = s == "MusicAndClips" || (s == "MusicOnly" && (i?.ItemType ?? "Music") == "Music"); if (sn) MetadataManager.UpdateMetadata(i?.Artist ?? "", i?.Title ?? "", i?.ItemType ?? "Music"); } catch { } }
 
         // ═══════════════════════════════════════════════════════════
@@ -1238,9 +1262,10 @@ namespace AirDirector.Controls
         {
             if (disposing && !_isDisposed)
             {
-                _isDisposed = true; _engineRunning = false;
+                _isDisposed = true; _engineRunning = false; _audioMirrorRunning = false;
                 _updateTimer?.Stop(); _updateTimer?.Dispose(); _mixCheckTimer?.Stop(); _mixCheckTimer?.Dispose(); _blinkTimer?.Stop(); _blinkTimer?.Dispose();
                 if (_engineThread != null && _engineThread.IsAlive) _engineThread.Join(2000);
+                if (_audioMirrorThread != null && _audioMirrorThread.IsAlive) _audioMirrorThread.Join(1000);
                 if (_deckA != null) { StopDeckInternal(_deckA, true); Marshal.FreeHGlobal(_deckA.VideoBufferPtr); }
                 if (_deckB != null) { StopDeckInternal(_deckB, true); Marshal.FreeHGlobal(_deckB.VideoBufferPtr); }
                 if (_bufferDeck != null) { StopDeckInternal(_bufferDeck, true); Marshal.FreeHGlobal(_bufferDeck.VideoBufferPtr); }
