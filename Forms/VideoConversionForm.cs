@@ -23,6 +23,7 @@ namespace AirDirector.Forms
         private const int ROW_HEIGHT = 108;
         private const int ROW_MARGIN = 6;
         private const string REGISTRY_PATH = @"SOFTWARE\AirDirector";
+        private const int PROGRESS_MAX = 1000;
         private const int VBR_BITRATE_TOLERANCE_KBPS = 10;
         private const double SILENCE_MIN_DURATION_SEC = 0.01;
 
@@ -518,7 +519,7 @@ namespace AirDirector.Forms
                 ? $"✅  {compatible} file(s) already compatible – toggle is OFF.  Press \"Start Conversion\"."
                 : "Ready.  Press \"Start Conversion\".";
 
-            progressOverall.Maximum = 1000; // use 1000 for weighted progress
+            progressOverall.Maximum = PROGRESS_MAX; // use weighted progress
             progressOverall.Value = 0;
             lblOverall.Text = $"0 / {_inputFiles.Length} files";
 
@@ -1976,10 +1977,10 @@ namespace AirDirector.Forms
                 }
             }
 
-            int overallPct = totalWeight * 1000 / (_fileRows.Count * 100);
+            int overallPct = totalWeight * PROGRESS_MAX / (_fileRows.Count * 100);
             // enforce monotonic overall progress
             if (overallPct > progressOverall.Value)
-                progressOverall.Value = Math.Min(overallPct, 1000);
+                progressOverall.Value = Math.Min(overallPct, PROGRESS_MAX);
 
             lblOverall.Text = $"{doneFiles} / {_inputFiles.Length} files completed";
         }

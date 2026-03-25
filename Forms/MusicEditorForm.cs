@@ -766,13 +766,19 @@ namespace AirDirector.Forms
                 if (File.Exists(tempThumb) && _picVideoPreview != null &&
                     !_picVideoPreview.IsDisposed && IsHandleCreated)
                 {
-                    var thumbImage = Image.FromFile(tempThumb);
+                    // Load into memory and release the file lock
+                    Image thumbImage;
+                    using (var stream = new FileStream(tempThumb, FileMode.Open, FileAccess.Read))
+                    {
+                        thumbImage = new Bitmap(Image.FromStream(stream));
+                    }
+
                     if (InvokeRequired)
                         Invoke(new Action(() => { _picVideoPreview.Image = thumbImage; }));
                     else
                         _picVideoPreview.Image = thumbImage;
 
-                    // Clean up temp file after loading into memory
+                    // Clean up temp file
                     try { File.Delete(tempThumb); } catch { }
                 }
             }
