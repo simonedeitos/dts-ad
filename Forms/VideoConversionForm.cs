@@ -1283,7 +1283,7 @@ namespace AirDirector.Forms
             Label lblBadge = new Label
             {
                 Text = badgeText,
-                Location = new Point(panW - 230, 5),
+                Location = new Point(panW - 170, 5),
                 Size = new Size(220, 18),
                 Font = new Font("Segoe UI", 8, FontStyle.Bold),
                 ForeColor = badgeColor,
@@ -1344,7 +1344,7 @@ namespace AirDirector.Forms
             ProgressBar pb = new ProgressBar
             {
                 Location = new Point(30, 82),
-                Size = new Size(panW - 183, 20),
+                Size = new Size(panW - 160, 20),
                 Minimum = 0,
                 Maximum = 100,
                 Value = compatible ? 100 : 0,
@@ -1356,7 +1356,7 @@ namespace AirDirector.Forms
             Label lblProg = new Label
             {
                 Text = needsConvert ? "Waiting…" : "Skip (toggle ON to convert)",
-                Location = new Point(pb.Right + 8, 84),
+                Location = new Point(pb.Right + 10, 84),
                 Size = new Size(panW - pb.Right - 20, 18),
                 Font = new Font("Segoe UI", 8),
                 ForeColor = Color.LightGray
