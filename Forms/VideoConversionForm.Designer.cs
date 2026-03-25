@@ -79,7 +79,7 @@ namespace AirDirector.Forms
             // ═══════════════════════════════════════════════════════════════
             // pnlScroll (pannello elenco file – PARTE DA TOP = 135px)
             // ═══════════════════════════════════════════════════════════════
-            this.pnlScroll.Location = new System.Drawing.Point(0, 135);  // 85 (pnlTop) + 50 (pnlPreEditing) = 135
+            this.pnlScroll.Location = new System.Drawing.Point(0, 167);  // 85 (pnlTop) + 50 (pnlPreEditing) + 32 (pnlTagSource) = 167
             this.pnlScroll.Dock = System.Windows.Forms.DockStyle.None;
             this.pnlScroll.Anchor =
                 System.Windows.Forms.AnchorStyles.Top |
@@ -93,7 +93,7 @@ namespace AirDirector.Forms
             // Resize dinamico: quando il form si ridimensiona, aggiorna pnlScroll
             this.Resize += (s, ev) =>
             {
-                int top = 135; // fisso: 85 + 50
+                int top = 167; // fisso: 85 + 50 + 32
                 int bottom = this.pnlBottom.Height;
                 this.pnlScroll.Location = new System.Drawing.Point(0, top);
                 this.pnlScroll.Size = new System.Drawing.Size(
@@ -273,7 +273,8 @@ namespace AirDirector.Forms
             // ═══════════════════════════════════════════════════════════════
             this.Text = "File Importer Converter — AirDirector";
             this.ClientSize = new System.Drawing.Size(920, 600);
-            this.MinimumSize = new System.Drawing.Size(720, 480);
+            this.MinimumSize = new System.Drawing.Size(920, 480);
+            this.MaximumSize = new System.Drawing.Size(920, System.Int32.MaxValue);
             this.BackColor = System.Drawing.Color.FromArgb(20, 20, 30);
             this.ForeColor = System.Drawing.Color.White;
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
