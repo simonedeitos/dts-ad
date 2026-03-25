@@ -1526,7 +1526,7 @@ namespace AirDirector.Controls
             convForm.ConversionCompleted += (convertedPaths) =>
             {
                 if (convertedPaths != null && convertedPaths.Count > 0)
-                    ImportFiles(convertedPaths.ToArray());
+                    ImportFiles(convertedPaths.ToArray(), convForm);
             };
 
             // Non-modal: user can keep working in other forms
@@ -1539,7 +1539,7 @@ namespace AirDirector.Controls
         //  conversion form — all video handling now routes through VideoConversionForm,
         //  so here we can always treat .mp4 as a regular video import)
         // ─────────────────────────────────────────────────────────────────────────────
-        private void ImportFiles(string[] filePaths)
+        private void ImportFiles(string[] filePaths, VideoConversionForm convForm = null)
         {
             if (filePaths.Length == 0) return;
 
@@ -1601,14 +1601,78 @@ namespace AirDirector.Controls
 
                     try
                     {
-                        string extension = Path.GetExtension(filePath).ToLower();
+                        string currentPath = filePath;
+                        string extension = Path.GetExtension(currentPath).ToLower();
                         bool isVideo = videoExtensions.Contains(extension);
+
+                        // Pre-editing: get detected markers from conversion form (if available)
+                        var (markerIn, markerOut) = convForm?.IsPreEditingEnabled == true
+                            ? convForm.GetPreEditMarkers(currentPath)
+                            : (-1, -1);
+
+                        // Rename file on disk if rename mode is active
+                        if (convForm != null && convForm.RenameMode != 0)
+                        {
+                            try
+                            {
+                                var (renArtist, renTitle) = convForm.GetArtistTitleForFile(currentPath);
+                                renArtist = convForm.ApplyRenameCase(renArtist);
+                                renTitle = convForm.ApplyRenameCase(renTitle);
+
+                                string newName;
+                                if (!string.IsNullOrWhiteSpace(renArtist) && !string.IsNullOrWhiteSpace(renTitle))
+                                    newName = $"{renArtist} - {renTitle}{extension}";
+                                else if (!string.IsNullOrWhiteSpace(renTitle))
+                                    newName = $"{renTitle}{extension}";
+                                else
+                                    newName = convForm.ApplyRenameCase(Path.GetFileNameWithoutExtension(currentPath)) + extension;
+
+                                string dir = Path.GetDirectoryName(currentPath) ?? "";
+                                string newPath = Path.Combine(dir, newName);
+                                if (!string.Equals(currentPath, newPath, StringComparison.Ordinal))
+                                {
+                                    // Case-only change on Windows: use temp file to avoid IOException
+                                    if (string.Equals(currentPath, newPath, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        string tmpPath = currentPath + ".tmp_rename";
+                                        File.Move(currentPath, tmpPath);
+                                        File.Move(tmpPath, newPath);
+                                    }
+                                    else if (!File.Exists(newPath))
+                                    {
+                                        File.Move(currentPath, newPath);
+                                    }
+                                    currentPath = newPath;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Log($"[ArchiveControl] ⚠️ Errore rename {currentPath}: {ex.Message}");
+                            }
+                        }
+
+                        // Get artist/title from conversion form settings (tag source + rename mode)
+                        string importArtist = null, importTitle = null;
+                        if (convForm != null)
+                        {
+                            var (a, t) = convForm.GetArtistTitleForFile(currentPath);
+                            importArtist = convForm.ApplyRenameCase(a);
+                            importTitle = convForm.ApplyRenameCase(t);
+                        }
 
                         if (_archiveType == "Music")
                         {
                             var musicEntry = isVideo
-                                ? CreateMusicEntryFromVideo(filePath)
-                                : CreateMusicEntryFromFile(filePath);
+                                ? CreateMusicEntryFromVideo(currentPath)
+                                : CreateMusicEntryFromFile(currentPath);
+
+                            // Override artist/title with conversion form settings
+                            if (!string.IsNullOrWhiteSpace(importArtist)) musicEntry.Artist = importArtist;
+                            if (!string.IsNullOrWhiteSpace(importTitle)) musicEntry.Title = importTitle;
+
+                            // Apply pre-editing markers if detected
+                            if (markerIn >= 0) musicEntry.MarkerIN = markerIn;
+                            if (markerOut >= 0) musicEntry.MarkerOUT = markerOut;
 
                             if (DbcManager.Insert("Music.dbc", musicEntry)) imported++;
                             else errors++;
@@ -1616,8 +1680,15 @@ namespace AirDirector.Controls
                         else
                         {
                             var clipEntry = isVideo
-                                ? CreateClipEntryFromVideo(filePath)
-                                : CreateClipEntryFromFile(filePath);
+                                ? CreateClipEntryFromVideo(currentPath)
+                                : CreateClipEntryFromFile(currentPath);
+
+                            // Override title with conversion form settings (clips have no artist)
+                            if (!string.IsNullOrWhiteSpace(importTitle)) clipEntry.Title = importTitle;
+
+                            // Apply pre-editing markers if detected
+                            if (markerIn >= 0) clipEntry.MarkerIN = markerIn;
+                            if (markerOut >= 0) clipEntry.MarkerOUT = markerOut;
 
                             if (DbcManager.Insert("Clips.dbc", clipEntry)) imported++;
                             else errors++;

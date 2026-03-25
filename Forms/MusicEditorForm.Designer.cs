@@ -191,15 +191,15 @@
             toolbarPanel.Dock = System.Windows.Forms.DockStyle.Top;
             toolbarPanel.Location = new System.Drawing.Point(0, 0);
             toolbarPanel.Name = "toolbarPanel";
-            toolbarPanel.Size = new System.Drawing.Size(1263, 105);
+            toolbarPanel.Size = new System.Drawing.Size(1263, 55);
             toolbarPanel.TabIndex = 0;
 
             // btnPlay
             btnPlay.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             btnPlay.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            btnPlay.Location = new System.Drawing.Point(15, 10);
+            btnPlay.Location = new System.Drawing.Point(15, 8);
             btnPlay.Name = "btnPlay";
-            btnPlay.Size = new System.Drawing.Size(90, 40);
+            btnPlay.Size = new System.Drawing.Size(90, 38);
             btnPlay.TabIndex = 0;
             btnPlay.Text = "▶ PLAY";
             btnPlay.UseVisualStyleBackColor = true;
@@ -208,9 +208,9 @@
             // btnStop
             btnStop.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             btnStop.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            btnStop.Location = new System.Drawing.Point(115, 10);
+            btnStop.Location = new System.Drawing.Point(115, 8);
             btnStop.Name = "btnStop";
-            btnStop.Size = new System.Drawing.Size(90, 40);
+            btnStop.Size = new System.Drawing.Size(90, 38);
             btnStop.TabIndex = 1;
             btnStop.Text = "⏹ STOP";
             btnStop.UseVisualStyleBackColor = true;
@@ -219,16 +219,16 @@
             // btnLoop
             btnLoop.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             btnLoop.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            btnLoop.Location = new System.Drawing.Point(1161, 10);
+            btnLoop.Location = new System.Drawing.Point(1161, 8);
             btnLoop.Name = "btnLoop";
-            btnLoop.Size = new System.Drawing.Size(90, 40);
+            btnLoop.Size = new System.Drawing.Size(90, 38);
             btnLoop.TabIndex = 2;
             btnLoop.Text = "🔁 LOOP";
             btnLoop.UseVisualStyleBackColor = true;
             btnLoop.Visible = false;
 
             // ========== ZOOM PANEL (in toolbar) ==========
-            zoomPanel.Location = new System.Drawing.Point(220, 5);
+            zoomPanel.Location = new System.Drawing.Point(220, 3);
             zoomPanel.Name = "zoomPanel";
             zoomPanel.Size = new System.Drawing.Size(300, 50);
             zoomPanel.TabIndex = 3;
@@ -261,11 +261,11 @@
             lblZoomPercent.Size = new System.Drawing.Size(55, 20);
             lblZoomPercent.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
 
-            // ========== VOLUME GROUP (under Play/Stop buttons) ==========
+            // ========== VOLUME GROUP (to the right of zoom, same row) ==========
             grpVolume.Text = "🔊 Volume Boost";
             grpVolume.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold);
             grpVolume.ForeColor = System.Drawing.Color.White;
-            grpVolume.Location = new System.Drawing.Point(15, 50);
+            grpVolume.Location = new System.Drawing.Point(530, 0);
             grpVolume.Size = new System.Drawing.Size(560, 50);
             grpVolume.TabIndex = 4;
             grpVolume.Controls.Add(trkVolume);
@@ -344,9 +344,9 @@
             leftPanel.Controls.Add(btnMarkerOutDown);
             leftPanel.Controls.Add(btnPlayFromOut);
             leftPanel.Dock = System.Windows.Forms.DockStyle.Left;
-            leftPanel.Location = new System.Drawing.Point(0, 105);
+            leftPanel.Location = new System.Drawing.Point(0, 55);
             leftPanel.Name = "leftPanel";
-            leftPanel.Size = new System.Drawing.Size(380, 305);
+            leftPanel.Size = new System.Drawing.Size(380, 355);
             leftPanel.TabIndex = 1;
 
             // lblCurrentPosition
@@ -653,7 +653,7 @@
 
             // ========== VU METER PANEL ==========
             vuMeterPanel.Dock = System.Windows.Forms.DockStyle.Top;
-            vuMeterPanel.Location = new System.Drawing.Point(380, 105);
+            vuMeterPanel.Location = new System.Drawing.Point(380, 55);
             vuMeterPanel.Name = "vuMeterPanel";
             vuMeterPanel.Size = new System.Drawing.Size(883, 24);
             vuMeterPanel.BackColor = System.Drawing.Color.FromArgb(15, 15, 15);
@@ -662,9 +662,9 @@
             // ========== picWaveform ==========
             picWaveform.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             picWaveform.Dock = System.Windows.Forms.DockStyle.Fill;
-            picWaveform.Location = new System.Drawing.Point(380, 129);
+            picWaveform.Location = new System.Drawing.Point(380, 79);
             picWaveform.Name = "picWaveform";
-            picWaveform.Size = new System.Drawing.Size(883, 261);
+            picWaveform.Size = new System.Drawing.Size(883, 331);
             picWaveform.TabIndex = 2;
             picWaveform.TabStop = false;
             picWaveform.Paint += picWaveform_Paint;
