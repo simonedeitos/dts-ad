@@ -261,10 +261,10 @@ namespace AirDirector.Controls
                 var provider = _audioMirrorBuffer;
                 if (ring == null || provider == null) { Thread.Sleep(10); continue; }
                 int avail = ring.Available;
-                if (avail < AUDIO_SAMPLE_RATE / 100 * AUDIO_CHANNELS) { Thread.Sleep(2); continue; }
+                if (avail < AUDIO_SAMPLE_RATE / 25 * AUDIO_CHANNELS) { Thread.Sleep(5); continue; }
                 int toRead = Math.Min(avail, localBuf.Length);
                 int read = ring.Read(localBuf, 0, toRead);
-                if (read <= 0) { Thread.Sleep(2); continue; }
+                if (read <= 0) { Thread.Sleep(5); continue; }
                 try
                 {
                     int byteCount = read * sizeof(float);
