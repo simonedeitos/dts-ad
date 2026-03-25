@@ -1245,13 +1245,13 @@ namespace AirDirector.Controls
                 {
                     if (_lannerSlot == null) { _lannerActive = false; return; }
                     if ((n - _lannerSlotStart).TotalMinutes >= _lannerSlot.DurationMinutes) { _lannerActive = false; _lannerSlot = null; _lannerImageBGRA = null; _lannerBgDirty = false; Log("[LANNER] OFF"); return; }
-                    if (_lannerSlot.ImagePaths.Count > 1 && _lannerImgDurSec > 0 && (n - _lannerImgStart).TotalSeconds >= _lannerImgDurSec) { _lannerImgIdx = (_lannerImgIdx + 1) % _lannerSlot.ImagePaths.Count; LoadLannerImg(_lannerSlot.ImagePaths[_lannerImgIdx]); _lannerImgStart = n; _lannerBgDirty = true; }
+                    if (_lannerSlot.ImagePaths.Count > 1 && _lannerImgDurSec > 0 && (n - _lannerImgStart).TotalSeconds >= _lannerImgDurSec) { _lannerImgIdx = (_lannerImgIdx + 1) % _lannerSlot.ImagePaths.Count; string lp = _lannerSlot.ImagePaths[_lannerImgIdx]; _lannerImgStart = n; ThreadPool.QueueUserWorkItem(_ => { LoadLannerImg(lp); _lannerBgDirty = true; }); }
                 }
                 else
                 {
                     foreach (var slot in _todayLannerSlots)
                         if (ct >= slot.StartTime && ct < slot.StartTime.Add(TimeSpan.FromMinutes(slot.DurationMinutes)))
-                        { _lannerSlot = slot; _lannerImgIdx = 0; _lannerSlotStart = n; _lannerImgStart = n; _lannerImgDurSec = slot.ImagePaths.Count > 1 ? (slot.DurationMinutes * 60) / slot.ImagePaths.Count : slot.DurationMinutes * 60; LoadLannerImg(slot.ImagePaths[0]); _lannerActive = true; _lannerBgDirty = true; Log("[LANNER] ON: " + string.Join(", ", slot.CampaignNames)); break; }
+                        { _lannerSlot = slot; _lannerImgIdx = 0; _lannerSlotStart = n; _lannerImgStart = n; _lannerImgDurSec = slot.ImagePaths.Count > 1 ? (slot.DurationMinutes * 60) / slot.ImagePaths.Count : slot.DurationMinutes * 60; _lannerActive = true; Log("[LANNER] ON: " + string.Join(", ", slot.CampaignNames)); string lp = slot.ImagePaths[0]; ThreadPool.QueueUserWorkItem(_ => { LoadLannerImg(lp); _lannerBgDirty = true; }); break; }
                 }
             }
         }
