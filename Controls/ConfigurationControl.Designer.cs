@@ -65,6 +65,7 @@ namespace AirDirector.Controls
             lblVideoTitle = new Label();
             lblAdvLanner = new Label();
             cmbAdvLanner = new ComboBox();
+            chkLocalAudioOutput = new CheckBox();
             tabPaths = new TabPage();
             btnBrowseTimeSignal = new Button();
             txtTimeSignalPath = new TextBox();
@@ -534,6 +535,7 @@ namespace AirDirector.Controls
             tabVideo.BackColor = Color.FromArgb(240, 240, 240);
             tabVideo.Controls.Add(btnSaveVideo);
             tabVideo.Controls.Add(grpNDI);
+            tabVideo.Controls.Add(chkLocalAudioOutput);
             tabVideo.Controls.Add(cmbAdvLanner);
             tabVideo.Controls.Add(lblAdvLanner);
             tabVideo.Controls.Add(cmbBufferMode);
@@ -656,6 +658,16 @@ namespace AirDirector.Controls
             lblAdvLanner.TabIndex = 15;
             lblAdvLanner.Text = "ADV Lanner Video on Output Playout:";
             lblAdvLanner.TextAlign = ContentAlignment.MiddleLeft;
+            // 
+            // chkLocalAudioOutput
+            // 
+            chkLocalAudioOutput.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            chkLocalAudioOutput.Location = new Point(40, 330);
+            chkLocalAudioOutput.Name = "chkLocalAudioOutput";
+            chkLocalAudioOutput.Size = new Size(590, 22);
+            chkLocalAudioOutput.TabIndex = 17;
+            chkLocalAudioOutput.Text = "🔊 Abilita riproduzione audio anche su uscita locale";
+            chkLocalAudioOutput.UseVisualStyleBackColor = true;
             // 
             // cmbBufferMode
             // 
@@ -1346,6 +1358,7 @@ namespace AirDirector.Controls
         private ComboBox cmbBufferMode;
         private Label lblAdvLanner;
         private ComboBox cmbAdvLanner;
+        private CheckBox chkLocalAudioOutput;
         private GroupBox grpNDI;
         private Label lblNDISourceName;
         private TextBox txtNDISourceName;
