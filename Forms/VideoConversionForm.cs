@@ -738,13 +738,21 @@ namespace AirDirector.Forms
         private static string ToCapitalized(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
-            var words = text.Split(' ');
-            for (int i = 0; i < words.Length; i++)
+            char[] chars = text.ToLower().ToCharArray();
+            bool capitalizeNext = true;
+            for (int i = 0; i < chars.Length; i++)
             {
-                if (words[i].Length > 0)
-                    words[i] = char.ToUpper(words[i][0]) + words[i].Substring(1).ToLower();
+                if (char.IsWhiteSpace(chars[i]) || chars[i] == '-' || chars[i] == '_')
+                {
+                    capitalizeNext = true;
+                }
+                else if (capitalizeNext && char.IsLetter(chars[i]))
+                {
+                    chars[i] = char.ToUpper(chars[i]);
+                    capitalizeNext = false;
+                }
             }
-            return string.Join(" ", words);
+            return new string(chars);
         }
 
         // ═════════════════════════════════════════════════════════════════

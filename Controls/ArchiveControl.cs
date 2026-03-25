@@ -1629,9 +1629,19 @@ namespace AirDirector.Controls
 
                                 string dir = Path.GetDirectoryName(currentPath) ?? "";
                                 string newPath = Path.Combine(dir, newName);
-                                if (!string.Equals(currentPath, newPath, StringComparison.OrdinalIgnoreCase) && !File.Exists(newPath))
+                                if (!string.Equals(currentPath, newPath, StringComparison.Ordinal))
                                 {
-                                    File.Move(currentPath, newPath);
+                                    // Case-only change on Windows: use temp file to avoid IOException
+                                    if (string.Equals(currentPath, newPath, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        string tmpPath = currentPath + ".tmp_rename";
+                                        File.Move(currentPath, tmpPath);
+                                        File.Move(tmpPath, newPath);
+                                    }
+                                    else if (!File.Exists(newPath))
+                                    {
+                                        File.Move(currentPath, newPath);
+                                    }
                                     currentPath = newPath;
                                 }
                             }
@@ -1657,8 +1667,8 @@ namespace AirDirector.Controls
                                 : CreateMusicEntryFromFile(currentPath);
 
                             // Override artist/title with conversion form settings
-                            if (importArtist != null) musicEntry.Artist = importArtist;
-                            if (importTitle != null) musicEntry.Title = importTitle;
+                            if (!string.IsNullOrWhiteSpace(importArtist)) musicEntry.Artist = importArtist;
+                            if (!string.IsNullOrWhiteSpace(importTitle)) musicEntry.Title = importTitle;
 
                             // Apply pre-editing markers if detected
                             if (markerIn >= 0) musicEntry.MarkerIN = markerIn;
@@ -1674,7 +1684,7 @@ namespace AirDirector.Controls
                                 : CreateClipEntryFromFile(currentPath);
 
                             // Override title with conversion form settings (clips have no artist)
-                            if (importTitle != null) clipEntry.Title = importTitle;
+                            if (!string.IsNullOrWhiteSpace(importTitle)) clipEntry.Title = importTitle;
 
                             // Apply pre-editing markers if detected
                             if (markerIn >= 0) clipEntry.MarkerIN = markerIn;
