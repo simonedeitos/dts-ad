@@ -56,6 +56,9 @@ namespace AirDirector.Forms
         // ✅ VOLUME BOOST
         private float _volumeBoostDb = 0f;
 
+        // Flag per la visualizzazione dei picchi colorati nella waveform (disattivato di default)
+        private bool _showColoredPeaks = false;
+
         // ✅ VU METER
         private float _vuLevelLeft = 0f;
         private float _vuLevelRight = 0f;
@@ -378,6 +381,13 @@ namespace AirDirector.Forms
             btnApplyVolume.Click += BtnApplyVolume_Click;
         }
 
+        private void ChkColoredPeaks_CheckedChanged(object sender, EventArgs e)
+        {
+            _showColoredPeaks = chkColoredPeaks.Checked;
+            RecreateWaveformBitmapWithBoost();
+            picWaveform.Invalidate();
+        }
+
         private void TrkVolume_ValueChanged(object sender, EventArgs e)
         {
             _volumeBoostDb = trkVolume.Value;
@@ -442,22 +452,30 @@ namespace AirDirector.Forms
 
                         float amplitude = _waveformData[sampleIdx] * (height / 2) * 0.98f;
 
-                        // ✅ Colore basato sull'ampiezza (clipping = rosso)
+                        // Colore basato sull'ampiezza (solo se _showColoredPeaks è attivo)
                         Color colorTop, colorBottom;
-                        if (_waveformData[sampleIdx] >= 0.98f)
+                        if (_showColoredPeaks)
                         {
-                            colorTop = Color.FromArgb(255, 40, 40);
-                            colorBottom = Color.FromArgb(220, 30, 30);
-                        }
-                        else if (_waveformData[sampleIdx] >= 0.8f)
-                        {
-                            colorTop = Color.FromArgb(255, 200, 0);
-                            colorBottom = Color.FromArgb(220, 170, 0);
+                            if (_waveformData[sampleIdx] >= 0.98f)
+                            {
+                                colorTop = Color.FromArgb(255, 40, 40);
+                                colorBottom = Color.FromArgb(220, 30, 30);
+                            }
+                            else if (_waveformData[sampleIdx] >= 0.8f)
+                            {
+                                colorTop = Color.FromArgb(255, 200, 0);
+                                colorBottom = Color.FromArgb(220, 170, 0);
+                            }
+                            else
+                            {
+                                colorTop = Color.FromArgb(0, 255, 100);
+                                colorBottom = Color.FromArgb(0, 200, 80);
+                            }
                         }
                         else
                         {
-                            colorTop = Color.FromArgb(0, 255, 100);
-                            colorBottom = Color.FromArgb(0, 200, 80);
+                            colorTop = Color.FromArgb(0, 200, 120);
+                            colorBottom = Color.FromArgb(0, 160, 90);
                         }
 
                         using (Pen penTop = new Pen(colorTop, 1.2f))

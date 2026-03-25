@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="playercontrolvideo_old-ok.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Properties\" />
     <Folder Include="Resources\" />
     <Folder Include="Services\Video\" />

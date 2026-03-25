@@ -21,7 +21,8 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(600, 550);
+            this.ClientSize = new System.Drawing.Size(620, 600);
+            this.MinimumSize = new System.Drawing.Size(640, 640);
             this.Name = "LicenseForm";
             this.Text = "Attivazione Licenza";
             this.Load += new System.EventHandler(this.LicenseForm_Load);
