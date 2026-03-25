@@ -47,7 +47,9 @@ namespace AirDirector.Controls
 		// ✅ FIX CRITICO: Aggiungi tracking reload come OverviewControl
 		private List<AirDirectorPlaylistItem> _cachedAdvItems = new List<AirDirectorPlaylistItem>();
 		private DateTime _advCacheDate = DateTime.MinValue;
-		private DateTime _lastAdvReloadTime = DateTime.MinValue; // ✅ MANCAVA QUESTO! 
+		private DateTime _lastAdvReloadTime = DateTime.MinValue; // ✅ MANCAVA QUESTO!
+
+		private Services.Core.DailyLogger _dailyLogger; 
 
 		public event EventHandler<int> QueueReady;
 		public event EventHandler<int> QueueCountChanged;
@@ -94,8 +96,9 @@ namespace AirDirector.Controls
 
 			CalculateNextDayScheduleLoadTime();
 			LoadAdvCache();
+			try { _dailyLogger = new Services.Core.DailyLogger("PlsQueue"); } catch { }
 
-			Console.WriteLine($"[PlaylistADV] ✅ Costruttore completato - Cache caricata all'avvio");
+			Log($"[PlaylistADV] ✅ Costruttore completato - Cache caricata all'avvio");
 		}
 
         private void PlaylistQueueControl_DragEnter(object sender, DragEventArgs e)
@@ -143,12 +146,12 @@ namespace AirDirector.Controls
                 Point clientPoint = this.PointToClient(new Point(e.X, e.Y));
                 int targetIndex = GetItemIndexAtPoint(clientPoint);
 
-                Console.WriteLine($"");
-                Console.WriteLine($"[DragDrop] ========================================");
-                Console.WriteLine($"[DragDrop] ?  Drop rilevato");
-                Console.WriteLine($"[DragDrop] Target index: {targetIndex}");
-                Console.WriteLine($"[DragDrop] Source index: {_dragSourceIndex}");
-                Console.WriteLine($"[DragDrop] IsDragging: {_isDragging}");
+                Log($"");
+                Log($"[DragDrop] ========================================");
+                Log($"[DragDrop] ?  Drop rilevato");
+                Log($"[DragDrop] Target index: {targetIndex}");
+                Log($"[DragDrop] Source index: {_dragSourceIndex}");
+                Log($"[DragDrop] IsDragging: {_isDragging}");
 
                 if (targetIndex < 0)
                     targetIndex = _items.Count;
@@ -158,12 +161,12 @@ namespace AirDirector.Controls
                 // ============================================
                 if (_isDragging && _dragSourceIndex >= 0)
                 {
-                    Console.WriteLine($"[DragDrop] ??  DRAG INTERNO RILEVATO");
+                    Log($"[DragDrop] ??  DRAG INTERNO RILEVATO");
 
                     // Protezioni
                     if (_dragSourceIndex == 0 && _currentPlayingIndex == 0)
                     {
-                        Console.WriteLine("[DragDrop] ?? Blocco:  item in riproduzione (source)");
+                        Log("[DragDrop] ?? Blocco:  item in riproduzione (source)");
                         _dragSourceIndex = -1;
                         _isDragging = false;
                         return;
@@ -171,7 +174,7 @@ namespace AirDirector.Controls
 
                     if (targetIndex == 0 && _currentPlayingIndex == 0)
                     {
-                        Console.WriteLine("[DragDrop] ?? Blocco: drop su item in riproduzione");
+                        Log("[DragDrop] ?? Blocco: drop su item in riproduzione");
                         _dragSourceIndex = -1;
                         _isDragging = false;
                         return;
@@ -180,17 +183,17 @@ namespace AirDirector.Controls
                     // Stesso indice = nessun cambio
                     if (targetIndex == _dragSourceIndex)
                     {
-                        Console.WriteLine("[DragDrop] ??  Stesso indice, nessuna azione");
+                        Log("[DragDrop] ??  Stesso indice, nessuna azione");
                         _dragSourceIndex = -1;
                         _isDragging = false;
                         return;
                     }
 
                     // ESEGUI SPOSTAMENTO
-                    Console.WriteLine($"[DragDrop] ??  Spostamento: {_dragSourceIndex} ?  {targetIndex}");
+                    Log($"[DragDrop] ??  Spostamento: {_dragSourceIndex} ?  {targetIndex}");
 
                     var item = _items[_dragSourceIndex];
-                    Console.WriteLine($"[DragDrop] Item:  '{item.Title}'");
+                    Log($"[DragDrop] Item:  '{item.Title}'");
 
                     // Rimuovi dalla posizione originale
                     _items.RemoveAt(_dragSourceIndex);
@@ -205,23 +208,23 @@ namespace AirDirector.Controls
                     // Inserisci nella nuova posizione
                     _items.Insert(finalTargetIndex, item);
 
-                    Console.WriteLine($"[DragDrop] ?  Inserito a index: {finalTargetIndex}");
+                    Log($"[DragDrop] ?  Inserito a index: {finalTargetIndex}");
 
                     // Aggiorna indice corrente in riproduzione
                     if (_dragSourceIndex < _currentPlayingIndex && finalTargetIndex >= _currentPlayingIndex)
                     {
                         _currentPlayingIndex--;
-                        Console.WriteLine($"[DragDrop] Current playing index aggiustato: {_currentPlayingIndex}");
+                        Log($"[DragDrop] Current playing index aggiustato: {_currentPlayingIndex}");
                     }
                     else if (_dragSourceIndex > _currentPlayingIndex && finalTargetIndex <= _currentPlayingIndex)
                     {
                         _currentPlayingIndex++;
-                        Console.WriteLine($"[DragDrop] Current playing index aggiustato: {_currentPlayingIndex}");
+                        Log($"[DragDrop] Current playing index aggiustato: {_currentPlayingIndex}");
                     }
                     else if (_dragSourceIndex == _currentPlayingIndex)
                     {
                         _currentPlayingIndex = finalTargetIndex;
-                        Console.WriteLine($"[DragDrop] Current playing spostato a: {_currentPlayingIndex}");
+                        Log($"[DragDrop] Current playing spostato a: {_currentPlayingIndex}");
                     }
 
                     // Ricalcola tempi
@@ -232,9 +235,9 @@ namespace AirDirector.Controls
                     this.Invalidate();
                     NotifyQueueCountChanged();
 
-                    Console.WriteLine($"[DragDrop] ? Spostamento completato con successo");
-                    Console.WriteLine($"[DragDrop] ========================================");
-                    Console.WriteLine($"");
+                    Log($"[DragDrop] ? Spostamento completato con successo");
+                    Log($"[DragDrop] ========================================");
+                    Log($"");
 
                     // Reset stato drag
                     _dragSourceIndex = -1;
@@ -245,14 +248,14 @@ namespace AirDirector.Controls
                 // ============================================
                 // DRAG ESTERNO (da MusicArchive, ClipsArchive)
                 // ============================================
-                Console.WriteLine($"[DragDrop] ?? Verifica drag esterno...");
+                Log($"[DragDrop] ?? Verifica drag esterno...");
 
                 if (e.Data.GetDataPresent("MusicEntryList"))
                 {
                     var musicList = e.Data.GetData("MusicEntryList") as List<MusicEntry>;
                     if (musicList != null && musicList.Count > 0)
                     {
-                        Console.WriteLine($"[DragDrop] ??  Drop {musicList.Count} music entries a index {targetIndex}");
+                        Log($"[DragDrop] ??  Drop {musicList.Count} music entries a index {targetIndex}");
 
                         foreach (var musicEntry in musicList)
                         {
@@ -261,7 +264,7 @@ namespace AirDirector.Controls
                             targetIndex++;
                         }
 
-                        Console.WriteLine($"[DragDrop] ?  Music entries inserite");
+                        Log($"[DragDrop] ?  Music entries inserite");
                         return;
                     }
                 }
@@ -270,7 +273,7 @@ namespace AirDirector.Controls
                     var clipsList = e.Data.GetData("ClipEntryList") as List<ClipEntry>;
                     if (clipsList != null && clipsList.Count > 0)
                     {
-                        Console.WriteLine($"[DragDrop] ?? Drop {clipsList.Count} clip entries a index {targetIndex}");
+                        Log($"[DragDrop] ?? Drop {clipsList.Count} clip entries a index {targetIndex}");
 
                         foreach (var clipEntry in clipsList)
                         {
@@ -279,7 +282,7 @@ namespace AirDirector.Controls
                             targetIndex++;
                         }
 
-                        Console.WriteLine($"[DragDrop] ? Clip entries inserite");
+                        Log($"[DragDrop] ? Clip entries inserite");
                         return;
                     }
                 }
@@ -288,7 +291,7 @@ namespace AirDirector.Controls
                     DragDropData dragData = e.Data.GetData(typeof(DragDropData)) as DragDropData;
                     if (dragData != null)
                     {
-                        Console.WriteLine($"[DragDrop] ?? Drop DragDropData:  {dragData.EntryType}");
+                        Log($"[DragDrop] ?? Drop DragDropData:  {dragData.EntryType}");
 
                         PlaylistQueueItem newItem = null;
 
@@ -300,26 +303,26 @@ namespace AirDirector.Controls
                         if (newItem != null)
                         {
                             InsertItem(targetIndex, newItem);
-                            Console.WriteLine($"[DragDrop] ? DragDropData inserito");
+                            Log($"[DragDrop] ? DragDropData inserito");
                         }
 
                         return;
                     }
                 }
 
-                Console.WriteLine($"[DragDrop] ??  Nessun formato riconosciuto");
-                Console.WriteLine($"[DragDrop] ========================================");
-                Console.WriteLine($"");
+                Log($"[DragDrop] ??  Nessun formato riconosciuto");
+                Log($"[DragDrop] ========================================");
+                Log($"");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"");
-                Console.WriteLine($"[DragDrop] ??  ERRORE CRITICO");
-                Console.WriteLine($"[DragDrop] Messaggio: {ex.Message}");
-                Console.WriteLine($"[DragDrop] StackTrace:");
-                Console.WriteLine(ex.StackTrace);
-                Console.WriteLine($"[DragDrop] ========================================");
-                Console.WriteLine($"");
+                Log($"");
+                Log($"[DragDrop] ??  ERRORE CRITICO");
+                Log($"[DragDrop] Messaggio: {ex.Message}");
+                Log($"[DragDrop] StackTrace:");
+                Log(ex.StackTrace);
+                Log($"[DragDrop] ========================================");
+                Log($"");
 
                 MessageBox.Show($"Errore drop: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -346,7 +349,7 @@ namespace AirDirector.Controls
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[QueueMonitor] Errore: {ex.Message}");
+				Log($"[QueueMonitor] Errore: {ex.Message}");
 			}
 		}
 
@@ -392,7 +395,7 @@ namespace AirDirector.Controls
 
 				if (shouldReload)
 				{
-					Console.WriteLine($"[PlaylistADV] 🔄 Ricarica palinsesto:  {reloadReason}");
+					Log($"[PlaylistADV] 🔄 Ricarica palinsesto:  {reloadReason}");
 					LoadAdvCache();
 				}
 
@@ -443,10 +446,10 @@ namespace AirDirector.Controls
 							if (_executedSchedules.Contains(advKey))
 								return;
 
-							Console.WriteLine($"");
-							Console.WriteLine($"╔════════════════════════════════════════════════════════════╗");
-							Console.WriteLine($"║  PUBBLICITÀ ATTIVATA: {slot.SlotTime}                           ║");
-							Console.WriteLine($"╚════════════════════════════════════════════════════════════╝");
+							Log($"");
+							Log($"╔════════════════════════════════════════════════════════════╗");
+							Log($"║  PUBBLICITÀ ATTIVATA: {slot.SlotTime}                           ║");
+							Log($"╚════════════════════════════════════════════════════════════╝");
 
 							int insertPosition = GetCorrectScheduleInsertPosition();
 							int addedCount = 0;
@@ -460,14 +463,14 @@ namespace AirDirector.Controls
 									InsertItem(insertPosition, advSlot);
 									insertPosition++;
 									addedCount++;
-									Console.WriteLine($"[PlaylistADV]   → {advFile.FileType}:  {Path.GetFileName(advFile.FilePath)} ({advFile.Duration}s)");
+									Log($"[PlaylistADV]   → {advFile.FileType}:  {Path.GetFileName(advFile.FilePath)} ({advFile.Duration}s)");
 								}
 							}
 
 							_executedSchedules.Add(advKey);
 
-							Console.WriteLine($"[PlaylistADV] ✅ Inseriti {addedCount} slot ADV");
-							Console.WriteLine($"");
+							Log($"[PlaylistADV] ✅ Inseriti {addedCount} slot ADV");
+							Log($"");
 
 							return;
 						}
@@ -476,8 +479,8 @@ namespace AirDirector.Controls
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[PlaylistADV] ❌ Errore:  {ex.Message}");
-				Console.WriteLine($"[PlaylistADV] StackTrace: {ex.StackTrace}");
+				Log($"[PlaylistADV] ❌ Errore:  {ex.Message}");
+				Log($"[PlaylistADV] StackTrace: {ex.StackTrace}");
 			}
 		}
 
@@ -487,7 +490,7 @@ namespace AirDirector.Controls
 			{
 				if (!File.Exists(advItem.FilePath))
 				{
-					Console.WriteLine($"[PlaylistADV] ⚠️ File non trovato: {advItem.FilePath}");
+					Log($"[PlaylistADV] ⚠️ File non trovato: {advItem.FilePath}");
 					return null;
 				}
 
@@ -523,7 +526,7 @@ namespace AirDirector.Controls
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[PlaylistADV] Errore creazione slot: {ex.Message}");
+				Log($"[PlaylistADV] Errore creazione slot: {ex.Message}");
 				return null;
 			}
 		}
@@ -555,7 +558,7 @@ namespace AirDirector.Controls
 		public void ReloadAdvSchedules()
 		{
 			LoadAdvCache();
-			Console.WriteLine("[PlaylistADV] ✅ Cache ADV ricaricata manualmente");
+			Log("[PlaylistADV] ✅ Cache ADV ricaricata manualmente");
 		}
 
 		// ✅ FIX:  LoadAdvCache IDENTICO a OverviewControl
@@ -583,16 +586,16 @@ namespace AirDirector.Controls
 
 				string advFilePath = Path.Combine(databasePath, "ADV_AirDirector.dbc");
 
-				Console.WriteLine($"");
-				Console.WriteLine($"[PlaylistADV] ━━━ CARICAMENTO CACHE ━━━");
-				Console.WriteLine($"[PlaylistADV] Ora: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-				Console.WriteLine($"[PlaylistADV] DatabasePath: {databasePath}");
-				Console.WriteLine($"[PlaylistADV] File: {advFilePath}");
-				Console.WriteLine($"[PlaylistADV] Esiste: {File.Exists(advFilePath)}");
+				Log($"");
+				Log($"[PlaylistADV] ━━━ CARICAMENTO CACHE ━━━");
+				Log($"[PlaylistADV] Ora: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+				Log($"[PlaylistADV] DatabasePath: {databasePath}");
+				Log($"[PlaylistADV] File: {advFilePath}");
+				Log($"[PlaylistADV] Esiste: {File.Exists(advFilePath)}");
 
 				if (!File.Exists(advFilePath))
 				{
-					Console.WriteLine($"[PlaylistADV] ❌ FILE NON TROVATO!");
+					Log($"[PlaylistADV] ❌ FILE NON TROVATO!");
 					_cachedAdvItems.Clear();
 					_advCacheDate = DateTime.MinValue;
 					_lastAdvReloadTime = DateTime.Now; // ✅ AGGIORNATO
@@ -600,7 +603,7 @@ namespace AirDirector.Controls
 				}
 
 				var lines = File.ReadAllLines(advFilePath);
-				Console.WriteLine($"[PlaylistADV] Righe file: {lines.Length}");
+				Log($"[PlaylistADV] Righe file: {lines.Length}");
 
 				_cachedAdvItems.Clear();
 
@@ -633,7 +636,7 @@ namespace AirDirector.Controls
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine($"[PlaylistADV] ⚠️ Riga {i} saltata: {ex.Message}");
+						Log($"[PlaylistADV] ⚠️ Riga {i} saltata: {ex.Message}");
 					}
 				}
 
@@ -646,10 +649,10 @@ namespace AirDirector.Controls
 				int itemOggi = _cachedAdvItems.Count(a => a.Date.Date == oggi);
 				int itemDomani = _cachedAdvItems.Count(a => a.Date.Date == domani);
 
-				Console.WriteLine($"[PlaylistADV] ✅ Totale caricati: {_cachedAdvItems.Count}");
-				Console.WriteLine($"[PlaylistADV] 📅 Item oggi ({oggi: dd/MM/yyyy}): {itemOggi}");
-				Console.WriteLine($"[PlaylistADV] 📅 Item domani ({domani:dd/MM/yyyy}): {itemDomani}");
-				Console.WriteLine($"[PlaylistADV] Data cache impostata:  {_advCacheDate:yyyy-MM-dd}");
+				Log($"[PlaylistADV] ✅ Totale caricati: {_cachedAdvItems.Count}");
+				Log($"[PlaylistADV] 📅 Item oggi ({oggi: dd/MM/yyyy}): {itemOggi}");
+				Log($"[PlaylistADV] 📅 Item domani ({domani:dd/MM/yyyy}): {itemDomani}");
+				Log($"[PlaylistADV] Data cache impostata:  {_advCacheDate:yyyy-MM-dd}");
 
 				var slotsOggi = _cachedAdvItems
 					.Where(a => a.Date.Date == oggi)
@@ -658,14 +661,14 @@ namespace AirDirector.Controls
 					.OrderBy(s => s)
 					.ToList();
 
-				Console.WriteLine($"[PlaylistADV] 🕐 Slot programmati oggi: {string.Join(", ", slotsOggi)}");
-				Console.WriteLine($"[PlaylistADV] ━━━━━━━━━━━━━━━━━━━━━━━━");
-				Console.WriteLine($"");
+				Log($"[PlaylistADV] 🕐 Slot programmati oggi: {string.Join(", ", slotsOggi)}");
+				Log($"[PlaylistADV] ━━━━━━━━━━━━━━━━━━━━━━━━");
+				Log($"");
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[PlaylistADV] ❌ ERRORE CRITICO: {ex.Message}");
-				Console.WriteLine($"[PlaylistADV] StackTrace: {ex.StackTrace}");
+				Log($"[PlaylistADV] ❌ ERRORE CRITICO: {ex.Message}");
+				Log($"[PlaylistADV] StackTrace: {ex.StackTrace}");
 				_cachedAdvItems.Clear();
 				_advCacheDate = DateTime.MinValue;
 				_lastAdvReloadTime = DateTime.Now; // ✅ AGGIORNATO
@@ -678,33 +681,33 @@ namespace AirDirector.Controls
             {
                 int currentDayOfWeek = (int)now.DayOfWeek;
 
-                Console.WriteLine($"");
-                Console.WriteLine($"[Schedules] ============================================");
-                Console.WriteLine($"[Schedules] ? Controllo ore {now:HH:mm:ss}");
-                Console.WriteLine($"[Schedules] ?? Giorno:   {now.DayOfWeek} (numero {currentDayOfWeek})");
+                Log($"");
+                Log($"[Schedules] ============================================");
+                Log($"[Schedules] ? Controllo ore {now:HH:mm:ss}");
+                Log($"[Schedules] ?? Giorno:   {now.DayOfWeek} (numero {currentDayOfWeek})");
 
                 var schedules = DbcManager.LoadFromCsv<ScheduleEntry>("Schedules.dbc");
 
-                Console.WriteLine($"[Schedules] ?? Totale schedules nel file: {schedules.Count}");
+                Log($"[Schedules] ?? Totale schedules nel file: {schedules.Count}");
 
                 var enabledSchedules = schedules.Where(s => s.IsEnabled == 1).ToList();
-                Console.WriteLine($"[Schedules] ? Schedules abilitate:   {enabledSchedules.Count}");
+                Log($"[Schedules] ? Schedules abilitate:   {enabledSchedules.Count}");
 
                 var activeSchedules = enabledSchedules.Where(s => IsDayEnabled(s, currentDayOfWeek)).ToList();
-                Console.WriteLine($"[Schedules] ?? Schedules attive oggi:  {activeSchedules.Count}");
+                Log($"[Schedules] ?? Schedules attive oggi:  {activeSchedules.Count}");
 
                 if (activeSchedules.Count == 0)
                 {
-                    Console.WriteLine($"[Schedules] ?? Nessuna schedule attiva per oggi");
-                    Console.WriteLine($"[Schedules] ============================================");
-                    Console.WriteLine($"");
+                    Log($"[Schedules] ?? Nessuna schedule attiva per oggi");
+                    Log($"[Schedules] ============================================");
+                    Log($"");
                     return;
                 }
 
                 // Log delle schedule attive
                 foreach (var schedule in activeSchedules)
                 {
-                    Console.WriteLine($"[Schedules]   - {schedule.Name} ({schedule.Type}) @ {schedule.Times}");
+                    Log($"[Schedules]   - {schedule.Name} ({schedule.Type}) @ {schedule.Times}");
                 }
 
                 foreach (var schedule in activeSchedules)
@@ -729,15 +732,15 @@ namespace AirDirector.Controls
                                 currentTimeSpan.Minutes == scheduleTime.Minutes &&
                                 currentTimeSpan.Seconds == scheduleTime.Seconds)
                             {
-                                Console.WriteLine($"");
-                                Console.WriteLine($"+============================================================+");
-                                Console.WriteLine($"|  ?? SCHEDULAZIONE ATTIVATA:   {schedule.Name,-30} |");
-                                Console.WriteLine($"+============================================================+");
-                                Console.WriteLine($"[Schedule] ?? Nome:   {schedule.Name}");
-                                Console.WriteLine($"[Schedule] ?? Tipo:  {schedule.Type}");
-                                Console.WriteLine($"[Schedule] ? Orario:   {timeStr}");
-                                Console.WriteLine($"[Schedule] ?? Key:  {scheduleKey}");
-                                Console.WriteLine($"");
+                                Log($"");
+                                Log($"+============================================================+");
+                                Log($"|  ?? SCHEDULAZIONE ATTIVATA:   {schedule.Name,-30} |");
+                                Log($"+============================================================+");
+                                Log($"[Schedule] ?? Nome:   {schedule.Name}");
+                                Log($"[Schedule] ?? Tipo:  {schedule.Type}");
+                                Log($"[Schedule] ? Orario:   {timeStr}");
+                                Log($"[Schedule] ?? Key:  {scheduleKey}");
+                                Log($"");
 
                                 _isInitialStartup = false;
                                 _pendingScheduleVideoBufferPath = schedule.VideoBufferPath ?? "";
@@ -746,32 +749,32 @@ namespace AirDirector.Controls
 
                                 _executedSchedules.Add(scheduleKey);
 
-                                Console.WriteLine($"[Schedule] ? Schedulazione completata");
-                                Console.WriteLine($"");
+                                Log($"[Schedule] ? Schedulazione completata");
+                                Log($"");
 
                                 return; // Esegui solo una schedule per tick
                             }
                         }
                         else
                         {
-                            Console.WriteLine($"[Schedules] ?? Formato ora non valido:   {timeStr}");
+                            Log($"[Schedules] ?? Formato ora non valido:   {timeStr}");
                         }
                     }
                 }
 
-                Console.WriteLine($"[Schedules] ?? Nessuna schedule da eseguire adesso");
-                Console.WriteLine($"[Schedules] ============================================");
-                Console.WriteLine($"");
+                Log($"[Schedules] ?? Nessuna schedule da eseguire adesso");
+                Log($"[Schedules] ============================================");
+                Log($"");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"");
-                Console.WriteLine($"[Schedules] ??? ERRORE CRITICO ???");
-                Console.WriteLine($"[Schedules] Messaggio: {ex.Message}");
-                Console.WriteLine($"[Schedules] StackTrace:");
-                Console.WriteLine(ex.StackTrace);
-                Console.WriteLine($"[Schedules] =======================================");
-                Console.WriteLine($"");
+                Log($"");
+                Log($"[Schedules] ??? ERRORE CRITICO ???");
+                Log($"[Schedules] Messaggio: {ex.Message}");
+                Log($"[Schedules] StackTrace:");
+                Log(ex.StackTrace);
+                Log($"[Schedules] =======================================");
+                Log($"");
             }
         }
 
@@ -779,15 +782,15 @@ namespace AirDirector.Controls
         {
             try
             {
-                Console.WriteLine($"[ExecuteSchedule] ?? Esecuzione:   {schedule.Name}");
-                Console.WriteLine($"[ExecuteSchedule] Tipo: {schedule.Type}");
+                Log($"[ExecuteSchedule] ?? Esecuzione:   {schedule.Name}");
+                Log($"[ExecuteSchedule] Tipo: {schedule.Type}");
 
                 switch (schedule.Type)
                 {
                     case "PlayClock":
                         if (!string.IsNullOrEmpty(schedule.ClockName))
                         {
-                            Console.WriteLine($"[ExecuteSchedule] ? Clock: {schedule.ClockName}");
+                            Log($"[ExecuteSchedule] ? Clock: {schedule.ClockName}");
                             ClearNonPlayingItems();
                             int clockStartIndex = _items.Count;
                             GeneratePlaylistFromClock(schedule.ClockName, 1000);
@@ -799,60 +802,60 @@ namespace AirDirector.Controls
                         }
                         else
                         {
-                            Console.WriteLine($"[ExecuteSchedule] ?? ClockName vuoto!  ");
+                            Log($"[ExecuteSchedule] ?? ClockName vuoto!  ");
                         }
                         break;
 
                     case "PlayAudio":
                         if (!string.IsNullOrEmpty(schedule.AudioFilePath))
                         {
-                            Console.WriteLine($"[ExecuteSchedule] ?? Audio:   {schedule.AudioFilePath}");
+                            Log($"[ExecuteSchedule] ?? Audio:   {schedule.AudioFilePath}");
                             InsertScheduledAudioFile(schedule.Name, schedule.AudioFilePath);
                         }
                         else
                         {
-                            Console.WriteLine($"[ExecuteSchedule] ?? AudioFilePath vuoto!  ");
+                            Log($"[ExecuteSchedule] ?? AudioFilePath vuoto!  ");
                         }
                         break;
 
                     case "PlayMiniPLS":
                         if (schedule.MiniPLSID > 0)
                         {
-                            Console.WriteLine($"[ExecuteSchedule] ?? MiniPLS ID:   {schedule.MiniPLSID}");
+                            Log($"[ExecuteSchedule] ?? MiniPLS ID:   {schedule.MiniPLSID}");
                             InsertScheduledMiniPlaylist(schedule.MiniPLSID);
                         }
                         else
                         {
-                            Console.WriteLine($"[ExecuteSchedule] ?? MiniPLSID non valido!  ");
+                            Log($"[ExecuteSchedule] ?? MiniPLSID non valido!  ");
                         }
                         break;
 
                     case "TimeSignal":
-                        Console.WriteLine($"[ExecuteSchedule] ? Segnale Orario");
+                        Log($"[ExecuteSchedule] ? Segnale Orario");
                         InsertTimeSignal(schedule.Name);
                         break;
 
                     case "URLStreaming":
                         if (!string.IsNullOrEmpty(schedule.ClockName))
                         {
-                            Console.WriteLine($"[ExecuteSchedule] ?? Streaming:  {schedule.ClockName}");
+                            Log($"[ExecuteSchedule] ?? Streaming:  {schedule.ClockName}");
                             InsertURLStreaming(schedule);
                         }
                         else
                         {
-                            Console.WriteLine($"[ExecuteSchedule] ?? URL Streaming vuoto!  ");
+                            Log($"[ExecuteSchedule] ?? URL Streaming vuoto!  ");
                         }
                         break;
 
                     default:
-                        Console.WriteLine($"[ExecuteSchedule] ?? Tipo sconosciuto: {schedule.Type}");
+                        Log($"[ExecuteSchedule] ?? Tipo sconosciuto: {schedule.Type}");
                         break;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ExecuteSchedule] ? ERRORE:   {ex.Message}");
-                Console.WriteLine($"[ExecuteSchedule] StackTrace: {ex.StackTrace}");
+                Log($"[ExecuteSchedule] ? ERRORE:   {ex.Message}");
+                Log($"[ExecuteSchedule] StackTrace: {ex.StackTrace}");
             }
         }
 
@@ -864,7 +867,7 @@ namespace AirDirector.Controls
 
 				if (string.IsNullOrEmpty(timeSignalPath) || !Directory.Exists(timeSignalPath))
 				{
-					Console.WriteLine("[TimeSignal] ⚠️ Cartella non configurata");
+					Log("[TimeSignal] ⚠️ Cartella non configurata");
 					return;
 				}
 
@@ -886,7 +889,7 @@ namespace AirDirector.Controls
 
 				if (foundFile == null)
 				{
-					Console.WriteLine($"[TimeSignal] ⚠️ File non trovato: {fileName}");
+					Log($"[TimeSignal] ⚠️ File non trovato: {fileName}");
 					return;
 				}
 
@@ -913,11 +916,11 @@ namespace AirDirector.Controls
 				ApplyScheduleVideoBuffer(timeSignalItem);
 				InsertItem(insertPosition, timeSignalItem);
 
-				Console.WriteLine($"[TimeSignal] ✅ Inserito:  {scheduleName}");
+				Log($"[TimeSignal] ✅ Inserito:  {scheduleName}");
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[TimeSignal] Errore: {ex.Message}");
+				Log($"[TimeSignal] Errore: {ex.Message}");
 			}
 		}
 
@@ -1018,11 +1021,11 @@ namespace AirDirector.Controls
 				ApplyScheduleVideoBuffer(streamingItem);
 				InsertItem(insertPosition, streamingItem);
 
-				Console.WriteLine($"[URLStreaming] ✅ Inserito: {schedule.Name}");
+				Log($"[URLStreaming] ✅ Inserito: {schedule.Name}");
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[URLStreaming] Errore: {ex.Message}");
+				Log($"[URLStreaming] Errore: {ex.Message}");
 			}
 		}
 
@@ -1067,7 +1070,7 @@ namespace AirDirector.Controls
 			{
 				if (!File.Exists(filePath))
 				{
-					Console.WriteLine($"[InsertScheduledAudioFile] ⚠️ File non trovato: {filePath}");
+					Log($"[InsertScheduledAudioFile] ⚠️ File non trovato: {filePath}");
 					return;
 				}
 
@@ -1088,7 +1091,7 @@ namespace AirDirector.Controls
 				{
 					// File exists on disk but is not registered in Music.dbc or Clips.dbc.
 					// Create a queue item directly from the file using tag metadata.
-					Console.WriteLine($"[InsertScheduledAudioFile] ℹ️ File non in archivio, lettura diretta da file");
+					Log($"[InsertScheduledAudioFile] ℹ️ File non in archivio, lettura diretta da file");
 
 					TimeSpan duration = GetAudioDuration(filePath);
 					string title = scheduleName;
@@ -1106,7 +1109,7 @@ namespace AirDirector.Controls
 					}
 					catch (Exception tagEx)
 					{
-						Console.WriteLine($"[InsertScheduledAudioFile] ℹ️ Lettura tag non riuscita, usato nome schedulazione: {tagEx.Message}");
+						Log($"[InsertScheduledAudioFile] ℹ️ Lettura tag non riuscita, usato nome schedulazione: {tagEx.Message}");
 					}
 
 					scheduledItem = new PlaylistQueueItem
@@ -1133,16 +1136,16 @@ namespace AirDirector.Controls
 					ApplyScheduleVideoBuffer(scheduledItem);
 					int insertPosition = GetCorrectScheduleInsertPosition();
 					InsertItem(insertPosition, scheduledItem);
-					Console.WriteLine($"[InsertScheduledAudioFile] ✅ Inserito: {scheduleName}");
+					Log($"[InsertScheduledAudioFile] ✅ Inserito: {scheduleName}");
 				}
 				else
 				{
-					Console.WriteLine($"[InsertScheduledAudioFile] ⚠️ Impossibile creare l'elemento per: {scheduleName}");
+					Log($"[InsertScheduledAudioFile] ⚠️ Impossibile creare l'elemento per: {scheduleName}");
 				}
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[InsertScheduledAudioFile] Errore:  {ex.Message}");
+				Log($"[InsertScheduledAudioFile] Errore:  {ex.Message}");
 			}
 		}
 
@@ -1341,10 +1344,10 @@ namespace AirDirector.Controls
         {
             try
             {
-                Console.WriteLine($"");
-                Console.WriteLine($"╔════════════════════════════════════════════════════════════╗");
-                Console.WriteLine($"║  🎼 GENERAZIONE PLAYLIST DA CLOCK: {clockName,-30} ║");
-                Console.WriteLine($"╚════════════════════════════════════════════════════════════╝");
+                Log($"");
+                Log($"╔════════════════════════════════════════════════════════════╗");
+                Log($"║  🎼 GENERAZIONE PLAYLIST DA CLOCK: {clockName,-30} ║");
+                Log($"╚════════════════════════════════════════════════════════════╝");
 
                 _queueSnapshotAtCreation.Clear();
                 DateTime now = DateTime.Now;
@@ -1363,13 +1366,13 @@ namespace AirDirector.Controls
 
                 if (clock == null)
                 {
-                    Console.WriteLine($"[GenerateClock] ❌ Clock '{clockName}' non trovato!");
+                    Log($"[GenerateClock] ❌ Clock '{clockName}' non trovato!");
                     return;
                 }
 
                 if (string.IsNullOrEmpty(clock.Items))
                 {
-                    Console.WriteLine($"[GenerateClock] ⚠️ Clock '{clockName}' vuoto!");
+                    Log($"[GenerateClock] ⚠️ Clock '{clockName}' vuoto!");
                     return;
                 }
 
@@ -1377,11 +1380,11 @@ namespace AirDirector.Controls
                 try
                 {
                     clockItems = JsonConvert.DeserializeObject<List<ClockItem>>(clock.Items);
-                    Console.WriteLine($"[GenerateClock] 📋 Clock contiene {clockItems.Count} elementi");
+                    Log($"[GenerateClock] 📋 Clock contiene {clockItems.Count} elementi");
                 }
                 catch (Exception jsonEx)
                 {
-                    Console.WriteLine($"[GenerateClock] ❌ Errore parsing JSON: {jsonEx.Message}");
+                    Log($"[GenerateClock] ❌ Errore parsing JSON: {jsonEx.Message}");
                     return;
                 }
 
@@ -1393,11 +1396,11 @@ namespace AirDirector.Controls
                 {
                     ClockItem currentItem = clockItems[clockIndex];
 
-                    Console.WriteLine($"");
-                    Console.WriteLine($"[GenerateClock] ━━━ Elemento #{clockIndex + 1}/{clockItems.Count} ━━━");
-                    Console.WriteLine($"[GenerateClock] Tipo:   {currentItem.Type}");
-                    Console.WriteLine($"[GenerateClock] Valore: {currentItem.Value ?? currentItem.CategoryName}");
-                    Console.WriteLine($"[GenerateClock] Count: {currentItem.Count}");
+                    Log($"");
+                    Log($"[GenerateClock] ━━━ Elemento #{clockIndex + 1}/{clockItems.Count} ━━━");
+                    Log($"[GenerateClock] Tipo:   {currentItem.Type}");
+                    Log($"[GenerateClock] Valore: {currentItem.Value ?? currentItem.CategoryName}");
+                    Log($"[GenerateClock] Count: {currentItem.Count}");
 
                     int itemsToAdd = currentItem.Count;
                     int addedForThisItem = 0;
@@ -1412,46 +1415,46 @@ namespace AirDirector.Controls
                             // ✅ MUSIC CATEGORY
                             if (currentItem.Type == "Music_Category")
                             {
-                                Console.WriteLine($"[GenerateClock]   → Cerco Music_Category:   {currentItem.CategoryName}");
+                                Log($"[GenerateClock]   → Cerco Music_Category:   {currentItem.CategoryName}");
                                 queueItem = GetRandomItemByCategory(currentItem.CategoryName, "Music",
                                     currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
                             }
                             // ✅ CLIPS CATEGORY
                             else if (currentItem.Type == "Clips_Category")
                             {
-                                Console.WriteLine($"[GenerateClock]   → Cerco Clips_Category:  {currentItem.CategoryName}");
+                                Log($"[GenerateClock]   → Cerco Clips_Category:  {currentItem.CategoryName}");
                                 queueItem = GetRandomItemByCategory(currentItem.CategoryName, "Clip",
                                     currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
                             }
                             // ✅ MUSIC GENRE
                             else if (currentItem.Type == "Music_Genre")
                             {
-                                Console.WriteLine($"[GenerateClock]   → Cerco Music_Genre: {currentItem.Value}");
+                                Log($"[GenerateClock]   → Cerco Music_Genre: {currentItem.Value}");
                                 queueItem = GetRandomMusicByGenre(currentItem.Value,
                                     currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
                             }
                             // ✅ CLIPS GENRE (ERA MANCANTE!)
                             else if (currentItem.Type == "Clips_Genre")
                             {
-                                Console.WriteLine($"[GenerateClock]   → Cerco Clips_Genre:  {currentItem.Value}");
+                                Log($"[GenerateClock]   → Cerco Clips_Genre:  {currentItem.Value}");
                                 queueItem = GetRandomClipByGenre(currentItem.Value);
                             }
                             // ✅ MUSIC CATEGORY+GENRE
                             else if (currentItem.Type == "Music_Category+Genre")
                             {
-                                Console.WriteLine($"[GenerateClock]   → Cerco Music_Category+Genre: {currentItem.Value}");
+                                Log($"[GenerateClock]   → Cerco Music_Category+Genre: {currentItem.Value}");
                                 queueItem = GetRandomMusicByCategoryAndGenre(currentItem.Value,
                                     currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
                             }
                             // ✅ CLIPS CATEGORY+GENRE
                             else if (currentItem.Type == "Clips_Category+Genre")
                             {
-                                Console.WriteLine($"[GenerateClock]   → Cerco Clips_Category+Genre: {currentItem.Value}");
+                                Log($"[GenerateClock]   → Cerco Clips_Category+Genre: {currentItem.Value}");
                                 queueItem = GetRandomClipByCategoryAndGenre(currentItem.Value);
                             }
                             else
                             {
-                                Console.WriteLine($"[GenerateClock]   ⚠️ Tipo sconosciuto: {currentItem.Type}");
+                                Log($"[GenerateClock]   ⚠️ Tipo sconosciuto: {currentItem.Type}");
                             }
 
                             attempts++;
@@ -1459,7 +1462,7 @@ namespace AirDirector.Controls
 
                             if (queueItem != null)
                             {
-                                Console.WriteLine($"[GenerateClock]   ✅ Trovato dopo {attempts} tentativi");
+                                Log($"[GenerateClock]   ✅ Trovato dopo {attempts} tentativi");
                             }
                         }
 
@@ -1471,32 +1474,32 @@ namespace AirDirector.Controls
                         }
                         else
                         {
-                            Console.WriteLine($"[GenerateClock]   ❌ Nessun elemento trovato dopo {maxAttemptsPerItem} tentativi");
+                            Log($"[GenerateClock]   ❌ Nessun elemento trovato dopo {maxAttemptsPerItem} tentativi");
                         }
                     }
 
-                    Console.WriteLine($"[GenerateClock] ✅ Aggiunti {addedForThisItem}/{itemsToAdd} per questo elemento");
+                    Log($"[GenerateClock] ✅ Aggiunti {addedForThisItem}/{itemsToAdd} per questo elemento");
                 }
 
                 _currentClockName = clockName;
                 DbcManager.SetConfigValue("LastUsedClock", clockName);
                 ClockChanged?.Invoke(this, clockName);
 
-                Console.WriteLine($"");
-                Console.WriteLine($"[GenerateClock] ═══════════════════════════════════════════");
-                Console.WriteLine($"[GenerateClock] ✅ GENERAZIONE COMPLETATA");
-                Console.WriteLine($"[GenerateClock] Totale aggiunti: {addedCount}");
-                Console.WriteLine($"[GenerateClock] Totale tentativi: {totalAttempts}");
-                Console.WriteLine($"[GenerateClock] ═══════════════════════════════════════════");
-                Console.WriteLine($"");
+                Log($"");
+                Log($"[GenerateClock] ═══════════════════════════════════════════");
+                Log($"[GenerateClock] ✅ GENERAZIONE COMPLETATA");
+                Log($"[GenerateClock] Totale aggiunti: {addedCount}");
+                Log($"[GenerateClock] Totale tentativi: {totalAttempts}");
+                Log($"[GenerateClock] ═══════════════════════════════════════════");
+                Log($"");
 
                 if (_isInitialStartup && _items.Count >= 2)
                     QueueReady?.Invoke(this, _items.Count);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GenerateClock] ❌ ERRORE CRITICO: {ex.Message}");
-                Console.WriteLine($"[GenerateClock] StackTrace: {ex.StackTrace}");
+                Log($"[GenerateClock] ❌ ERRORE CRITICO: {ex.Message}");
+                Log($"[GenerateClock] StackTrace: {ex.StackTrace}");
             }
         }
 
@@ -1505,33 +1508,33 @@ namespace AirDirector.Controls
         {
             try
             {
-                Console.WriteLine($"[GetRandomClipByGenre] 🔍 Cerco clips con genere '{genre}'");
+                Log($"[GetRandomClipByGenre] 🔍 Cerco clips con genere '{genre}'");
 
                 var allClips = DbcManager.LoadFromCsv<ClipEntry>("Clips.dbc");
                 var filtered = allClips.Where(c => c.Genre == genre).ToList();
 
-                Console.WriteLine($"[GetRandomClipByGenre] Trovati {filtered.Count} clips totali con genere '{genre}'");
+                Log($"[GetRandomClipByGenre] Trovati {filtered.Count} clips totali con genere '{genre}'");
 
                 var valid = filtered.Where(c => IsItemValid(c)).ToList();
 
-                Console.WriteLine($"[GetRandomClipByGenre] {valid.Count} clips validi (validità temporale OK)");
+                Log($"[GetRandomClipByGenre] {valid.Count} clips validi (validità temporale OK)");
 
                 if (valid.Count == 0)
                 {
-                    Console.WriteLine($"[GetRandomClipByGenre] ❌ Nessun clip valido");
+                    Log($"[GetRandomClipByGenre] ❌ Nessun clip valido");
                     return null;
                 }
 
                 Random rnd = new Random(Guid.NewGuid().GetHashCode());
                 var selected = valid[rnd.Next(valid.Count)];
 
-                Console.WriteLine($"[GetRandomClipByGenre] ✅ Selezionato: {selected.Title}");
+                Log($"[GetRandomClipByGenre] ✅ Selezionato: {selected.Title}");
 
                 return CreateClipQueueItem(selected);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GetRandomClipByGenre] ❌ Errore: {ex.Message}");
+                Log($"[GetRandomClipByGenre] ❌ Errore: {ex.Message}");
                 return null;
             }
         }
@@ -1544,14 +1547,14 @@ namespace AirDirector.Controls
                 var parts = value.Split(new[] { " + " }, StringSplitOptions.None);
                 if (parts.Length != 2)
                 {
-                    Console.WriteLine($"[GetRandomMusicByCategoryAndGenre] ⚠️ Formato non valido: '{value}'");
+                    Log($"[GetRandomMusicByCategoryAndGenre] ⚠️ Formato non valido: '{value}'");
                     return null;
                 }
 
                 string category = parts[0].Trim();
                 string genre = parts[1].Trim();
 
-                Console.WriteLine($"[GetRandomMusicByCategoryAndGenre] 🔍 Cerco Music con Categoria='{category}' E Genere='{genre}'");
+                Log($"[GetRandomMusicByCategoryAndGenre] 🔍 Cerco Music con Categoria='{category}' E Genere='{genre}'");
 
                 var allMusic = DbcManager.LoadFromCsv<MusicEntry>("Music.dbc");
 
@@ -1559,20 +1562,20 @@ namespace AirDirector.Controls
                     m.Categories == category &&
                     m.Genre == genre).ToList();
 
-                Console.WriteLine($"[GetRandomMusicByCategoryAndGenre] Trovati {filtered.Count} brani con categoria+genere");
+                Log($"[GetRandomMusicByCategoryAndGenre] Trovati {filtered.Count} brani con categoria+genere");
 
                 if (yearFilter)
                 {
                     filtered = filtered.Where(m => m.Year >= yearFrom && m.Year <= yearTo).ToList();
-                    Console.WriteLine($"[GetRandomMusicByCategoryAndGenre] Filtro anni {yearFrom}-{yearTo}:  rimangono {filtered.Count} brani");
+                    Log($"[GetRandomMusicByCategoryAndGenre] Filtro anni {yearFrom}-{yearTo}:  rimangono {filtered.Count} brani");
                 }
 
                 var valid = filtered.Where(m => IsItemValid(m)).ToList();
-                Console.WriteLine($"[GetRandomMusicByCategoryAndGenre] {valid.Count} brani validi");
+                Log($"[GetRandomMusicByCategoryAndGenre] {valid.Count} brani validi");
 
                 if (valid.Count == 0)
                 {
-                    Console.WriteLine($"[GetRandomMusicByCategoryAndGenre] ❌ Nessun brano valido");
+                    Log($"[GetRandomMusicByCategoryAndGenre] ❌ Nessun brano valido");
                     return null;
                 }
 
@@ -1583,16 +1586,16 @@ namespace AirDirector.Controls
                     Random rnd = new Random(Guid.NewGuid().GetHashCode());
                     var selected = available[rnd.Next(available.Count)];
                     _lastArtistFirstLetter = selected.Artist;
-                    Console.WriteLine($"[GetRandomMusicByCategoryAndGenre] ✅ Selezionato (perfetto): {selected.Artist} - {selected.Title}");
+                    Log($"[GetRandomMusicByCategoryAndGenre] ✅ Selezionato (perfetto): {selected.Artist} - {selected.Title}");
                     return CreateMusicQueueItemWithEntry(selected, selected);
                 }
 
-                Console.WriteLine($"[GetRandomMusicByCategoryAndGenre] ⚠️ Applico FALLBACK");
+                Log($"[GetRandomMusicByCategoryAndGenre] ⚠️ Applico FALLBACK");
                 return GetBestAvailableMusic(valid, "category+genre", $"{category}+{genre}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GetRandomMusicByCategoryAndGenre] ❌ Errore: {ex.Message}");
+                Log($"[GetRandomMusicByCategoryAndGenre] ❌ Errore: {ex.Message}");
                 return null;
             }
         }
@@ -1605,14 +1608,14 @@ namespace AirDirector.Controls
                 var parts = value.Split(new[] { " + " }, StringSplitOptions.None);
                 if (parts.Length != 2)
                 {
-                    Console.WriteLine($"[GetRandomClipByCategoryAndGenre] ⚠️ Formato non valido: '{value}'");
+                    Log($"[GetRandomClipByCategoryAndGenre] ⚠️ Formato non valido: '{value}'");
                     return null;
                 }
 
                 string category = parts[0].Trim();
                 string genre = parts[1].Trim();
 
-                Console.WriteLine($"[GetRandomClipByCategoryAndGenre] 🔍 Cerco Clips con Categoria='{category}' E Genere='{genre}'");
+                Log($"[GetRandomClipByCategoryAndGenre] 🔍 Cerco Clips con Categoria='{category}' E Genere='{genre}'");
 
                 var allClips = DbcManager.LoadFromCsv<ClipEntry>("Clips.dbc");
 
@@ -1620,27 +1623,27 @@ namespace AirDirector.Controls
                     c.Categories == category &&
                     c.Genre == genre).ToList();
 
-                Console.WriteLine($"[GetRandomClipByCategoryAndGenre] Trovati {filtered.Count} clips con categoria+genere");
+                Log($"[GetRandomClipByCategoryAndGenre] Trovati {filtered.Count} clips con categoria+genere");
 
                 var valid = filtered.Where(c => IsItemValid(c)).ToList();
-                Console.WriteLine($"[GetRandomClipByCategoryAndGenre] {valid.Count} clips validi");
+                Log($"[GetRandomClipByCategoryAndGenre] {valid.Count} clips validi");
 
                 if (valid.Count == 0)
                 {
-                    Console.WriteLine($"[GetRandomClipByCategoryAndGenre] ❌ Nessun clip valido");
+                    Log($"[GetRandomClipByCategoryAndGenre] ❌ Nessun clip valido");
                     return null;
                 }
 
                 Random rnd = new Random(Guid.NewGuid().GetHashCode());
                 var selected = valid[rnd.Next(valid.Count)];
 
-                Console.WriteLine($"[GetRandomClipByCategoryAndGenre] ✅ Selezionato: {selected.Title}");
+                Log($"[GetRandomClipByCategoryAndGenre] ✅ Selezionato: {selected.Title}");
 
                 return CreateClipQueueItem(selected);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GetRandomClipByCategoryAndGenre] ❌ Errore: {ex.Message}");
+                Log($"[GetRandomClipByCategoryAndGenre] ❌ Errore: {ex.Message}");
                 return null;
             }
         }
@@ -1728,7 +1731,7 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GetViolations] Errore:  {ex.Message}");
+                Log($"[GetViolations] Errore:  {ex.Message}");
             }
 
             return violations;
@@ -1792,7 +1795,7 @@ namespace AirDirector.Controls
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[CanPlayMusic] Errore: {ex.Message}");
+				Log($"[CanPlayMusic] Errore: {ex.Message}");
 				return true;
 			}
 		}
@@ -1853,7 +1856,7 @@ namespace AirDirector.Controls
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[GetRandomMusicByGenre] Errore: {ex.Message}");
+				Log($"[GetRandomMusicByGenre] Errore: {ex.Message}");
 				return null;
 			}
 		}
@@ -1907,7 +1910,7 @@ namespace AirDirector.Controls
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[GetRandomItemByCategory] Errore: {ex.Message}");
+				Log($"[GetRandomItemByCategory] Errore: {ex.Message}");
 				return null;
 			}
 		}
@@ -2040,7 +2043,7 @@ namespace AirDirector.Controls
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[FALLBACK] ❌ ERRORE: {ex.Message}");
+				Log($"[FALLBACK] ❌ ERRORE: {ex.Message}");
 
 				if (validTracks.Count > 0)
 				{
@@ -2157,7 +2160,7 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[IsDayEnabled] ? Errore:   {ex.Message}");
+                Log($"[IsDayEnabled] ? Errore:   {ex.Message}");
                 return false;
             }
         }
@@ -2284,8 +2287,8 @@ namespace AirDirector.Controls
                 {
                     if (Math.Abs(e.X - _dragStartPoint.X) > 5 || Math.Abs(e.Y - _dragStartPoint.Y) > 5)
                     {
-                        Console.WriteLine($"[MouseMove] ??  Inizio drag da index {_dragSourceIndex}");
-                        Console.WriteLine($"[MouseMove] Item: '{_items[_dragSourceIndex].Title}'");
+                        Log($"[MouseMove] ??  Inizio drag da index {_dragSourceIndex}");
+                        Log($"[MouseMove] Item: '{_items[_dragSourceIndex].Title}'");
 
                         _isDragging = true;
 
@@ -2295,7 +2298,7 @@ namespace AirDirector.Controls
                         // Avvia DragDrop
                         var result = this.DoDragDrop(_items[_dragSourceIndex], DragDropEffects.Move);
 
-                        Console.WriteLine($"[MouseMove] ?? DragDrop completato, result: {result}");
+                        Log($"[MouseMove] ?? DragDrop completato, result: {result}");
 
                         // Ripristina cursore
                         this.Cursor = Cursors.Default;
@@ -2309,7 +2312,7 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[MouseMove] ?? Errore: {ex.Message}");
+                Log($"[MouseMove] ?? Errore: {ex.Message}");
                 this.Cursor = Cursors.Default;
             }
         }
@@ -2637,7 +2640,7 @@ namespace AirDirector.Controls
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine($"[PlaylistQueue] Errore report: {ex.Message}");
+					Log($"[PlaylistQueue] Errore report: {ex.Message}");
 				}
 			}
 
@@ -2677,7 +2680,7 @@ namespace AirDirector.Controls
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine($"[PlaylistQueue] Errore report: {ex.Message}");
+						Log($"[PlaylistQueue] Errore report: {ex.Message}");
 					}
 				}
 
@@ -2696,7 +2699,7 @@ namespace AirDirector.Controls
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[PlaylistQueue] Errore rimozione:  {ex.Message}");
+				Log($"[PlaylistQueue] Errore rimozione:  {ex.Message}");
 			}
 		}
 
@@ -2849,9 +2852,13 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[NotifyQueueCountChanged] Errore: {ex.Message}");
+                Log($"[NotifyQueueCountChanged] Errore: {ex.Message}");
             }
         }
+
+		private void Log(string m) { _dailyLogger?.Log(m); }
+		private void LogErr(string m, Exception ex) { _dailyLogger?.LogErr(m, ex); }
+		private void LogErr(string m) { _dailyLogger?.LogErr(m); }
 
         protected override void Dispose(bool disposing)
 		{
@@ -2861,6 +2868,7 @@ namespace AirDirector.Controls
 				_queueMonitorTimer?.Dispose();
 				_scheduleMonitorTimer?.Stop();
 				_scheduleMonitorTimer?.Dispose();
+				try { _dailyLogger?.Dispose(); } catch { }
 			}
 			base.Dispose(disposing);
 		}
