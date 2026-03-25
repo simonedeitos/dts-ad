@@ -22,7 +22,7 @@ namespace AirDirector.Controls
         private List<DownloadTask> _downloadTasks = new List<DownloadTask>();
         private System.Windows.Forms.Timer _schedulerTimer;
         private System.Windows.Forms.Timer _countdownTimer;
-        private Services.Core.DailyLogger _dailyLogger;
+        private string _logFilePath;
         private bool _isProcessing = false;
         private bool _logVisible = true;
 
@@ -48,7 +48,13 @@ namespace AirDirector.Controls
         {
             InitializeComponent();
 
-            try { _dailyLogger = new Services.Core.DailyLogger("Downloader"); } catch { }
+            _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", "FileDownloader_Log.txt");
+
+            string logDir = Path.GetDirectoryName(_logFilePath);
+            if (!Directory.Exists(logDir))
+            {
+                Directory.CreateDirectory(logDir);
+            }
 
             _schedulerTimer = new System.Windows.Forms.Timer();
             _schedulerTimer.Interval = 1000;
@@ -63,7 +69,6 @@ namespace AirDirector.Controls
             LoadDownloadTasks();
             ApplyLanguage();
             RefreshDownloadTasksList();
-            LoadLastLogLines();
             UpdateNextScheduleInfo();
 
             LanguageManager.LanguageChanged += OnLanguageChanged;
@@ -78,7 +83,7 @@ namespace AirDirector.Controls
         private void ApplyLanguage()
         {
             if (lblTitle != null)
-                lblTitle.Text = "?? " + LanguageManager.GetString("Download.Title", "DOWNLOADER");
+                lblTitle.Text = "📥 " + LanguageManager.GetString("Download.Title", "DOWNLOADER");
 
             if (btnDateHelp != null)
                 btnDateHelp.Text = "?     " + LanguageManager.GetString("Download.DateHelp", "Date");
@@ -90,19 +95,19 @@ namespace AirDirector.Controls
                 lblNextTaskName.Text = LanguageManager.GetString("Download.NoTask", "Nessun task");
 
             if (btnAddTask != null)
-                btnAddTask.Text = "? " + LanguageManager.GetString("Download.Add", "Aggiungi");
+                btnAddTask.Text = "➕ " + LanguageManager.GetString("Download.Add", "Aggiungi");
 
             if (btnRefresh != null)
-                btnRefresh.Text = "?? " + LanguageManager.GetString("Download.Refresh", "Aggiorna");
+                btnRefresh.Text = "🔄 " + LanguageManager.GetString("Download.Refresh", "Aggiorna");
 
             if (btnClearLog != null)
-                btnClearLog.Text = "?? " + LanguageManager.GetString("Download.ClearLog", "Pulisci Log");
+                btnClearLog.Text = "🧹 " + LanguageManager.GetString("Download.ClearLog", "Pulisci Log");
 
             if (btnToggleLog != null)
             {
                 btnToggleLog.Text = _logVisible ?
-                    "? " + LanguageManager.GetString("Download.HideLog", "Nascondi Log") :
-                    "? " + LanguageManager.GetString("Download.ShowLog", "Mostra Log");
+                    "▼ " + LanguageManager.GetString("Download.HideLog", "Nascondi Log") :
+                    "▲ " + LanguageManager.GetString("Download.ShowLog", "Mostra Log");
             }
         }
 
@@ -124,7 +129,7 @@ namespace AirDirector.Controls
 
             lblTitle = new Label
             {
-                Text = "?? DOWNLOADER",
+                Text = "📥 DOWNLOADER",
                 Font = new Font("Segoe UI", 16, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(15, 15),
@@ -229,7 +234,7 @@ namespace AirDirector.Controls
 
             btnAddTask = new Button
             {
-                Text = "? Aggiungi",
+                Text = "➕ Aggiungi",
                 Size = new Size(110, 44),
                 Location = new Point(10, 8),
                 BackColor = Color.FromArgb(0, 180, 0),
@@ -244,7 +249,7 @@ namespace AirDirector.Controls
 
             btnRefresh = new Button
             {
-                Text = "?? Aggiorna",
+                Text = "🔄 Aggiorna",
                 Size = new Size(110, 44),
                 Location = new Point(125, 8),
                 BackColor = AppTheme.Info,
@@ -270,7 +275,7 @@ namespace AirDirector.Controls
 
             btnClearLog = new Button
             {
-                Text = "?? Pulisci Log",
+                Text = "🧹 Pulisci Log",
                 Size = new Size(120, 44),
                 BackColor = Color.FromArgb(80, 80, 80),
                 ForeColor = Color.White,
@@ -284,7 +289,7 @@ namespace AirDirector.Controls
 
             btnToggleLog = new Button
             {
-                Text = "? Nascondi Log",
+                Text = "▼ Nascondi Log",
                 Size = new Size(140, 44),
                 BackColor = Color.FromArgb(138, 43, 226),
                 ForeColor = Color.White,
@@ -404,11 +409,11 @@ namespace AirDirector.Controls
                         {
                             if (btnCtrl is Button btn)
                             {
-                                if (btn.Text == "??")
+                                if (btn.Text == "✏️")
                                     btn.Location = new Point(btnX, 10);
-                                else if (btn.Text == "??")
+                                else if (btn.Text == "▶️")
                                     btn.Location = new Point(btnX + 45, 10);
-                                else if (btn.Text == "???")
+                                else if (btn.Text == "🗑️")
                                     btn.Location = new Point(btnX + 90, 10);
                             }
                         }
@@ -443,7 +448,7 @@ namespace AirDirector.Controls
 
             flowTasks.ResumeLayout();
 
-            lblStatus.Text = string.Format(LanguageManager.GetString("Download.TasksConfigured", "?? {0} task configurati"), _downloadTasks.Count);
+            lblStatus.Text = string.Format(LanguageManager.GetString("Download.TasksConfigured", "📊 {0} task configurati"), _downloadTasks.Count);
         }
 
         private TimeSpan GetFirstTime(List<string> times)
@@ -494,7 +499,7 @@ namespace AirDirector.Controls
             };
             card.Controls.Add(lblTime);
 
-            string icon = task.IsHttpDownload ? "??" : "??";
+            string icon = task.IsHttpDownload ? "🌐" : "📁";
             Label lblTitle = new Label
             {
                 Text = $"{icon} {task.Name}",
@@ -516,13 +521,13 @@ namespace AirDirector.Controls
             if (task.Sunday) days.Add(LanguageManager.GetString("Download.DaySun", "Dom"));
 
             string daysText = days.Count == 7 ?
-                "?? " + LanguageManager.GetString("Download.EveryDay", "Tutti i giorni") :
-                $"?? {string.Join(", ", days)}";
+                "📅 " + LanguageManager.GetString("Download.EveryDay", "Tutti i giorni") :
+                $"📅 {string.Join(", ", days)}";
 
             string allTimes = task.ScheduleTimes != null && task.ScheduleTimes.Count > 0
                 ? string.Join(", ", task.ScheduleTimes)
                 : "--:--:--";
-            string timesInfo = task.ScheduleTimes?.Count > 1 ? $" | ? {allTimes}" : "";
+            string timesInfo = task.ScheduleTimes?.Count > 1 ? $" | ⏰ {allTimes}" : "";
 
             Label lblDays = new Label
             {
@@ -539,7 +544,7 @@ namespace AirDirector.Controls
 
             Button btnEdit = new Button
             {
-                Text = "??",
+                Text = "✏️",
                 Location = new Point(btnX, 10),
                 Size = new Size(35, 30),
                 BackColor = AppTheme.Warning,
@@ -555,7 +560,7 @@ namespace AirDirector.Controls
 
             Button btnExecute = new Button
             {
-                Text = "??",
+                Text = "▶️",
                 Location = new Point(btnX + 45, 10),
                 Size = new Size(35, 30),
                 BackColor = AppTheme.Success,
@@ -571,7 +576,7 @@ namespace AirDirector.Controls
 
             Button btnDelete = new Button
             {
-                Text = "???",
+                Text = "🗑️",
                 Location = new Point(btnX + 90, 10),
                 Size = new Size(35, 30),
                 BackColor = AppTheme.Danger,
@@ -591,28 +596,6 @@ namespace AirDirector.Controls
             tooltip.SetToolTip(btnDelete, LanguageManager.GetString("Download.Delete", "Elimina task"));
 
             return card;
-        }
-
-        private void LoadLastLogLines()
-        {
-            try
-            {
-                string today = DateTime.Now.ToString("yyyy-MM-dd");
-                string logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", today, "Downloader-" + today + ".log");
-                if (File.Exists(logFilePath))
-                {
-                    string[] logLines = File.ReadAllLines(logFilePath);
-                    int maxLines = Math.Min(logLines.Length, 100);
-                    for (int i = logLines.Length - maxLines; i < logLines.Length; i++)
-                    {
-                        txtLog.AppendText(logLines[i] + Environment.NewLine);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                txtLog.AppendText($"{LanguageManager.GetString("Download.LogLoadError", "Errore caricamento log")}: {ex.Message}" + Environment.NewLine);
-            }
         }
 
         private void UpdateNextScheduleInfo()
@@ -875,7 +858,7 @@ namespace AirDirector.Controls
 
             Button btnClose = new Button
             {
-                Text = "? " + LanguageManager.GetString("Common.Close", "Chiudi"),
+                Text = "✖ " + LanguageManager.GetString("Common.Close", "Chiudi"),
                 Size = new Size(130, 40),
                 Location = new Point(10, 10),
                 BackColor = Color.FromArgb(80, 80, 80),
@@ -900,7 +883,7 @@ namespace AirDirector.Controls
         {
             Label lblText = new Label
             {
-                Text = $"{text} ? {result}",
+                Text = $"{text} → {result}",
                 Font = new Font("Consolas", 10),
                 ForeColor = Color.LightGray,
                 Location = new Point(10, yPos + 5),
@@ -911,7 +894,7 @@ namespace AirDirector.Controls
 
             Button btnCopy = new Button
             {
-                Text = "??",
+                Text = "📋",
                 Size = new Size(35, 28),
                 Location = new Point(570, yPos),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -930,14 +913,14 @@ namespace AirDirector.Controls
                     Clipboard.SetText(textToCopy);
 
                     Button btn = (Button)s;
-                    btn.Text = "?";
+                    btn.Text = "✓";
                     btn.BackColor = Color.FromArgb(0, 180, 0);
 
                     System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
                     timer.Interval = 1000;
                     timer.Tick += (ts, te) =>
                     {
-                        btn.Text = "??";
+                        btn.Text = "📋";
                         btn.BackColor = Color.FromArgb(0, 120, 215);
                         timer.Stop();
                         timer.Dispose();
@@ -965,12 +948,12 @@ namespace AirDirector.Controls
             if (_logVisible)
             {
                 splitContainer.Panel2Collapsed = false;
-                btnToggleLog.Text = "? " + LanguageManager.GetString("Download.HideLog", "Nascondi Log");
+                btnToggleLog.Text = "▼ " + LanguageManager.GetString("Download.HideLog", "Nascondi Log");
             }
             else
             {
                 splitContainer.Panel2Collapsed = true;
-                btnToggleLog.Text = "? " + LanguageManager.GetString("Download.ShowLog", "Mostra Log");
+                btnToggleLog.Text = "▲ " + LanguageManager.GetString("Download.ShowLog", "Mostra Log");
             }
         }
 
@@ -1015,7 +998,7 @@ namespace AirDirector.Controls
             DownloadTask task = btn.Tag as DownloadTask;
 
             if (MessageBox.Show(
-                string.Format(LanguageManager.GetString("Download.ConfirmDelete", "??? Eliminare il task '{0}'?\n\nQuesta operazione non può essere annullata."), task.Name),
+                string.Format(LanguageManager.GetString("Download.ConfirmDelete", "🗑️ Eliminare il task '{0}'?\n\nQuesta operazione non può essere annullata."), task.Name),
                 LanguageManager.GetString("Common.Confirm", "Conferma Eliminazione"),
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question) == DialogResult.Yes)
@@ -1042,7 +1025,7 @@ namespace AirDirector.Controls
 
             _isProcessing = true;
             progressMain.Visible = true;
-            lblStatus.Text = $"? {task.Name}";
+            lblStatus.Text = $"⏳ {task.Name}";
 
             try
             {
@@ -1120,11 +1103,11 @@ namespace AirDirector.Controls
                 }
 
                 progressMain.Value = 100;
-                LogMessage(string.Format(LanguageManager.GetString("Download.CompletedSuccess", "? Download completato con successo:  {0}"), task.Name));
+                LogMessage(string.Format(LanguageManager.GetString("Download.CompletedSuccess", "✅ Download completato con successo:  {0}"), task.Name));
             }
             catch (Exception ex)
             {
-                LogMessage(string.Format(LanguageManager.GetString("Download.FinalError", "? Errore definitivo per task {0}: {1}"), task.Name, ex.Message));
+                LogMessage(string.Format(LanguageManager.GetString("Download.FinalError", "❌ Errore definitivo per task {0}: {1}"), task.Name, ex.Message));
             }
             finally
             {
@@ -1221,7 +1204,7 @@ namespace AirDirector.Controls
                 };
 
                 await client.DownloadFileTaskAsync(new Uri(processedUrl), processedLocalPath);
-                LogMessage(string.Format(LanguageManager.GetString("Download.FileDownloaded", "? File scaricato:  {0}"), processedLocalPath));
+                LogMessage(string.Format(LanguageManager.GetString("Download.FileDownloaded", "✅ File scaricato:  {0}"), processedLocalPath));
             }
         }
 
@@ -1255,7 +1238,7 @@ namespace AirDirector.Controls
                     await fileStream.WriteAsync(buffer, 0, bytesRead);
                 }
 
-                LogMessage(string.Format(LanguageManager.GetString("Download.FtpDownloaded", "? File FTP scaricato: {0}"), processedLocalPath));
+                LogMessage(string.Format(LanguageManager.GetString("Download.FtpDownloaded", "✅ File FTP scaricato: {0}"), processedLocalPath));
             }
         }
 
@@ -1268,7 +1251,7 @@ namespace AirDirector.Controls
             {
                 using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
                 {
-                    return false; // nessun blocco
+                    return false;
                 }
             }
             catch (IOException)
@@ -1294,7 +1277,6 @@ namespace AirDirector.Controls
             if (ex is System.IO.FileLoadException fileLoadEx && fileLoadEx.HResult == HR_SHARING_VIOLATION)
                 return true;
 
-            // Controlla anche l'inner exception
             if (ex.InnerException != null)
                 return IsFileInUseException(ex.InnerException);
 
@@ -1310,14 +1292,14 @@ namespace AirDirector.Controls
             {
                 try
                 {
-                    // Verifica preventiva: il file di destinazione è in uso?
+                    // Verifica preventiva: il file è in uso?
                     if (File.Exists(filePath) && IsFileLocked(filePath))
                     {
                         LogMessage(string.Format(
                             LanguageManager.GetString("Download.FileInUseSkip",
                                 "⚠️ File in uso da un altro processo, conversione MP3 saltata: {0}"),
                             filePath));
-                        return; // interrompe senza errore, la riproduzione continua
+                        return;
                     }
 
                     string tempFilePath = Path.Combine(
@@ -1337,18 +1319,15 @@ namespace AirDirector.Controls
                 }
                 catch (Exception ex) when (IsFileInUseException(ex))
                 {
-                    // Il file è in uso (riproduzione in corso): interrompe silenziosamente
+                    // File in uso durante la codifica: interrompe silenziosamente
                     LogMessage(string.Format(
                         LanguageManager.GetString("Download.FileInUseSkip",
                             "⚠️ File in uso da un altro processo, conversione MP3 saltata: {0}"),
                         filePath));
-                    // NON rilancia: la riproduzione non viene interrotta
                 }
                 catch (Exception ex)
                 {
-                    LogMessage(string.Format(
-                        LanguageManager.GetString("Download.Mp3ConversionError", "❌ Errore conversione MP3: {0}"),
-                        ex.Message));
+                    LogMessage(string.Format(LanguageManager.GetString("Download.Mp3ConversionError", "❌ Errore conversione MP3: {0}"), ex.Message));
                     throw;
                 }
             });
@@ -1385,7 +1364,7 @@ namespace AirDirector.Controls
                             LanguageManager.GetString("Download.FileInUseSkipCompose",
                                 "⚠️ File di output in uso da un altro processo, composizione saltata: {0}"),
                             outputFilePath));
-                        return; // interrompe senza errore, la riproduzione continua
+                        return;
                     }
 
                     string tempWavFile = Path.Combine(
@@ -1482,15 +1461,14 @@ namespace AirDirector.Controls
                     }
                     catch (Exception ex) when (IsFileInUseException(ex))
                     {
-                        // Il file di output è in uso (in riproduzione): interrompe silenziosamente
+                        // File di output in uso durante la codifica: interrompe silenziosamente
                         LogMessage(string.Format(
                             LanguageManager.GetString("Download.FileInUseSkipCompose",
                                 "⚠️ File di output in uso da un altro processo, composizione saltata: {0}"),
                             outputFilePath));
 
-                        // Pulizia file temporaneo
                         try { File.Delete(tempWavFile); } catch { }
-                        return; // NON rilancia
+                        return;
                     }
 
                     try
@@ -1499,16 +1477,12 @@ namespace AirDirector.Controls
                     }
                     catch { }
 
-                    LogMessage(string.Format(
-                        LanguageManager.GetString("Download.ComposedSaved", "✅ File composto salvato: {0}"),
-                        outputFilePath));
+                    LogMessage(string.Format(LanguageManager.GetString("Download.ComposedSaved", "✅ File composto salvato: {0}"), outputFilePath));
                 });
             }
             catch (Exception ex)
             {
-                LogMessage(string.Format(
-                    LanguageManager.GetString("Download.CompositionError", "❌ Errore composizione audio: {0}"),
-                    ex.Message));
+                LogMessage(string.Format(LanguageManager.GetString("Download.CompositionError", "❌ Errore composizione audio: {0}"), ex.Message));
                 throw;
             }
         }
@@ -1519,7 +1493,10 @@ namespace AirDirector.Controls
 
             try
             {
-                _dailyLogger?.Log(message);
+                using (StreamWriter writer = File.AppendText(_logFilePath))
+                {
+                    writer.WriteLine(logEntry);
+                }
 
                 if (txtLog.InvokeRequired)
                 {
@@ -1544,7 +1521,6 @@ namespace AirDirector.Controls
         {
             if (disposing)
             {
-                try { _dailyLogger?.Dispose(); } catch { }
                 LanguageManager.SaveMissingKeysToFile();
                 LanguageManager.LanguageChanged -= OnLanguageChanged;
 
