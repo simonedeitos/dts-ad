@@ -1486,14 +1486,7 @@ namespace AirDirector.Controls
 
                 string[] selectedFiles = ofd.FileNames;
 
-                if (!isRadioTVMode)
-                {
-                    // original audio-only import path (unchanged)
-                    ImportFiles(selectedFiles);
-                    return;
-                }
-
-                // ── RadioTV mode: separate audio from video ───────────────────
+                // ── Separate audio from video ───────────────────
                 var videoExtensions = new HashSet<string>(
                     new[] { ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".ts", ".mts", ".m2ts", ".webm" },
                     StringComparer.OrdinalIgnoreCase);
@@ -1506,13 +1499,18 @@ namespace AirDirector.Controls
                     .Where(f => videoExtensions.Contains(Path.GetExtension(f)))
                     .ToArray();
 
-                // import plain audio files immediately
+                // audio files → open conversion form (handles conversion + direct import for compatible files)
                 if (audioFiles.Length > 0)
-                    ImportFiles(audioFiles);
+                    OpenVideoConversionForm(audioFiles);
 
-                // video files → open conversion form (non-modal)
+                // video files → open conversion form (non-modal) – only in RadioTV mode
                 if (videoFiles.Length > 0)
-                    OpenVideoConversionForm(videoFiles);
+                {
+                    if (isRadioTVMode)
+                        OpenVideoConversionForm(videoFiles);
+                    else
+                        ImportFiles(videoFiles); // shouldn't happen in Radio mode, but handle gracefully
+                }
             }
         }
 

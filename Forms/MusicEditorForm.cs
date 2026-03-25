@@ -5,9 +5,11 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using NAudio.Wave;
+using LibVLCSharp.Shared;
 using AirDirector.Services.Database;
 using AirDirector.Services.Localization;
 using AirDirector.Themes;
@@ -70,6 +72,15 @@ namespace AirDirector.Forms
         private AutoCompleteStringCollection _genreSuggestions;
         private AutoCompleteStringCollection _categorySuggestions;
 
+        // ✅ VIDEO PREVIEW (RadioTV mode) – live playback via LibVLCSharp
+        private Panel _videoPreviewPanel;
+        private LibVLCSharp.WinForms.VideoView _videoView;
+        private Label _lblVideoPreviewTitle;
+        private LibVLC _vlcLib;
+        private LibVLCSharp.Shared.MediaPlayer _vlcMediaPlayer;
+        private string _videoPath;  // resolved video file path (null if no video)
+        private int _videoSyncTickCounter;  // rate-limiter for drift correction
+
         public MusicEditorForm(MusicEntry musicEntry, bool isClip = false)
         {
             InitializeComponent();
@@ -112,6 +123,7 @@ namespace AirDirector.Forms
             SetupZoomControls();
             SetupVolumeControls();
             SetupVuMeter();
+            SetupVideoPreview();
             LoadGenreSuggestions();
             LoadCategorySuggestions();
 
@@ -653,6 +665,113 @@ namespace AirDirector.Forms
             _vuDecayTimer = new System.Windows.Forms.Timer { Interval = 30 };
             _vuDecayTimer.Tick += VuDecayTimer_Tick;
             _vuDecayTimer.Start();
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // VIDEO PREVIEW (RadioTV mode only)
+        // ═════════════════════════════════════════════════════════════════
+
+        private void SetupVideoPreview()
+        {
+            // Only show video preview in RadioTV mode
+            if (!ConfigurationControl.IsRadioTVMode())
+                return;
+
+            // Check if the music entry has an associated video file
+            string videoPath = _musicEntry.VideoFilePath;
+            bool hasVideo = !string.IsNullOrEmpty(videoPath) && File.Exists(videoPath);
+
+            // Also check if the main file itself is a video
+            if (!hasVideo)
+            {
+                string ext = Path.GetExtension(_musicEntry.FilePath ?? "").ToLowerInvariant();
+                if (ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".mov" ||
+                    ext == ".wmv" || ext == ".ts" || ext == ".mts" || ext == ".m2ts" || ext == ".webm")
+                {
+                    videoPath = _musicEntry.FilePath;
+                    hasVideo = !string.IsNullOrEmpty(videoPath) && File.Exists(videoPath);
+                }
+            }
+
+            if (!hasVideo)
+                return;
+
+            _videoPath = videoPath;
+
+            // Create video preview panel in the left panel, below the markers
+            _videoPreviewPanel = new Panel
+            {
+                Size = new Size(350, 210),
+                Location = new Point(15, 280),
+                BackColor = Color.Black,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            _lblVideoPreviewTitle = new Label
+            {
+                Text = "📺 Video Preview",
+                Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                ForeColor = Color.LightGray,
+                BackColor = Color.FromArgb(28, 28, 40),
+                Dock = DockStyle.Top,
+                Height = 20,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            _videoPreviewPanel.Controls.Add(_lblVideoPreviewTitle);
+
+            // Use LibVLCSharp VideoView for live video playback
+            try
+            {
+                LibVLCSharp.Shared.Core.Initialize();
+            }
+            catch { /* already initialized */ }
+
+            _vlcLib = new LibVLC(
+                "--no-audio",          // mute video audio – NAudio handles audio
+                "--no-osd",
+                "--no-stats",
+                "--quiet",
+                "--avcodec-fast",
+                "--avcodec-threads=2"
+            );
+
+            _vlcMediaPlayer = new LibVLCSharp.Shared.MediaPlayer(_vlcLib);
+
+            _videoView = new LibVLCSharp.WinForms.VideoView
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.Black,
+                MediaPlayer = _vlcMediaPlayer
+            };
+            _videoPreviewPanel.Controls.Add(_videoView);
+
+            leftPanel.Controls.Add(_videoPreviewPanel);
+
+            // Load the video (paused at start)
+            var media = new Media(_vlcLib, new Uri(Path.GetFullPath(_videoPath)));
+            _vlcMediaPlayer.Media = media;
+
+            // Start paused: play then immediately pause to show the first frame
+            _vlcMediaPlayer.Playing += (s, ev) =>
+            {
+                // Mute as safety net (--no-audio should already handle this)
+                _vlcMediaPlayer.Mute = true;
+            };
+
+            // Play to load the first frame, will be paused by the audio sync logic
+            _vlcMediaPlayer.Play();
+            // Pause after a short delay to show the first frame
+            Task.Delay(200).ContinueWith(_ =>
+            {
+                try
+                {
+                    if (_vlcMediaPlayer != null && _vlcMediaPlayer.IsPlaying && !_isPlaying)
+                    {
+                        _vlcMediaPlayer.SetPause(true);
+                    }
+                }
+                catch { }
+            }, TaskScheduler.FromCurrentSynchronizationContext());
         }
 
         private void VuDecayTimer_Tick(object sender, EventArgs e)
@@ -1516,6 +1635,9 @@ namespace AirDirector.Forms
                 _positionTimer.Stop();
                 btnPlay.Text = LanguageManager.GetString("MusicEditor.Play", "▶ PLAY");
                 btnPlay.BackColor = Color.FromArgb(40, 160, 40);
+
+                // Pause video preview
+                SyncVideoPause();
             }
             else
             {
@@ -1524,6 +1646,9 @@ namespace AirDirector.Forms
                 _positionTimer.Start();
                 btnPlay.Text = "⏸ PAUSE";
                 btnPlay.BackColor = Color.FromArgb(200, 100, 0);
+
+                // Sync and play video preview
+                SyncVideoPlay();
             }
         }
 
@@ -1538,6 +1663,96 @@ namespace AirDirector.Forms
             lblCurrentPosition.Text = "00:00:00.000";
             lblCurrentPositionMs.Text = "0 ms";
             picWaveform.Invalidate();
+
+            // Stop and reset video preview
+            SyncVideoStop();
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // VIDEO PREVIEW – sync helpers
+        // ═════════════════════════════════════════════════════════════════
+
+        /// <summary>Seek video to the given audio position in milliseconds.</summary>
+        private void SyncVideoSeek(int audioMs)
+        {
+            if (_vlcMediaPlayer == null || _videoPath == null) return;
+            try
+            {
+                if (_vlcMediaPlayer.Length > 0)
+                {
+                    long seekMs = Math.Max(0, Math.Min(audioMs, _vlcMediaPlayer.Length));
+                    _vlcMediaPlayer.Time = seekMs;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MusicEditor] ⚠️ Video seek error: {ex.Message}");
+            }
+        }
+
+        /// <summary>Resume/start video playback synced to current audio position.</summary>
+        private void SyncVideoPlay()
+        {
+            if (_vlcMediaPlayer == null || _videoPath == null) return;
+            try
+            {
+                if (!_vlcMediaPlayer.IsPlaying)
+                {
+                    _vlcMediaPlayer.Play();
+                }
+                // Sync position to audio
+                if (_audioReader != null)
+                {
+                    int audioMs = (int)_audioReader.CurrentTime.TotalMilliseconds;
+                    SyncVideoSeek(audioMs);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MusicEditor] ⚠️ Video play error: {ex.Message}");
+            }
+        }
+
+        /// <summary>Pause video playback.</summary>
+        private void SyncVideoPause()
+        {
+            if (_vlcMediaPlayer == null || _videoPath == null) return;
+            try
+            {
+                if (_vlcMediaPlayer.IsPlaying)
+                    _vlcMediaPlayer.SetPause(true);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MusicEditor] ⚠️ Video pause error: {ex.Message}");
+            }
+        }
+
+        /// <summary>Stop video and seek back to beginning.</summary>
+        private void SyncVideoStop()
+        {
+            if (_vlcMediaPlayer == null || _videoPath == null) return;
+            try
+            {
+                _vlcMediaPlayer.Stop();
+                // Reload media so we can show first frame again
+                var media = new Media(_vlcLib, new Uri(Path.GetFullPath(_videoPath)));
+                _vlcMediaPlayer.Media = media;
+                _vlcMediaPlayer.Play();
+                Task.Delay(200).ContinueWith(_ =>
+                {
+                    try
+                    {
+                        if (_vlcMediaPlayer != null && _vlcMediaPlayer.IsPlaying)
+                            _vlcMediaPlayer.SetPause(true);
+                    }
+                    catch { }
+                }, TaskScheduler.FromCurrentSynchronizationContext());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MusicEditor] ⚠️ Video stop error: {ex.Message}");
+            }
         }
 
         private void btnSetMarkerIn_Click(object sender, EventArgs e) => SetMarkerToCurrent("In");
@@ -1676,6 +1891,9 @@ namespace AirDirector.Forms
 
             _audioReader.CurrentTime = TimeSpan.FromMilliseconds(ms);
 
+            // Sync video to this marker position
+            SyncVideoSeek(ms);
+
             if (!_isPlaying)
             {
                 btnPlay_Click(null, null);
@@ -1689,6 +1907,21 @@ namespace AirDirector.Forms
                 int currentMs = (int)_audioReader.CurrentTime.TotalMilliseconds;
                 lblCurrentPosition.Text = FormatTime(currentMs);
                 lblCurrentPositionMs.Text = $"{currentMs} ms";
+
+                // ✅ Periodic video sync: re-align if drift > 500ms (check every ~500ms)
+                if (_vlcMediaPlayer != null && _isPlaying && _vlcMediaPlayer.IsPlaying)
+                {
+                    _videoSyncTickCounter++;
+                    if (_videoSyncTickCounter >= 10) // timer is 50ms, so 10 ticks = 500ms
+                    {
+                        _videoSyncTickCounter = 0;
+                        long videoPosMs = _vlcMediaPlayer.Time;
+                        if (Math.Abs(videoPosMs - currentMs) > 500)
+                        {
+                            SyncVideoSeek(currentMs);
+                        }
+                    }
+                }
 
                 // ✅ Auto-scroll zoom: centra la posizione corrente se fuori dalla vista
                 if (_zoomLevel > 1.01f && _waveformData != null && _waveformData.Length > 0)
@@ -1815,6 +2048,10 @@ namespace AirDirector.Forms
             // ✅ Click su waveform = spostamento posizione (zoom-aware)
             int clickMs = PixelXToMs(e.X, totalMs);
             _audioReader.CurrentTime = TimeSpan.FromMilliseconds(clickMs);
+
+            // Sync video to click position
+            SyncVideoSeek(clickMs);
+
             picWaveform.Invalidate();
         }
 
@@ -2089,6 +2326,25 @@ namespace AirDirector.Forms
                 _waveOut?.Dispose();
                 _audioReader?.Dispose();
                 _waveformBitmap?.Dispose();
+
+                // Dispose LibVLC video preview resources
+                try
+                {
+                    if (_vlcMediaPlayer != null)
+                    {
+                        if (_vlcMediaPlayer.IsPlaying)
+                            _vlcMediaPlayer.Stop();
+                        _vlcMediaPlayer.Dispose();
+                        _vlcMediaPlayer = null;
+                    }
+                }
+                catch { }
+
+                try { _videoView?.Dispose(); _videoView = null; }
+                catch { }
+
+                try { _vlcLib?.Dispose(); _vlcLib = null; }
+                catch { }
 
                 if (components != null)
                 {
