@@ -1605,7 +1605,7 @@ namespace AirDirector.Controls
                         bool isVideo = videoExtensions.Contains(extension);
 
                         // Pre-editing: get detected markers from conversion form (if available)
-                        var preEditMarkers = convForm?.IsPreEditingEnabled == true
+                        var (markerIn, markerOut) = convForm?.IsPreEditingEnabled == true
                             ? convForm.GetPreEditMarkers(filePath)
                             : (-1, -1);
 
@@ -1616,10 +1616,8 @@ namespace AirDirector.Controls
                                 : CreateMusicEntryFromFile(filePath);
 
                             // Apply pre-editing markers if detected
-                            if (preEditMarkers.Item1 >= 0)
-                                musicEntry.MarkerIN = preEditMarkers.Item1;
-                            if (preEditMarkers.Item2 >= 0)
-                                musicEntry.MarkerOUT = preEditMarkers.Item2;
+                            if (markerIn >= 0) musicEntry.MarkerIN = markerIn;
+                            if (markerOut >= 0) musicEntry.MarkerOUT = markerOut;
 
                             if (DbcManager.Insert("Music.dbc", musicEntry)) imported++;
                             else errors++;
@@ -1631,10 +1629,8 @@ namespace AirDirector.Controls
                                 : CreateClipEntryFromFile(filePath);
 
                             // Apply pre-editing markers if detected
-                            if (preEditMarkers.Item1 >= 0)
-                                clipEntry.MarkerIN = preEditMarkers.Item1;
-                            if (preEditMarkers.Item2 >= 0)
-                                clipEntry.MarkerOUT = preEditMarkers.Item2;
+                            if (markerIn >= 0) clipEntry.MarkerIN = markerIn;
+                            if (markerOut >= 0) clipEntry.MarkerOUT = markerOut;
 
                             if (DbcManager.Insert("Clips.dbc", clipEntry)) imported++;
                             else errors++;
