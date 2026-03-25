@@ -73,6 +73,7 @@ namespace AirDirector.Forms
         private AutoCompleteStringCollection _categorySuggestions;
 
         // ✅ VIDEO PREVIEW (RadioTV mode) – live playback via LibVLCSharp
+        private const int VIDEO_PREVIEW_HEIGHT = 180;
         private Panel _videoPreviewPanel;
         private LibVLCSharp.WinForms.VideoView _videoView;
         private Label _lblVideoPreviewTitle;
@@ -702,7 +703,7 @@ namespace AirDirector.Forms
             _videoPreviewPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 180,
+                Height = VIDEO_PREVIEW_HEIGHT,
                 BackColor = Color.Black,
                 BorderStyle = BorderStyle.FixedSingle
             };
@@ -752,7 +753,7 @@ namespace AirDirector.Forms
             this.Controls.SetChildIndex(_videoPreviewPanel, vuIdx);
 
             // Increase form height to fit video preview
-            this.ClientSize = new Size(this.ClientSize.Width, this.ClientSize.Height + 180);
+            this.ClientSize = new Size(this.ClientSize.Width, this.ClientSize.Height + VIDEO_PREVIEW_HEIGHT);
 
             // Load the video (paused at start)
             var media = new Media(_vlcLib, new Uri(Path.GetFullPath(_videoPath)));

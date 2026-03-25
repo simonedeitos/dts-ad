@@ -1760,7 +1760,7 @@ namespace AirDirector.Forms
                 {
                     try
                     {
-                        // Analyze the actual file path (output if converted, input if skipped)
+                        // Use the output path for analysis (converted file), or input path if skipped
                         string fileToAnalyze = File.Exists(row.OutputPath) ? row.OutputPath : row.InputPath;
                         var markers = await DetectMarkersAsync(
                             fileToAnalyze,
@@ -1769,7 +1769,7 @@ namespace AirDirector.Forms
                             _cts.Token);
                         _preEditResults[row.OutputPath] = markers;
 
-                        // Also store by input path for lookup convenience
+                        // Store by input path too so callers can look up by either path
                         if (row.InputPath != row.OutputPath)
                             _preEditResults[row.InputPath] = markers;
                     }
