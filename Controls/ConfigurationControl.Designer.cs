@@ -662,7 +662,7 @@ namespace AirDirector.Controls
             // chkLocalAudioOutput
             // 
             chkLocalAudioOutput.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            chkLocalAudioOutput.Location = new Point(40, 330);
+            chkLocalAudioOutput.Location = new Point(40, 250);
             chkLocalAudioOutput.Name = "chkLocalAudioOutput";
             chkLocalAudioOutput.Size = new Size(590, 22);
             chkLocalAudioOutput.TabIndex = 17;
