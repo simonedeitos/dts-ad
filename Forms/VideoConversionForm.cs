@@ -1437,7 +1437,7 @@ namespace AirDirector.Forms
             Label lblBadge = new Label
             {
                 Text = badgeText,
-                Location = new Point(panW - 170, 5),
+                Location = new Point(panW - 260, 5),
                 Size = new Size(220, 18),
                 Font = new Font("Segoe UI", 8, FontStyle.Bold),
                 ForeColor = badgeColor,
@@ -1498,7 +1498,7 @@ namespace AirDirector.Forms
             ProgressBar pb = new ProgressBar
             {
                 Location = new Point(30, 82),
-                Size = new Size(panW - 160, 20),
+                Size = new Size(panW - 260, 20),
                 Minimum = 0,
                 Maximum = 100,
                 Value = compatible ? 100 : 0,
