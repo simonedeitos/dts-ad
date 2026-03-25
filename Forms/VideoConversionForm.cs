@@ -591,6 +591,11 @@ namespace AirDirector.Forms
         }
 
         /// <summary>
+        /// Returns true if pre-editing was enabled during this conversion session.
+        /// </summary>
+        public bool IsPreEditingEnabled => _chkPreEditing?.Checked == true;
+
+        /// <summary>
         /// Query pre-editing marker results for a file path after conversion is complete.
         /// Returns (-1, -1) if not computed.
         /// </summary>

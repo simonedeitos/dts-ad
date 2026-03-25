@@ -1526,7 +1526,7 @@ namespace AirDirector.Controls
             convForm.ConversionCompleted += (convertedPaths) =>
             {
                 if (convertedPaths != null && convertedPaths.Count > 0)
-                    ImportFiles(convertedPaths.ToArray());
+                    ImportFiles(convertedPaths.ToArray(), convForm);
             };
 
             // Non-modal: user can keep working in other forms
@@ -1539,7 +1539,7 @@ namespace AirDirector.Controls
         //  conversion form — all video handling now routes through VideoConversionForm,
         //  so here we can always treat .mp4 as a regular video import)
         // ─────────────────────────────────────────────────────────────────────────────
-        private void ImportFiles(string[] filePaths)
+        private void ImportFiles(string[] filePaths, VideoConversionForm convForm = null)
         {
             if (filePaths.Length == 0) return;
 
@@ -1604,11 +1604,22 @@ namespace AirDirector.Controls
                         string extension = Path.GetExtension(filePath).ToLower();
                         bool isVideo = videoExtensions.Contains(extension);
 
+                        // Pre-editing: get detected markers from conversion form (if available)
+                        var preEditMarkers = convForm?.IsPreEditingEnabled == true
+                            ? convForm.GetPreEditMarkers(filePath)
+                            : (-1, -1);
+
                         if (_archiveType == "Music")
                         {
                             var musicEntry = isVideo
                                 ? CreateMusicEntryFromVideo(filePath)
                                 : CreateMusicEntryFromFile(filePath);
+
+                            // Apply pre-editing markers if detected
+                            if (preEditMarkers.Item1 >= 0)
+                                musicEntry.MarkerIN = preEditMarkers.Item1;
+                            if (preEditMarkers.Item2 >= 0)
+                                musicEntry.MarkerOUT = preEditMarkers.Item2;
 
                             if (DbcManager.Insert("Music.dbc", musicEntry)) imported++;
                             else errors++;
@@ -1618,6 +1629,12 @@ namespace AirDirector.Controls
                             var clipEntry = isVideo
                                 ? CreateClipEntryFromVideo(filePath)
                                 : CreateClipEntryFromFile(filePath);
+
+                            // Apply pre-editing markers if detected
+                            if (preEditMarkers.Item1 >= 0)
+                                clipEntry.MarkerIN = preEditMarkers.Item1;
+                            if (preEditMarkers.Item2 >= 0)
+                                clipEntry.MarkerOUT = preEditMarkers.Item2;
 
                             if (DbcManager.Insert("Clips.dbc", clipEntry)) imported++;
                             else errors++;

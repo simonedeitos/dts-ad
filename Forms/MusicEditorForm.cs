@@ -699,10 +699,10 @@ namespace AirDirector.Forms
 
             _videoPath = videoPath;
 
-            // Create video preview panel ABOVE the waveform (docked Top)
+            // Create video preview panel inside leftPanel (below marker fields)
             _videoPreviewPanel = new Panel
             {
-                Dock = DockStyle.Top,
+                Dock = DockStyle.Bottom,
                 Height = VIDEO_PREVIEW_HEIGHT,
                 BackColor = Color.Black,
                 BorderStyle = BorderStyle.FixedSingle
@@ -746,14 +746,8 @@ namespace AirDirector.Forms
             };
             _videoPreviewPanel.Controls.Add(_videoView);
 
-            // Add to main form above the waveform (between vuMeterPanel and picWaveform)
-            this.Controls.Add(_videoPreviewPanel);
-            // Position in z-order so it docks between vuMeterPanel and picWaveform
-            int vuIdx = this.Controls.GetChildIndex(vuMeterPanel);
-            this.Controls.SetChildIndex(_videoPreviewPanel, vuIdx);
-
-            // Increase form height to fit video preview
-            this.ClientSize = new Size(this.ClientSize.Width, this.ClientSize.Height + VIDEO_PREVIEW_HEIGHT);
+            // Add to leftPanel at the bottom (below marker fields)
+            leftPanel.Controls.Add(_videoPreviewPanel);
 
             // Load the video (paused at start)
             var media = new Media(_vlcLib, new Uri(Path.GetFullPath(_videoPath)));
