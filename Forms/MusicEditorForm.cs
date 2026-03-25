@@ -79,6 +79,7 @@ namespace AirDirector.Forms
         private LibVLC _vlcLib;
         private LibVLCSharp.Shared.MediaPlayer _vlcMediaPlayer;
         private string _videoPath;  // resolved video file path (null if no video)
+        private int _videoSyncTickCounter;  // rate-limiter for drift correction
 
         public MusicEditorForm(MusicEntry musicEntry, bool isClip = false)
         {
@@ -762,11 +763,15 @@ namespace AirDirector.Forms
             // Pause after a short delay to show the first frame
             Task.Delay(200).ContinueWith(_ =>
             {
-                if (_vlcMediaPlayer != null && _vlcMediaPlayer.IsPlaying && !_isPlaying)
+                try
                 {
-                    _vlcMediaPlayer.SetPause(true);
+                    if (_vlcMediaPlayer != null && _vlcMediaPlayer.IsPlaying && !_isPlaying)
+                    {
+                        _vlcMediaPlayer.SetPause(true);
+                    }
                 }
-            });
+                catch { }
+            }, TaskScheduler.FromCurrentSynchronizationContext());
         }
 
         private void VuDecayTimer_Tick(object sender, EventArgs e)
@@ -1742,7 +1747,7 @@ namespace AirDirector.Forms
                             _vlcMediaPlayer.SetPause(true);
                     }
                     catch { }
-                });
+                }, TaskScheduler.FromCurrentSynchronizationContext());
             }
             catch (Exception ex)
             {
@@ -1903,13 +1908,18 @@ namespace AirDirector.Forms
                 lblCurrentPosition.Text = FormatTime(currentMs);
                 lblCurrentPositionMs.Text = $"{currentMs} ms";
 
-                // ✅ Periodic video sync: re-align if drift > 500ms
+                // ✅ Periodic video sync: re-align if drift > 500ms (check every ~500ms)
                 if (_vlcMediaPlayer != null && _isPlaying && _vlcMediaPlayer.IsPlaying)
                 {
-                    long videoPosMs = _vlcMediaPlayer.Time;
-                    if (Math.Abs(videoPosMs - currentMs) > 500)
+                    _videoSyncTickCounter++;
+                    if (_videoSyncTickCounter >= 10) // timer is 50ms, so 10 ticks = 500ms
                     {
-                        SyncVideoSeek(currentMs);
+                        _videoSyncTickCounter = 0;
+                        long videoPosMs = _vlcMediaPlayer.Time;
+                        if (Math.Abs(videoPosMs - currentMs) > 500)
+                        {
+                            SyncVideoSeek(currentMs);
+                        }
                     }
                 }
 
