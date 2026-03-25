@@ -54,6 +54,13 @@ namespace AirDirector.Forms
         private RadioButton _rbTagFromFilename;
         private bool _useTagsFromFile = true;  // true = read ID3/file tags, false = parse filename
 
+        // ── rename panel ──────────────────────────────────────────────────
+        private Panel _pnlRename;
+        private RadioButton _rbRenameNone;
+        private RadioButton _rbRenameUpper;
+        private RadioButton _rbRenameCapitalize;
+        private int _renameMode = 0;  // 0 = none, 1 = UPPERCASE, 2 = Capitalized
+
         // ── pre-editing results ───────────────────────────────────────────
         private readonly Dictionary<string, (int MarkerInMs, int MarkerOutMs)> _preEditResults
             = new Dictionary<string, (int, int)>();
@@ -225,6 +232,7 @@ namespace AirDirector.Forms
             int markerInDb = -25;
             int markerOutDb = -20;
             bool useTagsFromFile = true;
+            int renameMode = 0;
             try
             {
                 using (var key = Registry.CurrentUser.OpenSubKey(REGISTRY_PATH))
@@ -239,6 +247,8 @@ namespace AirDirector.Forms
                         if (valOut != null) markerOutDb = Convert.ToInt32(valOut);
                         var valTagSource = key.GetValue("ImportTagsFromFile");
                         if (valTagSource != null) useTagsFromFile = Convert.ToInt32(valTagSource) != 0;
+                        var valRenameMode = key.GetValue("RenameMode");
+                        if (valRenameMode != null) renameMode = Convert.ToInt32(valRenameMode);
                     }
                 }
             }
@@ -248,6 +258,7 @@ namespace AirDirector.Forms
             }
 
             _useTagsFromFile = useTagsFromFile;
+            _renameMode = renameMode;
 
             // ── Tag Source panel ──────────────────────────────────────
             _pnlTagSource = new Panel
@@ -310,6 +321,88 @@ namespace AirDirector.Forms
 
             Controls.Add(_pnlTagSource);
             _pnlTagSource.BringToFront();
+
+            // ── Rename panel ─────────────────────────────────────────
+            _pnlRename = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 32,
+                BackColor = Color.FromArgb(28, 28, 40),
+                Padding = new Padding(12, 4, 12, 4)
+            };
+
+            var lblRename = new Label
+            {
+                Text = "🔤 Rinomina file:",
+                Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                ForeColor = Color.FromArgb(170, 200, 255),
+                AutoSize = true,
+                Location = new Point(12, 8)
+            };
+            _pnlRename.Controls.Add(lblRename);
+
+            _rbRenameNone = new RadioButton
+            {
+                Text = "Nessuna",
+                Font = new Font("Segoe UI", 8),
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(140, 6),
+                Checked = _renameMode == 0
+            };
+            _rbRenameNone.CheckedChanged += (s, ev) =>
+            {
+                if (_rbRenameNone.Checked)
+                {
+                    _renameMode = 0;
+                    SavePreEditingSettings();
+                    RefreshArtistTitlePreviews();
+                }
+            };
+            _pnlRename.Controls.Add(_rbRenameNone);
+
+            _rbRenameUpper = new RadioButton
+            {
+                Text = "TUTTO MAIUSCOLO",
+                Font = new Font("Segoe UI", 8),
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(250, 6),
+                Checked = _renameMode == 1
+            };
+            _rbRenameUpper.CheckedChanged += (s, ev) =>
+            {
+                if (_rbRenameUpper.Checked)
+                {
+                    _renameMode = 1;
+                    SavePreEditingSettings();
+                    RefreshArtistTitlePreviews();
+                }
+            };
+            _pnlRename.Controls.Add(_rbRenameUpper);
+
+            _rbRenameCapitalize = new RadioButton
+            {
+                Text = "Capitalizzato",
+                Font = new Font("Segoe UI", 8),
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(430, 6),
+                Checked = _renameMode == 2
+            };
+            _rbRenameCapitalize.CheckedChanged += (s, ev) =>
+            {
+                if (_rbRenameCapitalize.Checked)
+                {
+                    _renameMode = 2;
+                    SavePreEditingSettings();
+                    RefreshArtistTitlePreviews();
+                }
+            };
+            _pnlRename.Controls.Add(_rbRenameCapitalize);
+
+            Controls.Add(_pnlRename);
+            _pnlRename.BringToFront();
 
             // ── Pre-editing panel ────────────────────────────────────
             _pnlPreEditing = new Panel
@@ -402,6 +495,7 @@ namespace AirDirector.Forms
                         key.SetValue("PreEditingMarkerInDb", (int)_nudMarkerInDb.Value);
                         key.SetValue("PreEditingMarkerOutDb", (int)_nudMarkerOutDb.Value);
                         key.SetValue("ImportTagsFromFile", _useTagsFromFile ? 1 : 0);
+                        key.SetValue("RenameMode", _renameMode);
                     }
                 }
             }
@@ -458,13 +552,15 @@ namespace AirDirector.Forms
 
         /// <summary>
         /// Refreshes Artist and Title preview labels for all file rows
-        /// based on the current tag source mode.
+        /// based on the current tag source mode and rename mode.
         /// </summary>
         private void RefreshArtistTitlePreviews()
         {
             foreach (var row in _fileRows)
             {
                 var (artist, title) = GetArtistTitle(row.InputPath);
+                artist = ApplyRenameCase(artist);
+                title = ApplyRenameCase(title);
                 if (row.LblArtistPreview != null)
                     row.LblArtistPreview.Text = $"👤 {(string.IsNullOrWhiteSpace(artist) ? "(unknown)" : artist)}";
                 if (row.LblTitlePreview != null)
@@ -596,6 +692,17 @@ namespace AirDirector.Forms
         public bool IsPreEditingEnabled => _chkPreEditing?.Checked == true;
 
         /// <summary>
+        /// Returns true if tag source is set to read from file tags (ID3).
+        /// When false, tags are parsed from filename ("Artist - Title.ext").
+        /// </summary>
+        public bool UseTagsFromFile => _useTagsFromFile;
+
+        /// <summary>
+        /// Rename mode: 0 = none, 1 = UPPERCASE, 2 = Capitalized.
+        /// </summary>
+        public int RenameMode => _renameMode;
+
+        /// <summary>
         /// Query pre-editing marker results for a file path after conversion is complete.
         /// Returns (-1, -1) if not computed.
         /// </summary>
@@ -604,6 +711,40 @@ namespace AirDirector.Forms
             if (_preEditResults.TryGetValue(filePath, out var result))
                 return result;
             return (-1, -1);
+        }
+
+        /// <summary>
+        /// Get artist and title for a given file path using the current tag source mode.
+        /// </summary>
+        public (string Artist, string Title) GetArtistTitleForFile(string filePath)
+        {
+            return GetArtistTitle(filePath);
+        }
+
+        /// <summary>
+        /// Apply the current rename mode (None/UPPERCASE/Capitalized) to a text string.
+        /// </summary>
+        public string ApplyRenameCase(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return text;
+            switch (_renameMode)
+            {
+                case 1: return text.ToUpperInvariant();
+                case 2: return ToCapitalized(text);
+                default: return text;
+            }
+        }
+
+        private static string ToCapitalized(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return text;
+            var words = text.Split(' ');
+            for (int i = 0; i < words.Length; i++)
+            {
+                if (words[i].Length > 0)
+                    words[i] = char.ToUpper(words[i][0]) + words[i].Substring(1).ToLower();
+            }
+            return string.Join(" ", words);
         }
 
         // ═════════════════════════════════════════════════════════════════

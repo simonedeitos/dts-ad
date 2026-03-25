@@ -77,9 +77,9 @@ namespace AirDirector.Forms
                 System.Windows.Forms.AnchorStyles.Right;
 
             // ═══════════════════════════════════════════════════════════════
-            // pnlScroll (pannello elenco file – PARTE DA TOP = 135px)
+            // pnlScroll (pannello elenco file – PARTE DA TOP = 199px)
             // ═══════════════════════════════════════════════════════════════
-            this.pnlScroll.Location = new System.Drawing.Point(0, 167);  // 85 (pnlTop) + 50 (pnlPreEditing) + 32 (pnlTagSource) = 167
+            this.pnlScroll.Location = new System.Drawing.Point(0, 199);  // 85 (pnlTop) + 50 (pnlPreEditing) + 32 (pnlTagSource) + 32 (pnlRename) = 199
             this.pnlScroll.Dock = System.Windows.Forms.DockStyle.None;
             this.pnlScroll.Anchor =
                 System.Windows.Forms.AnchorStyles.Top |
@@ -93,7 +93,7 @@ namespace AirDirector.Forms
             // Resize dinamico: quando il form si ridimensiona, aggiorna pnlScroll
             this.Resize += (s, ev) =>
             {
-                int top = 167; // fisso: 85 + 50 + 32
+                int top = 199; // fisso: 85 + 50 + 32 + 32
                 int bottom = this.pnlBottom.Height;
                 this.pnlScroll.Location = new System.Drawing.Point(0, top);
                 this.pnlScroll.Size = new System.Drawing.Size(
