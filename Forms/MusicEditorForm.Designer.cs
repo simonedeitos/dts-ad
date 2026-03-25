@@ -191,7 +191,7 @@
             toolbarPanel.Dock = System.Windows.Forms.DockStyle.Top;
             toolbarPanel.Location = new System.Drawing.Point(0, 0);
             toolbarPanel.Name = "toolbarPanel";
-            toolbarPanel.Size = new System.Drawing.Size(1263, 60);
+            toolbarPanel.Size = new System.Drawing.Size(1263, 105);
             toolbarPanel.TabIndex = 0;
 
             // btnPlay
@@ -261,12 +261,12 @@
             lblZoomPercent.Size = new System.Drawing.Size(55, 20);
             lblZoomPercent.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
 
-            // ========== VOLUME GROUP (in toolbar) ==========
+            // ========== VOLUME GROUP (under Play/Stop buttons) ==========
             grpVolume.Text = "🔊 Volume Boost";
             grpVolume.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold);
             grpVolume.ForeColor = System.Drawing.Color.White;
-            grpVolume.Location = new System.Drawing.Point(530, 2);
-            grpVolume.Size = new System.Drawing.Size(560, 55);
+            grpVolume.Location = new System.Drawing.Point(15, 50);
+            grpVolume.Size = new System.Drawing.Size(560, 50);
             grpVolume.TabIndex = 4;
             grpVolume.Controls.Add(trkVolume);
             grpVolume.Controls.Add(lblVolumeDb);
@@ -344,7 +344,7 @@
             leftPanel.Controls.Add(btnMarkerOutDown);
             leftPanel.Controls.Add(btnPlayFromOut);
             leftPanel.Dock = System.Windows.Forms.DockStyle.Left;
-            leftPanel.Location = new System.Drawing.Point(0, 60);
+            leftPanel.Location = new System.Drawing.Point(0, 105);
             leftPanel.Name = "leftPanel";
             leftPanel.Size = new System.Drawing.Size(380, 305);
             leftPanel.TabIndex = 1;
@@ -653,7 +653,7 @@
 
             // ========== VU METER PANEL ==========
             vuMeterPanel.Dock = System.Windows.Forms.DockStyle.Top;
-            vuMeterPanel.Location = new System.Drawing.Point(380, 60);
+            vuMeterPanel.Location = new System.Drawing.Point(380, 105);
             vuMeterPanel.Name = "vuMeterPanel";
             vuMeterPanel.Size = new System.Drawing.Size(883, 24);
             vuMeterPanel.BackColor = System.Drawing.Color.FromArgb(15, 15, 15);
@@ -662,7 +662,7 @@
             // ========== picWaveform ==========
             picWaveform.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             picWaveform.Dock = System.Windows.Forms.DockStyle.Fill;
-            picWaveform.Location = new System.Drawing.Point(380, 84);
+            picWaveform.Location = new System.Drawing.Point(380, 129);
             picWaveform.Name = "picWaveform";
             picWaveform.Size = new System.Drawing.Size(883, 261);
             picWaveform.TabIndex = 2;
@@ -674,7 +674,7 @@
 
             // ========== hScrollWaveform ==========
             hScrollWaveform.Dock = System.Windows.Forms.DockStyle.Bottom;
-            hScrollWaveform.Location = new System.Drawing.Point(380, 345);
+            hScrollWaveform.Location = new System.Drawing.Point(380, 390);
             hScrollWaveform.Name = "hScrollWaveform";
             hScrollWaveform.Size = new System.Drawing.Size(883, 20);
             hScrollWaveform.TabIndex = 11;
@@ -707,7 +707,7 @@
             bottomPanel.Controls.Add(btnSave);
             bottomPanel.Controls.Add(btnCancel);
             bottomPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
-            bottomPanel.Location = new System.Drawing.Point(0, 365);
+            bottomPanel.Location = new System.Drawing.Point(0, 410);
             bottomPanel.Name = "bottomPanel";
             bottomPanel.Size = new System.Drawing.Size(1263, 317);
             bottomPanel.TabIndex = 3;
@@ -933,7 +933,7 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.CancelButton = btnCancel;
-            this.ClientSize = new System.Drawing.Size(1263, 682);
+            this.ClientSize = new System.Drawing.Size(1263, 727);
 
             // Ordine di aggiunta critico per il docking corretto:
             this.Controls.Add(picWaveform);        // Fill - area centrale

@@ -20,7 +20,7 @@ namespace AirDirector.Forms
 
         // ── constants ─────────────────────────────────────────────────────
         private const int MAX_CONCURRENT = 3;
-        private const int ROW_HEIGHT = 108;
+        private const int ROW_HEIGHT = 128;
         private const int ROW_MARGIN = 6;
         private const string REGISTRY_PATH = @"SOFTWARE\AirDirector";
         private const int PROGRESS_MAX = 1000;
@@ -47,6 +47,12 @@ namespace AirDirector.Forms
         private NumericUpDown _nudMarkerInDb;
         private Label _lblMarkerOutThreshold;
         private NumericUpDown _nudMarkerOutDb;
+
+        // ── tag source panel ──────────────────────────────────────────────
+        private Panel _pnlTagSource;
+        private RadioButton _rbTagFromFile;
+        private RadioButton _rbTagFromFilename;
+        private bool _useTagsFromFile = true;  // true = read ID3/file tags, false = parse filename
 
         // ── pre-editing results ───────────────────────────────────────────
         private readonly Dictionary<string, (int MarkerInMs, int MarkerOutMs)> _preEditResults
@@ -179,6 +185,8 @@ namespace AirDirector.Forms
             public Label LblInputSpec;
             public Label LblOutputSpec;
             public Label LblStatus;
+            public Label LblArtistPreview;
+            public Label LblTitlePreview;
             public ProgressBar Bar;
             public CheckBox ChkConvert;
             public string InputPath;
@@ -216,6 +224,7 @@ namespace AirDirector.Forms
             bool preEditEnabled = false;
             int markerInDb = -25;
             int markerOutDb = -20;
+            bool useTagsFromFile = true;
             try
             {
                 using (var key = Registry.CurrentUser.OpenSubKey(REGISTRY_PATH))
@@ -228,6 +237,8 @@ namespace AirDirector.Forms
                         if (valIn != null) markerInDb = Convert.ToInt32(valIn);
                         var valOut = key.GetValue("PreEditingMarkerOutDb");
                         if (valOut != null) markerOutDb = Convert.ToInt32(valOut);
+                        var valTagSource = key.GetValue("ImportTagsFromFile");
+                        if (valTagSource != null) useTagsFromFile = Convert.ToInt32(valTagSource) != 0;
                     }
                 }
             }
@@ -236,6 +247,71 @@ namespace AirDirector.Forms
                 Console.WriteLine($"[VideoConversionForm] Registry read error: {ex.Message}");
             }
 
+            _useTagsFromFile = useTagsFromFile;
+
+            // ── Tag Source panel ──────────────────────────────────────
+            _pnlTagSource = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 32,
+                BackColor = Color.FromArgb(28, 28, 40),
+                Padding = new Padding(12, 4, 12, 4)
+            };
+
+            var lblTagSource = new Label
+            {
+                Text = "📋 Tag source:",
+                Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                ForeColor = Color.FromArgb(170, 200, 255),
+                AutoSize = true,
+                Location = new Point(12, 8)
+            };
+            _pnlTagSource.Controls.Add(lblTagSource);
+
+            _rbTagFromFile = new RadioButton
+            {
+                Text = "Read from file tags (ID3)",
+                Font = new Font("Segoe UI", 8),
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(120, 6),
+                Checked = _useTagsFromFile
+            };
+            _rbTagFromFile.CheckedChanged += (s, ev) =>
+            {
+                if (_rbTagFromFile.Checked)
+                {
+                    _useTagsFromFile = true;
+                    SavePreEditingSettings();
+                    RefreshArtistTitlePreviews();
+                }
+            };
+            _pnlTagSource.Controls.Add(_rbTagFromFile);
+
+            _rbTagFromFilename = new RadioButton
+            {
+                Text = "Parse from filename (Artist - Title.ext)",
+                Font = new Font("Segoe UI", 8),
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(350, 6),
+                Checked = !_useTagsFromFile
+            };
+            _rbTagFromFilename.CheckedChanged += (s, ev) =>
+            {
+                if (_rbTagFromFilename.Checked)
+                {
+                    _useTagsFromFile = false;
+                    SavePreEditingSettings();
+                    RefreshArtistTitlePreviews();
+                }
+            };
+            _pnlTagSource.Controls.Add(_rbTagFromFilename);
+
+            Controls.Add(_pnlTagSource);
+            _pnlTagSource.BringToFront();
+
+            // ── Pre-editing panel ────────────────────────────────────
             _pnlPreEditing = new Panel
             {
                 Dock = DockStyle.Top,
@@ -325,12 +401,74 @@ namespace AirDirector.Forms
                         key.SetValue("PreEditingEnabled", _chkPreEditing.Checked ? 1 : 0);
                         key.SetValue("PreEditingMarkerInDb", (int)_nudMarkerInDb.Value);
                         key.SetValue("PreEditingMarkerOutDb", (int)_nudMarkerOutDb.Value);
+                        key.SetValue("ImportTagsFromFile", _useTagsFromFile ? 1 : 0);
                     }
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[VideoConversionForm] Registry write error: {ex.Message}");
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // Artist / Title extraction helpers
+        // ═════════════════════════════════════════════════════════════════
+
+        private (string Artist, string Title) GetArtistTitle(string filePath)
+        {
+            if (_useTagsFromFile)
+                return GetArtistTitleFromTags(filePath);
+            else
+                return GetArtistTitleFromFilename(filePath);
+        }
+
+        private static (string Artist, string Title) GetArtistTitleFromTags(string filePath)
+        {
+            try
+            {
+                using var tf = TagLib.File.Create(filePath);
+                string artist = tf.Tag.FirstPerformer ?? tf.Tag.FirstAlbumArtist ?? "";
+                string title = tf.Tag.Title ?? "";
+                if (!string.IsNullOrWhiteSpace(artist) || !string.IsNullOrWhiteSpace(title))
+                    return (artist.Trim(), title.Trim());
+            }
+            catch { /* ignore tag read errors */ }
+
+            // Fallback to filename parsing if tags are empty
+            return GetArtistTitleFromFilename(filePath);
+        }
+
+        private static (string Artist, string Title) GetArtistTitleFromFilename(string filePath)
+        {
+            string name = Path.GetFileNameWithoutExtension(filePath);
+
+            // Try "Artist - Title" format (dash separator)
+            int idx = name.IndexOf(" - ", StringComparison.Ordinal);
+            if (idx > 0)
+            {
+                string artist = name.Substring(0, idx).Trim();
+                string title = name.Substring(idx + 3).Trim();
+                return (artist, title);
+            }
+
+            // No separator found – use entire name as title
+            return ("", name.Trim());
+        }
+
+        /// <summary>
+        /// Refreshes Artist and Title preview labels for all file rows
+        /// based on the current tag source mode.
+        /// </summary>
+        private void RefreshArtistTitlePreviews()
+        {
+            foreach (var row in _fileRows)
+            {
+                var (artist, title) = GetArtistTitle(row.InputPath);
+                if (row.LblArtistPreview != null)
+                    row.LblArtistPreview.Text = $"👤 {(string.IsNullOrWhiteSpace(artist) ? "(unknown)" : artist)}";
+                if (row.LblTitlePreview != null)
+                    row.LblTitlePreview.Text = $"🎵 {(string.IsNullOrWhiteSpace(title) ? "(unknown)" : title)}";
             }
         }
 
@@ -1128,14 +1266,14 @@ namespace AirDirector.Forms
             {
                 Text = $"🎬  {Path.GetFileName(filePath)}",
                 Location = new Point(30, 5),
-                Size = new Size(panW - 230, 18),
+                Size = new Size(panW - 250, 18),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = Color.White,
                 AutoEllipsis = true
             };
             container.Controls.Add(lblName);
 
-            // badge
+            // badge – shifted left and brought to front
             string badgeText = !spec.ProbeSuccess
                 ? "❓ Specs unavailable"
                 : compatible ? "⚡ Already compatible" : "🔄 Needs conversion";
@@ -1145,19 +1283,44 @@ namespace AirDirector.Forms
             Label lblBadge = new Label
             {
                 Text = badgeText,
-                Location = new Point(panW - 195, 5),
-                Size = new Size(190, 18),
+                Location = new Point(panW - 230, 5),
+                Size = new Size(220, 18),
                 Font = new Font("Segoe UI", 8, FontStyle.Bold),
                 ForeColor = badgeColor,
                 TextAlign = ContentAlignment.MiddleRight
             };
             container.Controls.Add(lblBadge);
+            lblBadge.BringToFront();
+
+            // artist/title preview
+            var (artist, title) = GetArtistTitle(filePath);
+            Label lblArtistPrev = new Label
+            {
+                Text = $"👤 {(string.IsNullOrWhiteSpace(artist) ? "(unknown)" : artist)}",
+                Location = new Point(30, 24),
+                Size = new Size((panW - 37) / 2, 16),
+                Font = new Font("Segoe UI", 7.5F, FontStyle.Italic),
+                ForeColor = Color.FromArgb(180, 230, 180),
+                AutoEllipsis = true
+            };
+            container.Controls.Add(lblArtistPrev);
+
+            Label lblTitlePrev = new Label
+            {
+                Text = $"🎵 {(string.IsNullOrWhiteSpace(title) ? "(unknown)" : title)}",
+                Location = new Point(30 + (panW - 37) / 2, 24),
+                Size = new Size((panW - 37) / 2, 16),
+                Font = new Font("Segoe UI", 7.5F, FontStyle.Italic),
+                ForeColor = Color.FromArgb(180, 210, 255),
+                AutoEllipsis = true
+            };
+            container.Controls.Add(lblTitlePrev);
 
             // input spec
             Label lblIn = new Label
             {
                 Text = BuildInputSpecText(spec),
-                Location = new Point(30, 26),
+                Location = new Point(30, 42),
                 Size = new Size(panW - 37, 18),
                 Font = new Font("Segoe UI", 8),
                 ForeColor = Color.FromArgb(210, 210, 210),
@@ -1169,7 +1332,7 @@ namespace AirDirector.Forms
             Label lblOut = new Label
             {
                 Text = BuildOutputSpecText(spec),
-                Location = new Point(30, 46),
+                Location = new Point(30, 60),
                 Size = new Size(panW - 37, 18),
                 Font = new Font("Segoe UI", 8),
                 ForeColor = compatible ? Color.LightGreen : Color.FromArgb(150, 220, 255),
@@ -1180,7 +1343,7 @@ namespace AirDirector.Forms
             // progress bar
             ProgressBar pb = new ProgressBar
             {
-                Location = new Point(30, 68),
+                Location = new Point(30, 82),
                 Size = new Size(panW - 183, 20),
                 Minimum = 0,
                 Maximum = 100,
@@ -1193,7 +1356,7 @@ namespace AirDirector.Forms
             Label lblProg = new Label
             {
                 Text = needsConvert ? "Waiting…" : "Skip (toggle ON to convert)",
-                Location = new Point(pb.Right + 8, 70),
+                Location = new Point(pb.Right + 8, 84),
                 Size = new Size(panW - pb.Right - 20, 18),
                 Font = new Font("Segoe UI", 8),
                 ForeColor = Color.LightGray
@@ -1213,6 +1376,8 @@ namespace AirDirector.Forms
                 LblInputSpec = lblIn,
                 LblOutputSpec = lblOut,
                 LblStatus = lblProg,
+                LblArtistPreview = lblArtistPrev,
+                LblTitlePreview = lblTitlePrev,
                 Bar = pb,
                 ChkConvert = chkConvert,
                 InputPath = filePath,
@@ -1272,14 +1437,14 @@ namespace AirDirector.Forms
             {
                 Text = $"🎵  {Path.GetFileName(filePath)}",
                 Location = new Point(30, 5),
-                Size = new Size(panW - 230, 18),
+                Size = new Size(panW - 250, 18),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = Color.White,
                 AutoEllipsis = true
             };
             container.Controls.Add(lblName);
 
-            // badge
+            // badge – shifted left and brought to front
             string badgeText;
             Color badgeColor;
             if (!spec.ProbeSuccess)
@@ -1306,19 +1471,44 @@ namespace AirDirector.Forms
             Label lblBadge = new Label
             {
                 Text = badgeText,
-                Location = new Point(panW - 195, 5),
-                Size = new Size(190, 18),
+                Location = new Point(panW - 230, 5),
+                Size = new Size(220, 18),
                 Font = new Font("Segoe UI", 8, FontStyle.Bold),
                 ForeColor = badgeColor,
                 TextAlign = ContentAlignment.MiddleRight
             };
             container.Controls.Add(lblBadge);
+            lblBadge.BringToFront();
+
+            // artist/title preview
+            var (artist, title) = GetArtistTitle(filePath);
+            Label lblArtistPrev = new Label
+            {
+                Text = $"👤 {(string.IsNullOrWhiteSpace(artist) ? "(unknown)" : artist)}",
+                Location = new Point(30, 24),
+                Size = new Size((panW - 37) / 2, 16),
+                Font = new Font("Segoe UI", 7.5F, FontStyle.Italic),
+                ForeColor = Color.FromArgb(180, 230, 180),
+                AutoEllipsis = true
+            };
+            container.Controls.Add(lblArtistPrev);
+
+            Label lblTitlePrev = new Label
+            {
+                Text = $"🎵 {(string.IsNullOrWhiteSpace(title) ? "(unknown)" : title)}",
+                Location = new Point(30 + (panW - 37) / 2, 24),
+                Size = new Size((panW - 37) / 2, 16),
+                Font = new Font("Segoe UI", 7.5F, FontStyle.Italic),
+                ForeColor = Color.FromArgb(180, 210, 255),
+                AutoEllipsis = true
+            };
+            container.Controls.Add(lblTitlePrev);
 
             // input spec
             Label lblIn = new Label
             {
                 Text = BuildAudioInputSpecText(spec),
-                Location = new Point(30, 26),
+                Location = new Point(30, 42),
                 Size = new Size(panW - 37, 18),
                 Font = new Font("Segoe UI", 8),
                 ForeColor = Color.FromArgb(210, 210, 210),
@@ -1330,7 +1520,7 @@ namespace AirDirector.Forms
             Label lblOut = new Label
             {
                 Text = BuildAudioOutputSpecText(spec),
-                Location = new Point(30, 46),
+                Location = new Point(30, 60),
                 Size = new Size(panW - 37, 18),
                 Font = new Font("Segoe UI", 8),
                 ForeColor = (compatible && !spec.IsVariableBitrate) ? Color.LightGreen : Color.FromArgb(150, 220, 255),
@@ -1341,7 +1531,7 @@ namespace AirDirector.Forms
             // progress bar
             ProgressBar pb = new ProgressBar
             {
-                Location = new Point(30, 68),
+                Location = new Point(30, 82),
                 Size = new Size(panW - 183, 20),
                 Minimum = 0,
                 Maximum = 100,
@@ -1354,7 +1544,7 @@ namespace AirDirector.Forms
             Label lblProg = new Label
             {
                 Text = defaultChecked ? "Waiting…" : "Skip (toggle ON to convert)",
-                Location = new Point(pb.Right + 8, 70),
+                Location = new Point(pb.Right + 8, 84),
                 Size = new Size(panW - pb.Right - 20, 18),
                 Font = new Font("Segoe UI", 8),
                 ForeColor = Color.LightGray
@@ -1377,6 +1567,8 @@ namespace AirDirector.Forms
                 LblInputSpec = lblIn,
                 LblOutputSpec = lblOut,
                 LblStatus = lblProg,
+                LblArtistPreview = lblArtistPrev,
+                LblTitlePreview = lblTitlePrev,
                 Bar = pb,
                 ChkConvert = chkConvert,
                 InputPath = filePath,
@@ -1559,6 +1751,7 @@ namespace AirDirector.Forms
             }
 
             // Pre-editing marker detection (if enabled)
+            // Analyze audio from INPUT files to position markers based on threshold
             if (_chkPreEditing.Checked && File.Exists(_ffmpegPath))
             {
                 lblStatus.Text = "🔍  Analyzing audio for marker detection…";
@@ -1567,12 +1760,18 @@ namespace AirDirector.Forms
                 {
                     try
                     {
+                        // Use the output path for analysis (converted file), or input path if skipped
+                        string fileToAnalyze = File.Exists(row.OutputPath) ? row.OutputPath : row.InputPath;
                         var markers = await DetectMarkersAsync(
-                            row.OutputPath,
+                            fileToAnalyze,
                             (double)_nudMarkerInDb.Value,
                             (double)_nudMarkerOutDb.Value,
                             _cts.Token);
                         _preEditResults[row.OutputPath] = markers;
+
+                        // Store by input path too so callers can look up by either path
+                        if (row.InputPath != row.OutputPath)
+                            _preEditResults[row.InputPath] = markers;
                     }
                     catch { /* ignore per-file marker errors */ }
                 }
