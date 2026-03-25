@@ -774,7 +774,7 @@ namespace AirDirector.Controls
         {
             if (_playlistQueue == null) return;
             List<PlaylistQueueItem> items;
-            try { items = _playlistQueue.GetAllItems(); } catch { return; }
+            try { items = _playlistQueue.GetAllItems(); } catch (Exception ex) { Log("[PREBUF] GetAllItems failed: " + ex.Message); return; }
             if (items.Count < 2) return;
 
             int nextIndex = -1;
@@ -1284,7 +1284,7 @@ namespace AirDirector.Controls
             finally { Monitor.Exit(_lannerLock); }
         }
 
-        private void LoadLannerImg(string p) { try { if (!File.Exists(p)) { _lannerImageBGRA = null; return; } int fw = _ndiWidth, fh = _ndiHeight; int needed = fw * fh * 4; if (_lannerBufA == null || _lannerBufA.Length != needed) _lannerBufA = new byte[needed]; if (_lannerBufB == null || _lannerBufB.Length != needed) _lannerBufB = new byte[needed]; byte[] buf = (_lannerBufSelect & 1) == 0 ? _lannerBufA : _lannerBufB; _lannerBufSelect++; using (var orig = Image.FromFile(p)) using (var bmp = new Bitmap(fw, fh, PixelFormat.Format32bppArgb)) using (var g = Graphics.FromImage(bmp)) { g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.SmoothingMode = SmoothingMode.HighQuality; g.CompositingQuality = CompositingQuality.HighQuality; g.Clear(Color.Black); float ir = (float)orig.Width / orig.Height, ar = (float)fw / fh; int dw, dh, dx, dy; if (ir > ar) { dw = fw; dh = (int)(fw / ir); dx = 0; dy = (fh - dh) / 2; } else { dh = fh; dw = (int)(fh * ir); dx = (fw - dw) / 2; dy = 0; } g.DrawImage(orig, dx, dy, dw, dh); var bd = bmp.LockBits(new Rectangle(0, 0, fw, fh), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb); Marshal.Copy(bd.Scan0, buf, 0, buf.Length); bmp.UnlockBits(bd); _lannerImageBGRA = buf; } } catch { _lannerImageBGRA = null; } }
+        private void LoadLannerImg(string p) { try { if (!File.Exists(p)) { _lannerImageBGRA = null; return; } int fw = _ndiWidth, fh = _ndiHeight; int needed = fw * fh * 4; if (_lannerBufA == null || _lannerBufA.Length != needed) _lannerBufA = new byte[needed]; if (_lannerBufB == null || _lannerBufB.Length != needed) _lannerBufB = new byte[needed]; int sel = Interlocked.Increment(ref _lannerBufSelect); byte[] buf = (sel & 1) == 0 ? _lannerBufA : _lannerBufB; using (var orig = Image.FromFile(p)) using (var bmp = new Bitmap(fw, fh, PixelFormat.Format32bppArgb)) using (var g = Graphics.FromImage(bmp)) { g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.SmoothingMode = SmoothingMode.HighQuality; g.CompositingQuality = CompositingQuality.HighQuality; g.Clear(Color.Black); float ir = (float)orig.Width / orig.Height, ar = (float)fw / fh; int dw, dh, dx, dy; if (ir > ar) { dw = fw; dh = (int)(fw / ir); dx = 0; dy = (fh - dh) / 2; } else { dh = fh; dw = (int)(fh * ir); dx = (fw - dw) / 2; dy = 0; } g.DrawImage(orig, dx, dy, dw, dh); var bd = bmp.LockBits(new Rectangle(0, 0, fw, fh), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb); Marshal.Copy(bd.Scan0, buf, 0, buf.Length); bmp.UnlockBits(bd); _lannerImageBGRA = buf; } } catch { _lannerImageBGRA = null; } }
         public void ReloadLannerSchedule() => ThreadPool.QueueUserWorkItem(_ => LoadLannerSchedule());
 
         // ═══════════════════════════════════════════════════════════

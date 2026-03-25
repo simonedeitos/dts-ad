@@ -2960,7 +2960,8 @@ namespace AirDirector.Controls
 		public List<PlaylistQueueItem> GetAllItems()
 		{
 			try { return new List<PlaylistQueueItem>(_items); }
-			catch { return new List<PlaylistQueueItem>(); }
+			catch (InvalidOperationException) { return new List<PlaylistQueueItem>(); }
+			catch (ArgumentException) { return new List<PlaylistQueueItem>(); }
 		}
 
 		public PlaylistQueueItem GetCurrentPlayingItem()
