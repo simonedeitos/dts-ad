@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using NAudio.Wave;
@@ -70,6 +71,11 @@ namespace AirDirector.Forms
         private AutoCompleteStringCollection _genreSuggestions;
         private AutoCompleteStringCollection _categorySuggestions;
 
+        // ✅ VIDEO PREVIEW (RadioTV mode)
+        private Panel _videoPreviewPanel;
+        private PictureBox _picVideoPreview;
+        private Label _lblVideoPreviewTitle;
+
         public MusicEditorForm(MusicEntry musicEntry, bool isClip = false)
         {
             InitializeComponent();
@@ -112,6 +118,7 @@ namespace AirDirector.Forms
             SetupZoomControls();
             SetupVolumeControls();
             SetupVuMeter();
+            SetupVideoPreview();
             LoadGenreSuggestions();
             LoadCategorySuggestions();
 
@@ -653,6 +660,126 @@ namespace AirDirector.Forms
             _vuDecayTimer = new System.Windows.Forms.Timer { Interval = 30 };
             _vuDecayTimer.Tick += VuDecayTimer_Tick;
             _vuDecayTimer.Start();
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // VIDEO PREVIEW (RadioTV mode only)
+        // ═════════════════════════════════════════════════════════════════
+
+        private void SetupVideoPreview()
+        {
+            // Only show video preview in RadioTV mode
+            if (!ConfigurationControl.IsRadioTVMode())
+                return;
+
+            // Check if the music entry has an associated video file
+            string videoPath = _musicEntry.VideoFilePath;
+            bool hasVideo = !string.IsNullOrEmpty(videoPath) && File.Exists(videoPath);
+
+            // Also check if the main file itself is a video
+            if (!hasVideo)
+            {
+                string ext = Path.GetExtension(_musicEntry.FilePath ?? "").ToLowerInvariant();
+                if (ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".mov" ||
+                    ext == ".wmv" || ext == ".ts" || ext == ".mts" || ext == ".m2ts" || ext == ".webm")
+                {
+                    videoPath = _musicEntry.FilePath;
+                    hasVideo = !string.IsNullOrEmpty(videoPath) && File.Exists(videoPath);
+                }
+            }
+
+            if (!hasVideo)
+                return;
+
+            // Create video preview panel in the left panel, below the markers
+            _videoPreviewPanel = new Panel
+            {
+                Size = new Size(350, 210),
+                Location = new Point(15, 280),
+                BackColor = Color.Black,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            _lblVideoPreviewTitle = new Label
+            {
+                Text = "📺 Video Preview",
+                Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                ForeColor = Color.LightGray,
+                BackColor = Color.FromArgb(28, 28, 40),
+                Dock = DockStyle.Top,
+                Height = 20,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            _videoPreviewPanel.Controls.Add(_lblVideoPreviewTitle);
+
+            _picVideoPreview = new PictureBox
+            {
+                Dock = DockStyle.Fill,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = Color.Black
+            };
+            _videoPreviewPanel.Controls.Add(_picVideoPreview);
+
+            leftPanel.Controls.Add(_videoPreviewPanel);
+
+            // Extract a thumbnail frame asynchronously
+            _ = LoadVideoThumbnailAsync(videoPath);
+        }
+
+        private async Task LoadVideoThumbnailAsync(string videoPath)
+        {
+            try
+            {
+                string ffmpegPath = Path.Combine(
+                    Path.GetDirectoryName(Application.ExecutablePath) ?? "", "ffmpeg.exe");
+                if (!File.Exists(ffmpegPath))
+                    return;
+
+                string tempThumb = Path.Combine(Path.GetTempPath(),
+                    $"airdirector_preview_{Guid.NewGuid():N}.jpg");
+
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = ffmpegPath,
+                            Arguments = $"-y -ss 1 -i \"{videoPath}\" -vframes 1 -q:v 2 \"{tempThumb}\"",
+                            RedirectStandardError = true,
+                            RedirectStandardOutput = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                        using (var p = Process.Start(psi))
+                        {
+                            p.StandardError.ReadToEnd();
+                            p.WaitForExit();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[MusicEditor] ⚠️ Video thumbnail extraction error: {ex.Message}");
+                    }
+                });
+
+                if (File.Exists(tempThumb) && _picVideoPreview != null &&
+                    !_picVideoPreview.IsDisposed && IsHandleCreated)
+                {
+                    var thumbImage = Image.FromFile(tempThumb);
+                    if (InvokeRequired)
+                        Invoke(new Action(() => { _picVideoPreview.Image = thumbImage; }));
+                    else
+                        _picVideoPreview.Image = thumbImage;
+
+                    // Clean up temp file after loading into memory
+                    try { File.Delete(tempThumb); } catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MusicEditor] ⚠️ Video preview error: {ex.Message}");
+            }
         }
 
         private void VuDecayTimer_Tick(object sender, EventArgs e)
@@ -2089,6 +2216,7 @@ namespace AirDirector.Forms
                 _waveOut?.Dispose();
                 _audioReader?.Dispose();
                 _waveformBitmap?.Dispose();
+                _picVideoPreview?.Image?.Dispose();
 
                 if (components != null)
                 {
