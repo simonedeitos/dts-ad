@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -78,7 +78,7 @@ namespace AirDirector.Controls
         private void ApplyLanguage()
         {
             if (lblTitle != null)
-                lblTitle.Text = "📥 " + LanguageManager.GetString("Download.Title", "DOWNLOADER");
+                lblTitle.Text = "?? " + LanguageManager.GetString("Download.Title", "DOWNLOADER");
 
             if (btnDateHelp != null)
                 btnDateHelp.Text = "?     " + LanguageManager.GetString("Download.DateHelp", "Date");
@@ -90,19 +90,19 @@ namespace AirDirector.Controls
                 lblNextTaskName.Text = LanguageManager.GetString("Download.NoTask", "Nessun task");
 
             if (btnAddTask != null)
-                btnAddTask.Text = "➕ " + LanguageManager.GetString("Download.Add", "Aggiungi");
+                btnAddTask.Text = "? " + LanguageManager.GetString("Download.Add", "Aggiungi");
 
             if (btnRefresh != null)
-                btnRefresh.Text = "🔄 " + LanguageManager.GetString("Download.Refresh", "Aggiorna");
+                btnRefresh.Text = "?? " + LanguageManager.GetString("Download.Refresh", "Aggiorna");
 
             if (btnClearLog != null)
-                btnClearLog.Text = "🧹 " + LanguageManager.GetString("Download.ClearLog", "Pulisci Log");
+                btnClearLog.Text = "?? " + LanguageManager.GetString("Download.ClearLog", "Pulisci Log");
 
             if (btnToggleLog != null)
             {
                 btnToggleLog.Text = _logVisible ?
-                    "▼ " + LanguageManager.GetString("Download.HideLog", "Nascondi Log") :
-                    "▲ " + LanguageManager.GetString("Download.ShowLog", "Mostra Log");
+                    "? " + LanguageManager.GetString("Download.HideLog", "Nascondi Log") :
+                    "? " + LanguageManager.GetString("Download.ShowLog", "Mostra Log");
             }
         }
 
@@ -124,7 +124,7 @@ namespace AirDirector.Controls
 
             lblTitle = new Label
             {
-                Text = "📥 DOWNLOADER",
+                Text = "?? DOWNLOADER",
                 Font = new Font("Segoe UI", 16, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(15, 15),
@@ -229,7 +229,7 @@ namespace AirDirector.Controls
 
             btnAddTask = new Button
             {
-                Text = "➕ Aggiungi",
+                Text = "? Aggiungi",
                 Size = new Size(110, 44),
                 Location = new Point(10, 8),
                 BackColor = Color.FromArgb(0, 180, 0),
@@ -244,7 +244,7 @@ namespace AirDirector.Controls
 
             btnRefresh = new Button
             {
-                Text = "🔄 Aggiorna",
+                Text = "?? Aggiorna",
                 Size = new Size(110, 44),
                 Location = new Point(125, 8),
                 BackColor = AppTheme.Info,
@@ -270,7 +270,7 @@ namespace AirDirector.Controls
 
             btnClearLog = new Button
             {
-                Text = "🧹 Pulisci Log",
+                Text = "?? Pulisci Log",
                 Size = new Size(120, 44),
                 BackColor = Color.FromArgb(80, 80, 80),
                 ForeColor = Color.White,
@@ -284,7 +284,7 @@ namespace AirDirector.Controls
 
             btnToggleLog = new Button
             {
-                Text = "▼ Nascondi Log",
+                Text = "? Nascondi Log",
                 Size = new Size(140, 44),
                 BackColor = Color.FromArgb(138, 43, 226),
                 ForeColor = Color.White,
@@ -404,11 +404,11 @@ namespace AirDirector.Controls
                         {
                             if (btnCtrl is Button btn)
                             {
-                                if (btn.Text == "✏️")
+                                if (btn.Text == "??")
                                     btn.Location = new Point(btnX, 10);
-                                else if (btn.Text == "▶️")
+                                else if (btn.Text == "??")
                                     btn.Location = new Point(btnX + 45, 10);
-                                else if (btn.Text == "🗑️")
+                                else if (btn.Text == "???")
                                     btn.Location = new Point(btnX + 90, 10);
                             }
                         }
@@ -443,7 +443,7 @@ namespace AirDirector.Controls
 
             flowTasks.ResumeLayout();
 
-            lblStatus.Text = string.Format(LanguageManager.GetString("Download.TasksConfigured", "📊 {0} task configurati"), _downloadTasks.Count);
+            lblStatus.Text = string.Format(LanguageManager.GetString("Download.TasksConfigured", "?? {0} task configurati"), _downloadTasks.Count);
         }
 
         private TimeSpan GetFirstTime(List<string> times)
@@ -494,7 +494,7 @@ namespace AirDirector.Controls
             };
             card.Controls.Add(lblTime);
 
-            string icon = task.IsHttpDownload ? "🌐" : "📁";
+            string icon = task.IsHttpDownload ? "??" : "??";
             Label lblTitle = new Label
             {
                 Text = $"{icon} {task.Name}",
@@ -516,13 +516,13 @@ namespace AirDirector.Controls
             if (task.Sunday) days.Add(LanguageManager.GetString("Download.DaySun", "Dom"));
 
             string daysText = days.Count == 7 ?
-                "📅 " + LanguageManager.GetString("Download.EveryDay", "Tutti i giorni") :
-                $"📅 {string.Join(", ", days)}";
+                "?? " + LanguageManager.GetString("Download.EveryDay", "Tutti i giorni") :
+                $"?? {string.Join(", ", days)}";
 
             string allTimes = task.ScheduleTimes != null && task.ScheduleTimes.Count > 0
                 ? string.Join(", ", task.ScheduleTimes)
                 : "--:--:--";
-            string timesInfo = task.ScheduleTimes?.Count > 1 ? $" | ⏰ {allTimes}" : "";
+            string timesInfo = task.ScheduleTimes?.Count > 1 ? $" | ? {allTimes}" : "";
 
             Label lblDays = new Label
             {
@@ -539,7 +539,7 @@ namespace AirDirector.Controls
 
             Button btnEdit = new Button
             {
-                Text = "✏️",
+                Text = "??",
                 Location = new Point(btnX, 10),
                 Size = new Size(35, 30),
                 BackColor = AppTheme.Warning,
@@ -555,7 +555,7 @@ namespace AirDirector.Controls
 
             Button btnExecute = new Button
             {
-                Text = "▶️",
+                Text = "??",
                 Location = new Point(btnX + 45, 10),
                 Size = new Size(35, 30),
                 BackColor = AppTheme.Success,
@@ -571,7 +571,7 @@ namespace AirDirector.Controls
 
             Button btnDelete = new Button
             {
-                Text = "🗑️",
+                Text = "???",
                 Location = new Point(btnX + 90, 10),
                 Size = new Size(35, 30),
                 BackColor = AppTheme.Danger,
@@ -862,7 +862,7 @@ namespace AirDirector.Controls
             yPos += 40;
 
             AddCopyableRow(contentPanel, "http://example.com/file_{TODAY}.mp3",
-                $"http://example.com/file_{today: yyyy-MM-dd}.mp3", ref yPos);
+                $"http://example.com/file_{today:yyyy-MM-dd}.mp3", ref yPos);
 
             Panel footerPanel = new Panel
             {
@@ -875,7 +875,7 @@ namespace AirDirector.Controls
 
             Button btnClose = new Button
             {
-                Text = "✖ " + LanguageManager.GetString("Common.Close", "Chiudi"),
+                Text = "? " + LanguageManager.GetString("Common.Close", "Chiudi"),
                 Size = new Size(130, 40),
                 Location = new Point(10, 10),
                 BackColor = Color.FromArgb(80, 80, 80),
@@ -900,7 +900,7 @@ namespace AirDirector.Controls
         {
             Label lblText = new Label
             {
-                Text = $"{text} → {result}",
+                Text = $"{text} ? {result}",
                 Font = new Font("Consolas", 10),
                 ForeColor = Color.LightGray,
                 Location = new Point(10, yPos + 5),
@@ -911,7 +911,7 @@ namespace AirDirector.Controls
 
             Button btnCopy = new Button
             {
-                Text = "📋",
+                Text = "??",
                 Size = new Size(35, 28),
                 Location = new Point(570, yPos),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -930,14 +930,14 @@ namespace AirDirector.Controls
                     Clipboard.SetText(textToCopy);
 
                     Button btn = (Button)s;
-                    btn.Text = "✓";
+                    btn.Text = "?";
                     btn.BackColor = Color.FromArgb(0, 180, 0);
 
                     System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
                     timer.Interval = 1000;
                     timer.Tick += (ts, te) =>
                     {
-                        btn.Text = "📋";
+                        btn.Text = "??";
                         btn.BackColor = Color.FromArgb(0, 120, 215);
                         timer.Stop();
                         timer.Dispose();
@@ -965,12 +965,12 @@ namespace AirDirector.Controls
             if (_logVisible)
             {
                 splitContainer.Panel2Collapsed = false;
-                btnToggleLog.Text = "▼ " + LanguageManager.GetString("Download.HideLog", "Nascondi Log");
+                btnToggleLog.Text = "? " + LanguageManager.GetString("Download.HideLog", "Nascondi Log");
             }
             else
             {
                 splitContainer.Panel2Collapsed = true;
-                btnToggleLog.Text = "▲ " + LanguageManager.GetString("Download.ShowLog", "Mostra Log");
+                btnToggleLog.Text = "? " + LanguageManager.GetString("Download.ShowLog", "Mostra Log");
             }
         }
 
@@ -1015,7 +1015,7 @@ namespace AirDirector.Controls
             DownloadTask task = btn.Tag as DownloadTask;
 
             if (MessageBox.Show(
-                string.Format(LanguageManager.GetString("Download.ConfirmDelete", "🗑️ Eliminare il task '{0}'?\n\nQuesta operazione non può essere annullata."), task.Name),
+                string.Format(LanguageManager.GetString("Download.ConfirmDelete", "??? Eliminare il task '{0}'?\n\nQuesta operazione non può essere annullata."), task.Name),
                 LanguageManager.GetString("Common.Confirm", "Conferma Eliminazione"),
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question) == DialogResult.Yes)
@@ -1042,7 +1042,7 @@ namespace AirDirector.Controls
 
             _isProcessing = true;
             progressMain.Visible = true;
-            lblStatus.Text = $"⏳ {task.Name}";
+            lblStatus.Text = $"? {task.Name}";
 
             try
             {
@@ -1120,11 +1120,11 @@ namespace AirDirector.Controls
                 }
 
                 progressMain.Value = 100;
-                LogMessage(string.Format(LanguageManager.GetString("Download.CompletedSuccess", "✅ Download completato con successo:  {0}"), task.Name));
+                LogMessage(string.Format(LanguageManager.GetString("Download.CompletedSuccess", "? Download completato con successo:  {0}"), task.Name));
             }
             catch (Exception ex)
             {
-                LogMessage(string.Format(LanguageManager.GetString("Download.FinalError", "❌ Errore definitivo per task {0}: {1}"), task.Name, ex.Message));
+                LogMessage(string.Format(LanguageManager.GetString("Download.FinalError", "? Errore definitivo per task {0}: {1}"), task.Name, ex.Message));
             }
             finally
             {
@@ -1221,7 +1221,7 @@ namespace AirDirector.Controls
                 };
 
                 await client.DownloadFileTaskAsync(new Uri(processedUrl), processedLocalPath);
-                LogMessage(string.Format(LanguageManager.GetString("Download.FileDownloaded", "✅ File scaricato:  {0}"), processedLocalPath));
+                LogMessage(string.Format(LanguageManager.GetString("Download.FileDownloaded", "? File scaricato:  {0}"), processedLocalPath));
             }
         }
 
@@ -1255,16 +1255,71 @@ namespace AirDirector.Controls
                     await fileStream.WriteAsync(buffer, 0, bytesRead);
                 }
 
-                LogMessage(string.Format(LanguageManager.GetString("Download.FtpDownloaded", "✅ File FTP scaricato: {0}"), processedLocalPath));
+                LogMessage(string.Format(LanguageManager.GetString("Download.FtpDownloaded", "? File FTP scaricato: {0}"), processedLocalPath));
             }
         }
 
+        // ---------------------------------------------------------------
+        // HELPER: verifica se un file è bloccato da un altro processo
+        // ---------------------------------------------------------------
+        private static bool IsFileLocked(string filePath)
+        {
+            try
+            {
+                using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                    return false; // nessun blocco
+                }
+            }
+            catch (IOException)
+            {
+                return true;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return true;
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // HELPER: riconosce eccezioni di tipo "file in uso" (0x80070020)
+        // ---------------------------------------------------------------
+        private static bool IsFileInUseException(Exception ex)
+        {
+            const int HR_SHARING_VIOLATION = unchecked((int)0x80070020);
+
+            if (ex is IOException ioEx && (ioEx.HResult & 0xFFFF) == 0x0020)
+                return true;
+
+            if (ex is System.IO.FileLoadException fileLoadEx && fileLoadEx.HResult == HR_SHARING_VIOLATION)
+                return true;
+
+            // Controlla anche l'inner exception
+            if (ex.InnerException != null)
+                return IsFileInUseException(ex.InnerException);
+
+            return false;
+        }
+
+        // ---------------------------------------------------------------
+        // Conversione MP3 — con gestione file in uso
+        // ---------------------------------------------------------------
         private async Task ConvertMp3ToBitrateAsync(string filePath)
         {
             await Task.Run(() =>
             {
                 try
                 {
+                    // Verifica preventiva: il file di destinazione è in uso?
+                    if (File.Exists(filePath) && IsFileLocked(filePath))
+                    {
+                        LogMessage(string.Format(
+                            LanguageManager.GetString("Download.FileInUseSkip",
+                                "⚠️ File in uso da un altro processo, conversione MP3 saltata: {0}"),
+                            filePath));
+                        return; // interrompe senza errore, la riproduzione continua
+                    }
+
                     string tempFilePath = Path.Combine(
                         Path.GetDirectoryName(filePath),
                         Path.GetFileNameWithoutExtension(filePath) + "_temp.mp3"
@@ -1280,14 +1335,28 @@ namespace AirDirector.Controls
 
                     LogMessage(LanguageManager.GetString("Download.Mp3Converted", "✅ Conversione MP3 a 320kbps completata"));
                 }
+                catch (Exception ex) when (IsFileInUseException(ex))
+                {
+                    // Il file è in uso (riproduzione in corso): interrompe silenziosamente
+                    LogMessage(string.Format(
+                        LanguageManager.GetString("Download.FileInUseSkip",
+                            "⚠️ File in uso da un altro processo, conversione MP3 saltata: {0}"),
+                        filePath));
+                    // NON rilancia: la riproduzione non viene interrotta
+                }
                 catch (Exception ex)
                 {
-                    LogMessage(string.Format(LanguageManager.GetString("Download.Mp3ConversionError", "❌ Errore conversione MP3: {0}"), ex.Message));
+                    LogMessage(string.Format(
+                        LanguageManager.GetString("Download.Mp3ConversionError", "❌ Errore conversione MP3: {0}"),
+                        ex.Message));
                     throw;
                 }
             });
         }
 
+        // ---------------------------------------------------------------
+        // Composizione audio — con gestione file in uso
+        // ---------------------------------------------------------------
         private async Task ComposeAudioFilesAsync(DownloadTask task)
         {
             LogMessage(LanguageManager.GetString("Download.StartingComposition", "Avvio composizione audio..."));
@@ -1309,6 +1378,16 @@ namespace AirDirector.Controls
 
                 await Task.Run(() =>
                 {
+                    // Verifica preventiva: il file di output è in uso?
+                    if (File.Exists(outputFilePath) && IsFileLocked(outputFilePath))
+                    {
+                        LogMessage(string.Format(
+                            LanguageManager.GetString("Download.FileInUseSkipCompose",
+                                "⚠️ File di output in uso da un altro processo, composizione saltata: {0}"),
+                            outputFilePath));
+                        return; // interrompe senza errore, la riproduzione continua
+                    }
+
                     string tempWavFile = Path.Combine(
                         Path.GetDirectoryName(outputFilePath),
                         Path.GetFileNameWithoutExtension(outputFilePath) + "_temp.wav"
@@ -1387,16 +1466,31 @@ namespace AirDirector.Controls
 
                     WaveFileWriter.CreateWaveFile16(tempWavFile, finalProvider);
 
-                    using (var reader = new AudioFileReader(tempWavFile))
+                    try
                     {
-                        if (Path.GetExtension(outputFilePath).ToLower() == ".mp3")
+                        using (var reader = new AudioFileReader(tempWavFile))
                         {
-                            MediaFoundationEncoder.EncodeToMp3(reader, outputFilePath, 320000);
+                            if (Path.GetExtension(outputFilePath).ToLower() == ".mp3")
+                            {
+                                MediaFoundationEncoder.EncodeToMp3(reader, outputFilePath, 320000);
+                            }
+                            else
+                            {
+                                MediaFoundationEncoder.EncodeToWma(reader, outputFilePath);
+                            }
                         }
-                        else
-                        {
-                            MediaFoundationEncoder.EncodeToWma(reader, outputFilePath);
-                        }
+                    }
+                    catch (Exception ex) when (IsFileInUseException(ex))
+                    {
+                        // Il file di output è in uso (in riproduzione): interrompe silenziosamente
+                        LogMessage(string.Format(
+                            LanguageManager.GetString("Download.FileInUseSkipCompose",
+                                "⚠️ File di output in uso da un altro processo, composizione saltata: {0}"),
+                            outputFilePath));
+
+                        // Pulizia file temporaneo
+                        try { File.Delete(tempWavFile); } catch { }
+                        return; // NON rilancia
                     }
 
                     try
@@ -1405,12 +1499,16 @@ namespace AirDirector.Controls
                     }
                     catch { }
 
-                    LogMessage(string.Format(LanguageManager.GetString("Download.ComposedSaved", "✅ File composto salvato: {0}"), outputFilePath));
+                    LogMessage(string.Format(
+                        LanguageManager.GetString("Download.ComposedSaved", "✅ File composto salvato: {0}"),
+                        outputFilePath));
                 });
             }
             catch (Exception ex)
             {
-                LogMessage(string.Format(LanguageManager.GetString("Download.CompositionError", "❌ Errore composizione audio: {0}"), ex.Message));
+                LogMessage(string.Format(
+                    LanguageManager.GetString("Download.CompositionError", "❌ Errore composizione audio: {0}"),
+                    ex.Message));
                 throw;
             }
         }
