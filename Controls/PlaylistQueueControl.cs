@@ -2356,6 +2356,7 @@ namespace AirDirector.Controls
                 MarkerINTRO = entry.MarkerINTRO,
                 MarkerMIX = entry.MarkerMIX,
                 MarkerOUT = entry.MarkerOUT,
+                FileDurationMs = entry.Duration * 1000,
                 IsScheduled = false,
                 OriginalMusicEntry = originalEntry,
                 // ✅ Campi video - converti enum a string
@@ -2390,6 +2391,7 @@ namespace AirDirector.Controls
 				MarkerINTRO = entry.MarkerINTRO,
 				MarkerMIX = entry.MarkerMIX,
 				MarkerOUT = entry.MarkerOUT,
+				FileDurationMs = entry.Duration,
 				IsScheduled = false,
 				VideoFilePath = entry.VideoFilePath ?? "",
 				VideoSource = entry.VideoSource.ToString(),
@@ -3089,6 +3091,9 @@ namespace AirDirector.Controls
 		public int MarkerINTRO { get; set; }
 		public int MarkerMIX { get; set; }
 		public int MarkerOUT { get; set; }
+
+		/// <summary>Full file duration in milliseconds (before markers, actual file length)</summary>
+		public int FileDurationMs { get; set; }
 
 		public bool IsScheduled { get; set; }
 		public MusicEntry OriginalMusicEntry { get; set; }
