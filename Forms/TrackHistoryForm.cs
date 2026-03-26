@@ -31,37 +31,34 @@ namespace AirDirector.Forms
             this.BackColor = Color.FromArgb(30, 30, 30);
             this.ForeColor = Color.White;
 
-            // Header label
+            const int HEADER_HEIGHT = 45;
+            const int BUTTON_PANEL_HEIGHT = 50;
+
+            // ✅ Header label - posizionamento manuale
             Label lblHeader = new Label
             {
                 Text = $"🎵 {_artist} - {_title}",
                 Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 ForeColor = Color.White,
-                Dock = DockStyle.Top,
-                Height = 35,
+                BackColor = Color.FromArgb(30, 30, 30),
+                Location = new Point(0, 0),
+                Size = new Size(this.ClientSize.Width, HEADER_HEIGHT),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(10, 0, 0, 0)
+                Padding = new Padding(10, 0, 0, 0),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             this.Controls.Add(lblHeader);
 
-            // Button panel
+            // ✅ Button panel - posizionamento manuale dal basso
             Panel pnlButtons = new Panel
             {
-                Dock = DockStyle.Bottom,
-                Height = 45,
+                Location = new Point(0, this.ClientSize.Height - BUTTON_PANEL_HEIGHT),
+                Size = new Size(this.ClientSize.Width, BUTTON_PANEL_HEIGHT),
                 BackColor = Color.FromArgb(40, 40, 40),
-                Padding = new Padding(10, 5, 10, 5)
+                Padding = new Padding(10, 5, 10, 5),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
             };
             this.Controls.Add(pnlButtons);
-
-            // Spacer to push the table below the header (header height + 5px)
-            Panel pnlSpacer = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 5,
-                BackColor = Color.FromArgb(30, 30, 30)
-            };
-            this.Controls.Add(pnlSpacer);
 
             Button btnExport = new Button
             {
@@ -71,7 +68,7 @@ namespace AirDirector.Forms
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(130, 32),
-                Location = new Point(10, 6),
+                Location = new Point(10, 9),
                 Cursor = Cursors.Hand
             };
             btnExport.FlatAppearance.BorderSize = 0;
@@ -83,7 +80,7 @@ namespace AirDirector.Forms
                 Name = "lblCount",
                 Font = new Font("Segoe UI", 9),
                 ForeColor = Color.LightGray,
-                Location = new Point(160, 12),
+                Location = new Point(160, 15),
                 AutoSize = true
             };
             pnlButtons.Controls.Add(lblCount);
@@ -96,25 +93,25 @@ namespace AirDirector.Forms
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(80, 32),
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
                 Cursor = Cursors.Hand
             };
             btnClose.FlatAppearance.BorderSize = 0;
             btnClose.Click += (s, e) => this.Close();
             pnlButtons.Controls.Add(btnClose);
-            this.Load += (s, e) =>
-            {
-                btnClose.Location = new Point(pnlButtons.Width - btnClose.Width - 10, 6);
-            };
-            pnlButtons.Resize += (s, e) =>
-            {
-                btnClose.Location = new Point(pnlButtons.Width - btnClose.Width - 10, 6);
-            };
 
-            // DataGridView
+            // Posiziona btnClose a destra
+            Action positionCloseButton = () =>
+            {
+                btnClose.Location = new Point(pnlButtons.Width - btnClose.Width - 10, 9);
+            };
+            positionCloseButton();
+            pnlButtons.Resize += (s, e) => positionCloseButton();
+
+            // ✅ DataGridView - posizionamento manuale tra header e buttons
             _dgv = new DataGridView
             {
-                Dock = DockStyle.Fill,
+                Location = new Point(0, HEADER_HEIGHT),
+                Size = new Size(this.ClientSize.Width, this.ClientSize.Height - HEADER_HEIGHT - BUTTON_PANEL_HEIGHT),
                 BackgroundColor = Color.FromArgb(25, 25, 25),
                 ForeColor = Color.White,
                 GridColor = Color.FromArgb(60, 60, 60),
@@ -126,6 +123,7 @@ namespace AirDirector.Forms
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 RowHeadersVisible = false,
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
                 {
                     BackColor = Color.FromArgb(50, 50, 50),
