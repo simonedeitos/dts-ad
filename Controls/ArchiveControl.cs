@@ -9,7 +9,6 @@ using AirDirector.Services.Database;
 using AirDirector.Services.Licensing;
 using AirDirector.Services.Localization;
 using AirDirector.Forms;
-using AirDirector.Forms;
 using AirDirector.Themes;
 
 namespace AirDirector.Controls

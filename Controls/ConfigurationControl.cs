@@ -1091,9 +1091,11 @@ namespace AirDirector.Controls
         // VIDEO GETTERS
         public static bool IsRadioTVMode() { try { return DbcManager.GetConfigValue("Mode", "Radio") == "RadioTV"; } catch { return false; } }
         public static string GetVideoOutputType() { try { return "NDI"; } catch { return "NDI"; } } // Solo NDI per ora
+        // Frame rate e NDI source sono gestiti internamente da PlayerControlVideo con parametri predefiniti
         public static int GetVideoFrameRate() { return 30; }
         public static string GetBufferVideoPath() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return key?.GetValue("BufferVideoPath", "").ToString() ?? ""; } } catch { return ""; } }
         public static string GetBufferVideoMode() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return key?.GetValue("BufferVideoMode", "RandomLoop").ToString() ?? "RandomLoop"; } } catch { return "RandomLoop"; } }
+        // Nome sorgente NDI gestito internamente da PlayerControlVideo
         public static string GetNDISourceName() { return "AirDirector Output"; }
         public static string GetSDIDeviceName() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return key?.GetValue("SDI_DeviceName", "").ToString() ?? ""; } } catch { return ""; } }
         public static string GetAdvLannerPlayout() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return key?.GetValue("AdvLannerPlayout", "YesInternal").ToString() ?? "YesInternal"; } } catch { return "YesInternal"; } }
