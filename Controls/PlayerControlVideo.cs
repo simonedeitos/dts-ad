@@ -67,10 +67,9 @@ namespace AirDirector.Controls
             public string VideoFilePath = "", VideoSource = "", NDISourceName = "";
             public TimeSpan Intro = TimeSpan.Zero, Duration = TimeSpan.Zero;
             public int MarkerIN, MarkerINTRO, MarkerMIX, MarkerOUT;
-            public int FileDurationMs;
             public bool IsScheduled = false;
             public static PlayItem FromQueueItem(PlaylistQueueItem qi) => new PlayItem
-            { FilePath = qi.FilePath ?? "", Artist = qi.Artist ?? "", Title = qi.Title ?? "", Intro = qi.Intro, MarkerIN = qi.MarkerIN, MarkerINTRO = qi.MarkerINTRO, MarkerMIX = qi.MarkerMIX, MarkerOUT = qi.MarkerOUT, FileDurationMs = qi.FileDurationMs, ItemType = qi.ItemType ?? "Music", VideoFilePath = qi.VideoFilePath ?? "", VideoSource = qi.VideoSource ?? "", NDISourceName = qi.NDISourceName ?? "", Duration = qi.Duration, IsScheduled = qi.IsScheduled };
+            { FilePath = qi.FilePath ?? "", Artist = qi.Artist ?? "", Title = qi.Title ?? "", Intro = qi.Intro, MarkerIN = qi.MarkerIN, MarkerINTRO = qi.MarkerINTRO, MarkerMIX = qi.MarkerMIX, MarkerOUT = qi.MarkerOUT, ItemType = qi.ItemType ?? "Music", VideoFilePath = qi.VideoFilePath ?? "", VideoSource = qi.VideoSource ?? "", NDISourceName = qi.NDISourceName ?? "", Duration = qi.Duration, IsScheduled = qi.IsScheduled };
         }
 
         private enum DeckType { VideoClip, AudioTrack, WebStream, Buffer }
@@ -149,7 +148,6 @@ namespace AirDirector.Controls
         public bool IsAutoMode => _autoMode;
         private TimeSpan _totalDuration, _introTime;
         private int _markerIN, _markerINTRO, _markerMIX, _markerOUT;
-        private volatile bool _vlcDurationChecked;
         private volatile int _mixGeneration = 0;
 
         private List<string> _bufferPlaylist = new List<string>();
@@ -367,10 +365,6 @@ namespace AirDirector.Controls
                     deck.IsReadyForVideo = true;
                     deck.FrameCount++;
                     try { long t = deck.VlcPlayer.Time; if (t > 0) deck.VlcTimeMs = t; } catch { }
-                    if (!_vlcDurationChecked && deck == _activeDeck && deck.Type == DeckType.VideoClip)
-                    {
-                        try { long len = deck.VlcPlayer.Length; if (len > 100) { double curMs = _totalDuration.TotalMilliseconds; if (curMs < 100 || Math.Abs(len - curMs) > 500) _totalDuration = TimeSpan.FromMilliseconds(len); _vlcDurationChecked = true; } } catch { }
-                    }
                     if (deck.IsPreBuffered && deck.FrameCount >= MIN_READY_FRAMES && deck.AudioStarted)
                         deck.PreBufferReady = true;
                 }, null);
@@ -1024,23 +1018,12 @@ namespace AirDirector.Controls
             }
 
             _waveformPeaks = null; _waveformCurrentFile = "";
-            // Determine full file duration (NOT effective duration between markers)
-            // Priority: 1) NAudio FileReader, 2) FileDurationMs from DB, 3) max of markers, 4) effective duration
-            TimeSpan dur;
+            TimeSpan dur = item.Duration;
+            if (dur.TotalMilliseconds < 100 && item.MarkerOUT > 0) dur = TimeSpan.FromMilliseconds(item.MarkerOUT);
+            if (dur.TotalMilliseconds < 100 && item.MarkerMIX > 0) dur = TimeSpan.FromMilliseconds(item.MarkerMIX);
             if (target.FileReader != null && target.FileReader.TotalTime.TotalMilliseconds > 100)
                 dur = target.FileReader.TotalTime;
-            else if (item.FileDurationMs > 100)
-                dur = TimeSpan.FromMilliseconds(item.FileDurationMs);
-            else
-            {
-                int bestMs = Math.Max(item.MarkerOUT, item.MarkerMIX);
-                if (bestMs > 100)
-                    dur = TimeSpan.FromMilliseconds(bestMs);
-                else
-                    dur = item.Duration;
-            }
-            _totalDuration = dur; _vlcDurationChecked = false;
-            _markerIN = item.MarkerIN; _markerINTRO = item.MarkerINTRO;
+            _totalDuration = dur; _markerIN = item.MarkerIN; _markerINTRO = item.MarkerINTRO;
             _markerMIX = item.MarkerMIX > 0 ? item.MarkerMIX : item.MarkerOUT > 0 ? item.MarkerOUT : (int)dur.TotalMilliseconds;
             _markerOUT = item.MarkerOUT > 0 ? item.MarkerOUT : (int)dur.TotalMilliseconds;
             _introTime = item.Intro; if (_introTime.TotalMilliseconds <= 0 && _markerINTRO > 0) _introTime = TimeSpan.FromMilliseconds(_markerINTRO);
@@ -1310,7 +1293,7 @@ namespace AirDirector.Controls
         // ═══════════════════════════════════════════════════════════
         private void LoadWaveformForCurrentFile(string fp) { if (_waveformCache.TryGetValue(fp, out float[] c) && _currentFile == fp) { _waveformPeaks = c; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); return; } Task.Run(() => GenWaveform(fp, true)); }
         private void PreCacheNextWaveform() { if (_playlistQueue == null) return; var i = _playlistQueue.GetAllItems(); if (i.Count < 2) return; string nf = i[1].FilePath; if (!string.IsNullOrEmpty(nf) && !IsWebStream(nf) && !_waveformCache.ContainsKey(nf)) Task.Run(() => GenWaveform(nf, false)); }
-        private void GenWaveform(string fp, bool apply) { try { if (IsWebStream(fp)) return; if (_waveformCache.ContainsKey(fp)) { if (apply && _currentFile == fp) { _waveformPeaks = _waveformCache[fp]; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } float[] pk = new float[WAVEFORM_BARS]; NAudio.Wave.WaveStream rd = null; string ext = Path.GetExtension(fp).ToLowerInvariant(); try { if (ext == ".mp3") rd = new NAudio.Wave.Mp3FileReader(fp); else if (ext == ".wav") rd = new NAudio.Wave.WaveFileReader(fp); else rd = new NAudio.Wave.AudioFileReader(fp); } catch { try { rd = new NAudio.Wave.AudioFileReader(fp); } catch { } } if (rd != null) { TimeSpan actualDur; using (rd) { actualDur = rd.TotalTime; int bps = rd.WaveFormat.BitsPerSample / 8; if (bps < 1) bps = 2; long tot = rd.Length / bps; long spb = Math.Max(1, tot / WAVEFORM_BARS); int bs = (int)Math.Min(spb * bps, 65536); byte[] buf = new byte[bs]; for (int b = 0; b < WAVEFORM_BARS; b++) { int r2 = rd.Read(buf, 0, Math.Min(bs, buf.Length)); if (r2 == 0) break; float mx = 0; if (bps == 2) { for (int i = 0; i < r2 - 1; i += 2) { float a = Math.Abs(BitConverter.ToInt16(buf, i) / 32768f); if (a > mx) mx = a; } } else if (bps == 4) { for (int i = 0; i < r2 - 3; i += 4) { float a = Math.Abs(BitConverter.ToSingle(buf, i)); if (a > mx) mx = a; } } else mx = 0.3f; pk[b] = Math.Min(1f, mx); } } if (apply && _currentFile == fp && actualDur.TotalMilliseconds > 100) { int oldMs = (int)_totalDuration.TotalMilliseconds; int newMs = (int)actualDur.TotalMilliseconds; if (Math.Abs(newMs - oldMs) > 500) { _totalDuration = actualDur; } } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } var rr = new Random(fp.GetHashCode()); for (int i = 0; i < pk.Length; i++) { float t = (float)i / pk.Length, env = 1f; if (t < 0.02f) env = t / 0.02f; if (t > 0.95f) env = (1f - t) / 0.05f; pk[i] = Math.Min(1f, (0.35f + (float)(rr.NextDouble() * 0.5)) * env); } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } } catch { } }
+        private void GenWaveform(string fp, bool apply) { try { if (IsWebStream(fp)) return; if (_waveformCache.ContainsKey(fp)) { if (apply && _currentFile == fp) { _waveformPeaks = _waveformCache[fp]; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } float[] pk = new float[WAVEFORM_BARS]; NAudio.Wave.WaveStream rd = null; string ext = Path.GetExtension(fp).ToLowerInvariant(); try { if (ext == ".mp3") rd = new NAudio.Wave.Mp3FileReader(fp); else if (ext == ".wav") rd = new NAudio.Wave.WaveFileReader(fp); else rd = new NAudio.Wave.AudioFileReader(fp); } catch { try { rd = new NAudio.Wave.AudioFileReader(fp); } catch { } } if (rd != null) { TimeSpan actualDur; using (rd) { actualDur = rd.TotalTime; int bps = rd.WaveFormat.BitsPerSample / 8; if (bps < 1) bps = 2; long tot = rd.Length / bps; long spb = Math.Max(1, tot / WAVEFORM_BARS); int bs = (int)Math.Min(spb * bps, 65536); byte[] buf = new byte[bs]; for (int b = 0; b < WAVEFORM_BARS; b++) { int r2 = rd.Read(buf, 0, Math.Min(bs, buf.Length)); if (r2 == 0) break; float mx = 0; if (bps == 2) { for (int i = 0; i < r2 - 1; i += 2) { float a = Math.Abs(BitConverter.ToInt16(buf, i) / 32768f); if (a > mx) mx = a; } } else if (bps == 4) { for (int i = 0; i < r2 - 3; i += 4) { float a = Math.Abs(BitConverter.ToSingle(buf, i)); if (a > mx) mx = a; } } else mx = 0.3f; pk[b] = Math.Min(1f, mx); } } if (apply && _currentFile == fp && actualDur.TotalMilliseconds > 100) { int oldMs = (int)_totalDuration.TotalMilliseconds; int newMs = (int)actualDur.TotalMilliseconds; if (Math.Abs(newMs - oldMs) > 500) { _totalDuration = actualDur; if (_markerMIX == oldMs) _markerMIX = newMs; if (_markerOUT == oldMs) _markerOUT = newMs; } } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } var rr = new Random(fp.GetHashCode()); for (int i = 0; i < pk.Length; i++) { float t = (float)i / pk.Length, env = 1f; if (t < 0.02f) env = t / 0.02f; if (t > 0.95f) env = (1f - t) / 0.05f; pk[i] = Math.Min(1f, (0.35f + (float)(rr.NextDouble() * 0.5)) * env); } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } } catch { } }
 
         // ═══════════════════════════════════════════════════════════
         // UI
@@ -1332,41 +1315,38 @@ namespace AirDirector.Controls
             int w = waveformPanel.Width, h = waveformPanel.Height;
             g.Clear(Color.Black);
 
-            // Durata totale del file (dalla durata, non dai marker)
             float tm = (float)_totalDuration.TotalMilliseconds;
             if (tm <= 0) return;
 
-            // Calcola posizione corrente come percentuale della durata totale (come PlayerControl.cs)
-            float pr = Math.Max(0f, Math.Min(1f, (float)_positionMs / tm));
-            int cx = (int)(pr * w);
+            // Calculate positions relative to full file duration
+            // Use (w - 1) to ensure everything fits within panel bounds [0, w-1]
+            float pr = Math.Max(0f, Math.Min(1f, _positionMs / tm));
+            int cx = (int)(pr * (w - 1));
 
-            int inX = _markerIN > 0 ? (int)((_markerIN / tm) * w) : 0;
+            int inX = _markerIN > 0 ? (int)(Math.Min(1f, _markerIN / tm) * (w - 1)) : 0;
 
             float introMs = (float)_introTime.TotalMilliseconds;
-            int introX = introMs > 0 ? (int)((introMs / tm) * w) : inX;
+            int introX = introMs > 0 ? (int)(Math.Min(1f, introMs / tm) * (w - 1)) : inX;
 
-            // In modalità manuale, mixX è invisibile (= w, fuori schermo)
-            int mixX = w;
-            if (_autoMode && _markerMIX > 0)
-                mixX = (int)((_markerMIX / tm) * w);
+            int mixX = _markerMIX > 0 ? (int)(Math.Min(1f, _markerMIX / tm) * (w - 1)) : (w - 1);
 
             int cy = h / 2;
 
-            // Background zone: rosso tra IN e INTRO, grigio dopo MIX (solo in AUTO)
+            // Background zones: red between IN and INTRO, gray after MIX
             if (introX > inX)
                 using (var b = new SolidBrush(Color.FromArgb(25, 255, 0, 0)))
                     g.FillRectangle(b, inX, 0, introX - inX, h);
 
-            if (_autoMode && mixX < w)
+            if (mixX < w - 1)
                 using (var b = new SolidBrush(Color.FromArgb(20, 128, 128, 128)))
                     g.FillRectangle(b, mixX, 0, w - mixX, h);
 
-            // Waveform bars: rappresenta tutto il file da 0% a 100%
+            // Waveform bars: entire file
             float[] pk = _waveformPeaks;
             if (pk != null && pk.Length > 0)
             {
                 int nb = pk.Length;
-                float bw2 = (float)w / nb;
+                float bw2 = (float)(w - 1) / nb;
 
                 for (int i = 0; i < nb; i++)
                 {
@@ -1374,22 +1354,19 @@ namespace AirDirector.Controls
                     int bh = Math.Max(1, (int)(pv * h * 0.85f));
                     int bx = (int)(i * bw2);
 
-                    // Limita rigorosamente a w
-                    if (bx >= w) break;
-
-                    int barWidth = Math.Max(1, (int)Math.Ceiling(bw2));
-                    if (bx + barWidth > w) barWidth = w - bx;
-
-                    // Colori: grigio scuro se già riprodotto (bx < cx), altrimenti colore zona
                     Color bc;
                     if (bx < inX)
-                        bc = Color.FromArgb(50, 50, 50);  // Prima di IN: grigio scuro
+                        bc = Color.FromArgb(50, 50, 50);
                     else if (bx < introX)
-                        bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(255, 80, 80);  // Intro: grigio se riprodotto, rosso se no
+                        bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(255, 80, 80);
                     else if (bx < mixX)
-                        bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(0, 200, 0);  // Zona normale: grigio se riprodotto, verde se no
+                        bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(0, 200, 0);
                     else
-                        bc = Color.FromArgb(120, 120, 120);  // Dopo MIX: grigio chiaro
+                        bc = Color.FromArgb(120, 120, 120);
+
+                    int barWidth = Math.Max(1, (int)Math.Ceiling(bw2));
+                    // Ensure bar doesn't overflow panel
+                    if (bx + barWidth > w) barWidth = w - bx;
 
                     using (var br = new SolidBrush(bc))
                         g.FillRectangle(br, bx, cy - bh / 2, barWidth, bh);
@@ -1397,8 +1374,7 @@ namespace AirDirector.Controls
             }
             else
             {
-                // Fallback: nessuna waveform disponibile
-                if (cx < w)
+                if (cx < w - 1)
                     using (var b = new SolidBrush(Color.FromArgb(0, 150, 0)))
                         g.FillRectangle(b, cx, 0, w - cx, h);
                 if (cx > 0)
@@ -1406,36 +1382,36 @@ namespace AirDirector.Controls
                         g.FillRectangle(b, 0, 0, cx, h);
             }
 
-            // Progress bar in basso (barra orizzontale di 3px)
-            if (cx > 0 && cx <= w)
+            // Progress bar at bottom
+            if (cx > 0)
                 using (var b = new SolidBrush(Color.FromArgb(70, 70, 70)))
-                    g.FillRectangle(b, 0, h - 3, Math.Min(cx, w), 3);
-            if (cx < w)
-                using (var b = new SolidBrush(Color.FromArgb(0, 255, 0)))
-                    g.FillRectangle(b, Math.Min(cx, w), h - 3, w - Math.Min(cx, w), 3);
+                    g.FillRectangle(b, 0, h - 3, cx, 3);
 
-            // Marker IN (linea bianca spessa)
+            if (cx < w - 1)
+                using (var b = new SolidBrush(Color.FromArgb(0, 255, 0)))
+                    g.FillRectangle(b, cx, h - 3, w - cx, 3);
+
+            // Marker IN (white line)
             if (inX > 0 && inX < w)
                 using (var pn = new Pen(Color.White, 2))
                     g.DrawLine(pn, inX, 0, inX, h);
 
-            // Marker INTRO (linea gialla sottile) - solo se diverso da IN
-            if (introX > 0 && introX < w && introX != inX)
+            // Marker INTRO (yellow line)
+            if (introX > 0 && introX < w)
                 using (var pn = new Pen(Color.FromArgb(200, 255, 255, 0), 1))
                     g.DrawLine(pn, introX, 0, introX, h);
 
-            // Marker MIX (linea gialla spessa) - visibile SOLO in modalità AUTO
-            if (_autoMode && mixX > 0 && mixX < w)
+            // Marker MIX (yellow line, thicker)
+            if (mixX > 0 && mixX < w)
                 using (var pn = new Pen(Color.Yellow, 2))
                     g.DrawLine(pn, mixX, 0, mixX, h);
 
-            // Cursore di playback (linea rossa spessa) - limitato rigorosamente a w
-            int cursorX = Math.Min(cx, w - 1);
-            if (_isPlaying && cursorX >= 0 && cursorX < w)
+            // Playback cursor
+            if (_isPlaying && cx > 0)
                 using (var pn = new Pen(Color.Red, 2))
-                    g.DrawLine(pn, cursorX, 0, cursorX, h);
+                    g.DrawLine(pn, cx, 0, cx, h);
 
-            // Linea centrale orizzontale
+            // Center line
             using (var pn = new Pen(Color.FromArgb(25, 255, 255, 255), 1))
                 g.DrawLine(pn, 0, cy, w, cy);
         }
@@ -1450,7 +1426,7 @@ namespace AirDirector.Controls
         private static bool IsVideoFile(string p) { if (string.IsNullOrEmpty(p)) return false; string ext = Path.GetExtension(p).ToLowerInvariant(); return ext == ".mp4" || ext == ".avi" || ext == ".mov" || ext == ".mkv" || ext == ".wmv" || ext == ".webm" || ext == ".m4v"; }
         private void SafeInvoke(Action a) { if (IsDisposed || _isDisposed) return; try { if (InvokeRequired) BeginInvoke(a); else a(); } catch { } }
         private void UpdateTrackDisplay(PlayItem i) { if (i == null) return; bool isMusicArchive = i.ItemType.Equals("Music", StringComparison.OrdinalIgnoreCase) && !i.IsScheduled; string d = isMusicArchive ? (string.IsNullOrEmpty(i.Artist) ? (i.Title ?? "").ToUpper() : i.Artist.ToUpper() + " - " + (i.Title ?? "").ToUpper()) : (!string.IsNullOrEmpty(i.Title) ? i.Title : Path.GetFileNameWithoutExtension(i.FilePath ?? "")).ToUpper(); lblArtist.Text = d.Replace("&&", "&"); lblArtist.Invalidate(); if (i.Intro.TotalMilliseconds > 0) { lblIntro.Text = i.Intro.ToString(@"mm\:ss"); lblIntro.ForeColor = Color.White; lblIntro.BackColor = Color.Red; } else { lblIntro.Text = ""; lblIntro.BackColor = Color.Black; } }
-        private void ClearPlayer() { SafeInvoke(() => { lblArtist.Text = ""; lblArtist.Invalidate(); lblIntro.Text = "--:--"; lblIntro.BackColor = Color.Black; lblIntro.ForeColor = AppTheme.LEDYellow; lblElapsed.Text = "--:--"; lblRemaining.Text = "--:--"; lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed; _waveformPeaks = null; _waveformCurrentFile = ""; waveformPanel.Invalidate(); UpdateBtnStates(); }); _totalDuration = TimeSpan.Zero; _introTime = TimeSpan.Zero; _markerIN = 0; _markerINTRO = 0; _markerMIX = 0; _markerOUT = 0; _positionMs = 0; _vlcDurationChecked = false; ResetMixTrigger(); CurrentFilePath = ""; CurrentArtist = ""; CurrentTitle = ""; _playlistQueue?.SetCurrentPlaying(-1); }
+        private void ClearPlayer() { SafeInvoke(() => { lblArtist.Text = ""; lblArtist.Invalidate(); lblIntro.Text = "--:--"; lblIntro.BackColor = Color.Black; lblIntro.ForeColor = AppTheme.LEDYellow; lblElapsed.Text = "--:--"; lblRemaining.Text = "--:--"; lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed; _waveformPeaks = null; _waveformCurrentFile = ""; waveformPanel.Invalidate(); UpdateBtnStates(); }); _totalDuration = TimeSpan.Zero; _introTime = TimeSpan.Zero; _markerIN = 0; _markerINTRO = 0; _markerMIX = 0; _markerOUT = 0; _positionMs = 0; ResetMixTrigger(); CurrentFilePath = ""; CurrentArtist = ""; CurrentTitle = ""; _playlistQueue?.SetCurrentPlaying(-1); }
 
         /// <summary>
         /// Aggiorna il CG overlay.
