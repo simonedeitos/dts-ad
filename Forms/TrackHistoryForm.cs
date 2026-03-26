@@ -54,6 +54,15 @@ namespace AirDirector.Forms
             };
             this.Controls.Add(pnlButtons);
 
+            // Spacer to push the table below the header (header height + 5px)
+            Panel pnlSpacer = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 5,
+                BackColor = Color.FromArgb(30, 30, 30)
+            };
+            this.Controls.Add(pnlSpacer);
+
             Button btnExport = new Button
             {
                 Text = "📥 Esporta CSV",
