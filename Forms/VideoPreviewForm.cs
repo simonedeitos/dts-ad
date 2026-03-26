@@ -138,7 +138,7 @@ namespace AirDirector.Forms
             {
                 if (_vlcMediaPlayer.Length > 0)
                 {
-                    long seekMs = Math.Max(0, Math.Min(audioMs, _vlcMediaPlayer.Length));
+                    long seekMs = Math.Max(0L, Math.Min((long)audioMs, _vlcMediaPlayer.Length));
                     _vlcMediaPlayer.Time = seekMs;
                 }
             }
