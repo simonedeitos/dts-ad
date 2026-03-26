@@ -144,29 +144,9 @@ namespace AirDirector.Forms
             {
                 _genreSuggestions = new AutoCompleteStringCollection();
 
-                // ✅ Carica SOLO generi dall'archivio corrispondente (nessun predefinito hardcoded)
+                // ✅ Carica SOLO generi presenti in altri brani dell'archivio
                 string dbcFile = _isClip ? "Clips.dbc" : "Music.dbc";
                 var existingGenres = GetDistinctFieldValues(dbcFile, "Genre");
-
-                // ✅ Aggiungi anche i generi dal file Genres.dbc (gestiti dall'utente)
-                try
-                {
-                    var genreEntries = DbcManager.LoadFromCsv<GenreEntry>("Genres.dbc");
-                    if (genreEntries != null)
-                    {
-                        foreach (var ge in genreEntries)
-                        {
-                            if (!string.IsNullOrWhiteSpace(ge.GenreName) && !existingGenres.Contains(ge.GenreName))
-                            {
-                                existingGenres.Add(ge.GenreName);
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[MusicEditor] ⚠️ Errore lettura Genres.dbc: {ex.Message}");
-                }
 
                 foreach (var genre in existingGenres)
                 {
@@ -180,7 +160,7 @@ namespace AirDirector.Forms
                 cmbGenre.AutoCompleteSource = AutoCompleteSource.CustomSource;
                 cmbGenre.AutoCompleteCustomSource = _genreSuggestions;
 
-                // ✅ Popola dropdown SOLO con generi reali (archivio + Genres.dbc)
+                // ✅ Popola dropdown SOLO con generi presenti nell'archivio
                 cmbGenre.Items.Clear();
                 var allGenres = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (string g in existingGenres)
@@ -190,7 +170,7 @@ namespace AirDirector.Forms
                 }
                 cmbGenre.Items.AddRange(allGenres.OrderBy(g => g).ToArray());
 
-                Console.WriteLine($"[MusicEditor] ✅ Caricati {allGenres.Count} generi da {dbcFile} + Genres.dbc (no predefiniti)");
+                Console.WriteLine($"[MusicEditor] ✅ Caricati {allGenres.Count} generi da {dbcFile} (solo brani esistenti)");
             }
             catch (Exception ex)
             {
@@ -306,9 +286,42 @@ namespace AirDirector.Forms
 
         private void PicWaveform_MouseWheel(object sender, MouseEventArgs e)
         {
+            if (_waveformData == null || _waveformData.Length == 0)
+            {
+                int delta0 = e.Delta > 0 ? 50 : -50;
+                int newVal0 = Math.Max(trkZoom.Minimum, Math.Min(trkZoom.Maximum, trkZoom.Value + delta0));
+                trkZoom.Value = newVal0;
+                return;
+            }
+
+            float oldZoom = _zoomLevel;
             int delta = e.Delta > 0 ? 50 : -50;
             int newVal = Math.Max(trkZoom.Minimum, Math.Min(trkZoom.Maximum, trkZoom.Value + delta));
+            float newZoom = newVal / 100f;
+
+            // Calculate the sample index under cursor before zoom
+            int oldVisible = (int)(_waveformData.Length / oldZoom);
+            oldVisible = Math.Max(1, Math.Min(oldVisible, _waveformData.Length));
+            float cursorRatio = (float)e.X / picWaveform.Width;
+            float sampleUnderCursor = _scrollOffset + cursorRatio * oldVisible;
+
+            // Apply zoom
+            _zoomLevel = newZoom;
+            trkZoom.ValueChanged -= TrkZoom_ValueChanged;
             trkZoom.Value = newVal;
+            trkZoom.ValueChanged += TrkZoom_ValueChanged;
+            lblZoomPercent.Text = $"{newVal}%";
+
+            // Adjust scroll offset so the sample under cursor stays at the same screen position
+            int newVisible = (int)(_waveformData.Length / newZoom);
+            newVisible = Math.Max(1, Math.Min(newVisible, _waveformData.Length));
+            int newOffset = (int)(sampleUnderCursor - cursorRatio * newVisible);
+            int maxOffset = Math.Max(0, _waveformData.Length - newVisible);
+            _scrollOffset = Math.Max(0, Math.Min(newOffset, maxOffset));
+
+            UpdateScrollBarForZoom();
+            RecreateWaveformBitmapWithBoost();
+            picWaveform.Invalidate();
         }
 
         private void HScrollWaveform_Scroll(object sender, ScrollEventArgs e)
@@ -710,6 +723,27 @@ namespace AirDirector.Forms
             _btnVideoPreview.FlatAppearance.BorderColor = Color.FromArgb(100, 100, 200);
             _btnVideoPreview.Click += BtnVideoPreview_Click;
             toolbarPanel.Controls.Add(_btnVideoPreview);
+
+            // In RadioTV mode, auto-open video preview at bottom-left of screen
+            this.Shown += (s, ev) =>
+            {
+                OpenVideoPreviewBottomLeft();
+            };
+        }
+
+        private void OpenVideoPreviewBottomLeft()
+        {
+            if (_videoPath == null) return;
+            if (_videoPreviewForm != null && !_videoPreviewForm.IsDisposed) return;
+
+            _videoPreviewForm = new VideoPreviewForm(_videoPath);
+            _videoPreviewForm.StartPosition = FormStartPosition.Manual;
+            var screen = Screen.FromControl(this);
+            _videoPreviewForm.Location = new Point(
+                screen.WorkingArea.Left,
+                screen.WorkingArea.Bottom - _videoPreviewForm.Height);
+            _videoPreviewForm.FormClosed += (s2, ev2) => _videoPreviewForm = null;
+            _videoPreviewForm.Show(this);
         }
 
         private void BtnVideoPreview_Click(object sender, EventArgs e)
@@ -1604,6 +1638,13 @@ namespace AirDirector.Forms
             }
             else
             {
+                // If stopped (position at 0 or before IN), seek to IN marker first
+                if (_audioReader != null && _musicEntry.MarkerIN > 0 && _audioReader.CurrentTime.TotalMilliseconds < _musicEntry.MarkerIN)
+                {
+                    _audioReader.CurrentTime = TimeSpan.FromMilliseconds(_musicEntry.MarkerIN);
+                    SyncVideoSeek(_musicEntry.MarkerIN);
+                }
+
                 _waveOut?.Play();
                 _isPlaying = true;
                 _positionTimer.Start();
@@ -1815,18 +1856,18 @@ namespace AirDirector.Forms
 
             int ms = 0;
 
-            switch (markerType)
+            switch (markerType.ToUpperInvariant())
             {
-                case "In":
+                case "IN":
                     ms = _musicEntry.MarkerIN;
                     break;
-                case "Intro":
+                case "INTRO":
                     ms = _musicEntry.MarkerINTRO;
                     break;
-                case "Mix":
+                case "MIX":
                     ms = _musicEntry.MarkerMIX;
                     break;
-                case "Out":
+                case "OUT":
                     ms = _musicEntry.MarkerOUT;
                     break;
             }

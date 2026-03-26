@@ -296,7 +296,6 @@ namespace AirDirector.Controls
         {
             try
             {
-                _ndiSourceName = ConfigurationControl.GetNDISourceName();
                 _localAudioEnabled = ConfigurationControl.IsLocalAudioEnabled();
                 try
                 {
@@ -1308,8 +1307,58 @@ namespace AirDirector.Controls
         private void UpdateBtnStates() { if (btnPlay == null) return; btnPlay.BackColor = _isPlaying && !_isPaused ? AppTheme.Success : Color.FromArgb(80, 80, 80); btnPause.BackColor = _isPaused ? AppTheme.Warning : Color.FromArgb(80, 80, 80); btnStop.BackColor = !_isPlaying && !_isPaused ? AppTheme.Danger : Color.FromArgb(80, 80, 80); }
         private void InitTimers() { _updateTimer = new System.Windows.Forms.Timer { Interval = 33 }; _updateTimer.Tick += (s, e) => { if (!_isPlaying || _isPaused) return; UpdCnt(); waveformPanel?.Invalidate(); vuMeterLeftPanel?.Invalidate(); vuMeterRightPanel?.Invalidate(); }; _mixCheckTimer = new System.Windows.Forms.Timer { Interval = 50 }; _mixCheckTimer.Tick += MixCheckTimer_Tick; _blinkTimer = new System.Windows.Forms.Timer { Interval = 500 }; _blinkTimer.Tick += (s, e) => { _blinkState = !_blinkState; }; }
         private void UpdCnt() { int p = _positionMs, ee = _markerMIX > 0 ? _markerMIX : _markerOUT; if (ee <= 0) ee = (int)_totalDuration.TotalMilliseconds; lblElapsed.Text = TimeSpan.FromMilliseconds(Math.Max(0, p - _markerIN)).ToString(@"mm\:ss"); int r = Math.Max(0, ee - p); lblRemaining.Text = "-" + TimeSpan.FromMilliseconds(r).ToString(@"mm\:ss"); if (r > 0 && r <= 10000) { if (!_blinkTimer.Enabled) _blinkTimer.Start(); lblRemaining.BackColor = _blinkState ? Color.Red : Color.Black; lblRemaining.ForeColor = _blinkState ? Color.Black : AppTheme.LEDRed; } else { _blinkTimer.Stop(); lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed; } int im = (int)_introTime.TotalMilliseconds; if (im > 0 && p < im) { lblIntro.Text = TimeSpan.FromMilliseconds(im - p).ToString(@"mm\:ss"); lblIntro.ForeColor = Color.White; lblIntro.BackColor = Color.Red; } else { lblIntro.Text = ""; lblIntro.BackColor = Color.Black; } }
-        private void WfPaint(object s, PaintEventArgs e) { Graphics g = e.Graphics; int w = waveformPanel.Width, h = waveformPanel.Height; g.Clear(Color.Black); int rS = _markerIN, rE = _markerOUT > 0 ? _markerOUT : (int)_totalDuration.TotalMilliseconds, rL = rE - rS; if (rL <= 0) return; float pr = Math.Max(0f, Math.Min(1f, (float)(_positionMs - rS) / rL)); int cx = (int)(pr * w); float mp = _markerMIX > 0 ? Math.Max(0f, Math.Min(1f, (float)(_markerMIX - rS) / rL)) : 1f; int mx = (int)(mp * w); float ip = _introTime.TotalMilliseconds > 0 ? Math.Max(0f, Math.Min(1f, (float)(_introTime.TotalMilliseconds - rS) / rL)) : 0f; int ix = (int)(ip * w); int cy = h / 2; if (ix > 0) using (var b = new SolidBrush(Color.FromArgb(25, 255, 0, 0))) g.FillRectangle(b, 0, 0, ix, h); if (mx < w) using (var b = new SolidBrush(Color.FromArgb(20, 128, 128, 128))) g.FillRectangle(b, mx, 0, w - mx, h); float[] pk = _waveformPeaks; if (pk != null && pk.Length > 0) { int nb = pk.Length; float bw2 = (float)w / nb, tm = (float)_totalDuration.TotalMilliseconds; float bs2 = tm > 0 ? (float)rS / tm : 0, be = tm > 0 ? (float)rE / tm : 1; for (int i = 0; i < nb; i++) { float fr = bs2 + ((float)i / nb) * (be - bs2); int pi = Math.Max(0, Math.Min(nb - 1, (int)(fr * nb))); float pv = pk[pi]; int bh = Math.Max(1, (int)(pv * h * 0.85f)), bx = (int)(i * bw2); Color bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(0, 200, 0); using (var br = new SolidBrush(bc)) g.FillRectangle(br, bx, cy - bh / 2, Math.Max(1, (int)bw2 - 1), bh); } } else { if (cx < w) using (var b = new SolidBrush(Color.FromArgb(0, 150, 0))) g.FillRectangle(b, cx, 0, w - cx, h); if (cx > 0) using (var b = new SolidBrush(Color.FromArgb(60, 60, 60))) g.FillRectangle(b, 0, 0, cx, h); } if (cx > 0) using (var b = new SolidBrush(Color.FromArgb(70, 70, 70))) g.FillRectangle(b, 0, h - 3, cx, 3); if (cx < w) using (var b = new SolidBrush(Color.FromArgb(0, 255, 0))) g.FillRectangle(b, cx, h - 3, w - cx, 3); if (ix > 0 && ix < w) using (var pn = new Pen(Color.FromArgb(200, 255, 255, 0), 1)) g.DrawLine(pn, ix, 0, ix, h); if (mx > 0 && mx < w) using (var pn = new Pen(Color.Yellow, 2)) g.DrawLine(pn, mx, 0, mx, h); if (_isPlaying && cx > 0) using (var pn = new Pen(Color.Red, 2)) g.DrawLine(pn, cx, 0, cx, h); using (var pn = new Pen(Color.FromArgb(25, 255, 255, 255), 1)) g.DrawLine(pn, 0, cy, w, cy); }
-        private void WfClick(object s, MouseEventArgs e) { if (e.Button == MouseButtons.Left && ModifierKeys.HasFlag(Keys.Control) && _isPlaying && _totalDuration.TotalSeconds > 0) { int rS = _markerIN, rE = _markerOUT > 0 ? _markerOUT : (int)_totalDuration.TotalMilliseconds; SeekTo(TimeSpan.FromMilliseconds(rS + (int)(Math.Max(0, Math.Min(1, (double)e.X / waveformPanel.Width)) * (rE - rS)))); } }
+        private void WfPaint(object s, PaintEventArgs e)
+        {
+            Graphics g = e.Graphics; int w = waveformPanel.Width, h = waveformPanel.Height;
+            g.Clear(Color.Black);
+            float tm = (float)_totalDuration.TotalMilliseconds; if (tm <= 0) return;
+            // Positions relative to full file duration
+            float pr = Math.Max(0f, Math.Min(1f, _positionMs / tm)); int cx = (int)(pr * w);
+            int inX = _markerIN > 0 ? (int)(Math.Min(1f, _markerIN / tm) * w) : 0;
+            float introMs = (float)_introTime.TotalMilliseconds;
+            int introX = introMs > 0 ? (int)(Math.Min(1f, introMs / tm) * w) : inX;
+            int mixX = _markerMIX > 0 ? (int)(Math.Min(1f, _markerMIX / tm) * w) : w;
+            int cy = h / 2;
+            // Background zones: red between IN and INTRO, gray after MIX
+            if (introX > inX) using (var b = new SolidBrush(Color.FromArgb(25, 255, 0, 0))) g.FillRectangle(b, inX, 0, introX - inX, h);
+            if (mixX < w) using (var b = new SolidBrush(Color.FromArgb(20, 128, 128, 128))) g.FillRectangle(b, mixX, 0, w - mixX, h);
+            // Waveform bars: entire file
+            float[] pk = _waveformPeaks;
+            if (pk != null && pk.Length > 0)
+            {
+                int nb = pk.Length; float bw2 = (float)w / nb;
+                for (int i = 0; i < nb; i++)
+                {
+                    float pv = pk[Math.Min(i, nb - 1)];
+                    int bh = Math.Max(1, (int)(pv * h * 0.85f)), bx = (int)(i * bw2);
+                    Color bc;
+                    if (bx < inX) bc = Color.FromArgb(50, 50, 50);
+                    else if (bx < introX) bc = Color.FromArgb(255, 80, 80);
+                    else if (bx < mixX) bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(0, 200, 0);
+                    else bc = Color.FromArgb(120, 120, 120);
+                    using (var br = new SolidBrush(bc)) g.FillRectangle(br, bx, cy - bh / 2, Math.Max(1, (int)bw2 - 1), bh);
+                }
+            }
+            else
+            {
+                if (cx < w) using (var b = new SolidBrush(Color.FromArgb(0, 150, 0))) g.FillRectangle(b, cx, 0, w - cx, h);
+                if (cx > 0) using (var b = new SolidBrush(Color.FromArgb(60, 60, 60))) g.FillRectangle(b, 0, 0, cx, h);
+            }
+            // Progress bar at bottom
+            if (cx > 0) using (var b = new SolidBrush(Color.FromArgb(70, 70, 70))) g.FillRectangle(b, 0, h - 3, cx, 3);
+            if (cx < w) using (var b = new SolidBrush(Color.FromArgb(0, 255, 0))) g.FillRectangle(b, cx, h - 3, w - cx, 3);
+            // Marker IN (white line)
+            if (inX > 0 && inX < w) using (var pn = new Pen(Color.White, 2)) g.DrawLine(pn, inX, 0, inX, h);
+            // Marker INTRO (yellow line)
+            if (introX > 0 && introX < w) using (var pn = new Pen(Color.FromArgb(200, 255, 255, 0), 1)) g.DrawLine(pn, introX, 0, introX, h);
+            // Marker MIX (yellow line, thicker)
+            if (mixX > 0 && mixX < w) using (var pn = new Pen(Color.Yellow, 2)) g.DrawLine(pn, mixX, 0, mixX, h);
+            // Playback cursor
+            if (_isPlaying && cx > 0) using (var pn = new Pen(Color.Red, 2)) g.DrawLine(pn, cx, 0, cx, h);
+            // Center line
+            using (var pn = new Pen(Color.FromArgb(25, 255, 255, 255), 1)) g.DrawLine(pn, 0, cy, w, cy);
+        }
+        private void WfClick(object s, MouseEventArgs e) { if (e.Button == MouseButtons.Left && ModifierKeys.HasFlag(Keys.Control) && _isPlaying && _totalDuration.TotalSeconds > 0) { float tm = (float)_totalDuration.TotalMilliseconds; int ms = (int)(Math.Max(0, Math.Min(1, (double)e.X / waveformPanel.Width)) * tm); SeekTo(TimeSpan.FromMilliseconds(ms)); } }
 
         // ═══════════════════════════════════════════════════════════
         // PUBLIC API

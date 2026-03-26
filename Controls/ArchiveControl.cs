@@ -516,6 +516,8 @@ namespace AirDirector.Controls
             contextMenu.Items.Add("🗑️ " + LanguageManager.GetString("Archive.RemoveVideo", "Rimuovi Video"), null, MenuRemoveVideo_Click);
             contextMenu.Items.Add(new ToolStripSeparator());
             contextMenu.Items.Add("✏️ " + LanguageManager.GetString("Archive.EditGenreCategory", "Modifica Genere/Categoria"), null, MenuBatchEdit_Click);
+            contextMenu.Items.Add(new ToolStripSeparator());
+            contextMenu.Items.Add("📋 " + LanguageManager.GetString("Archive.ShowPlayHistory", "Mostra Storico Passaggi"), null, MenuShowPlayHistory_Click);
             dgvArchive.ContextMenuStrip = contextMenu;
 
             dgvArchive.CellDoubleClick += DgvArchive_CellDoubleClick;
@@ -1022,6 +1024,34 @@ namespace AirDirector.Controls
                     ApplyBatchEdit(batchForm.ModifyGenre, batchForm.NewGenre, batchForm.ModifyCategory, batchForm.NewCategory);
                 }
             }
+        }
+
+        private void MenuShowPlayHistory_Click(object sender, EventArgs e)
+        {
+            if (dgvArchive.SelectedRows.Count == 0) return;
+
+            var row = dgvArchive.SelectedRows[0];
+            string artist = "", title = "";
+
+            if (_archiveType == "Music" && row.Tag is MusicEntry musicEntry)
+            {
+                artist = musicEntry.Artist ?? "";
+                title = musicEntry.Title ?? "";
+            }
+            else if (_archiveType == "Clips" && row.Tag is ClipEntry clipEntry)
+            {
+                artist = "";
+                title = clipEntry.Title ?? "";
+            }
+
+            if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title))
+            {
+                MessageBox.Show("Nessun artista/titolo disponibile per questo brano.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var historyForm = new TrackHistoryForm(artist, title);
+            historyForm.ShowDialog(this.FindForm());
         }
 
         private void ApplyBatchEdit(bool modifyGenre, string newGenre, bool modifyCategory, string newCategory)

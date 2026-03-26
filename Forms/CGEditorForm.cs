@@ -17,6 +17,7 @@ namespace AirDirector.Forms
         private bool _lowerThirdEnabled = true;
         private string _lowerThirdPosition = "BottomLeft";
         private string _lowerThirdAnimation = "SlideLeft";
+        private int _lowerThirdEntranceTheme = 1;
         private int _lowerThirdDelayStart = 2;
         private int _lowerThirdDuration = 8;
         private bool _lowerThirdShowAtEnd = false;
@@ -241,7 +242,7 @@ namespace AirDirector.Forms
             CheckBox chkPreviewSpot = new CheckBox
             {
                 Text = "Preview ADV",
-                Checked = false,
+                Checked = true,
                 Location = new Point(btnX, tabTop + 150),
                 AutoSize = true,
                 ForeColor = Color.White
@@ -330,7 +331,15 @@ namespace AirDirector.Forms
 
             y += 30;
 
-            // Row 5: Show at end options
+            // Row 5: Entrance Theme
+            AddLabelAndCombo(tab, "Entrance Theme:", 10, y, 100, 210,
+                new[] { "Theme 1 - Classic", "Theme 2 - Staggered", "Theme 3 - Cinematic" },
+                _lowerThirdEntranceTheme - 1,
+                (idx) => { _lowerThirdEntranceTheme = idx + 1; _previewAnimProgress = 0f; _animStartTime = DateTime.Now; _previewPanel.Invalidate(); });
+
+            y += 30;
+
+            // Row 6: Show at end options
             CheckBox chkShowEnd = new CheckBox
             {
                 Text = "Show also at track end",
@@ -947,6 +956,18 @@ namespace AirDirector.Forms
             string titleText = _previewTitle;
             string artistText = _previewArtist;
 
+            if (_lowerThirdEntranceTheme == 2)
+            {
+                DrawLowerThirdTheme2(g, w, h, progress, scale, titleText, artistText);
+                return;
+            }
+            else if (_lowerThirdEntranceTheme == 3)
+            {
+                DrawLowerThirdTheme3(g, w, h, progress, scale, titleText, artistText);
+                return;
+            }
+
+            // Theme 1: Classic (original behavior)
             using (Font titleFont = new Font(_lowerThirdFontFamily, _lowerThirdTitleFontSize * scale, FontStyle.Bold))
             using (Font artistFont = new Font(_lowerThirdFontFamily, _lowerThirdArtistFontSize * scale, FontStyle.Regular))
             {
@@ -1051,6 +1072,145 @@ namespace AirDirector.Forms
             }
         }
 
+        /// <summary>
+        /// Theme 2 - Staggered: Background slides in first, then title fades in, then artist fades in.
+        /// Exit: artist fades out first, then title, then background slides out.
+        /// </summary>
+        private void DrawLowerThirdTheme2(Graphics g, int w, int h, float progress, float scale, string titleText, string artistText)
+        {
+            using (Font titleFont = new Font(_lowerThirdFontFamily, _lowerThirdTitleFontSize * scale, FontStyle.Bold))
+            using (Font artistFont = new Font(_lowerThirdFontFamily, _lowerThirdArtistFontSize * scale, FontStyle.Regular))
+            {
+                SizeF titleSize = g.MeasureString(titleText, titleFont);
+                SizeF artistSize = g.MeasureString(artistText, artistFont);
+
+                int padding = (int)(20 * scale);
+                int accentWidth = (int)(6 * scale);
+                int marginX = (int)(_lowerThirdMarginX * scale);
+                int marginY = (int)(_lowerThirdMarginY * scale);
+
+                int boxW = (int)Math.Max(titleSize.Width, artistSize.Width) + padding * 2 + accentWidth;
+                int boxH = (int)(titleSize.Height + artistSize.Height) + padding;
+
+                int baseX = 0, baseY = h - boxH - marginY;
+                switch (_lowerThirdPosition)
+                {
+                    case "BottomLeft": baseX = marginX; break;
+                    case "BottomCenter": baseX = (w - boxW) / 2; break;
+                    case "BottomRight": baseX = w - boxW - marginX; break;
+                }
+
+                // Phase 1: 0-0.4 → background slides up
+                // Phase 2: 0.4-0.7 → title fades in
+                // Phase 3: 0.7-1.0 → artist fades in
+                float bgProgress = Math.Min(1f, progress / 0.4f);
+                float titleAlpha = progress < 0.4f ? 0f : Math.Min(1f, (progress - 0.4f) / 0.3f);
+                float artistAlpha = progress < 0.7f ? 0f : Math.Min(1f, (progress - 0.7f) / 0.3f);
+
+                float drawX = baseX;
+                float drawY = baseY + (h - baseY) * (1f - bgProgress);
+
+                // Background
+                using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(
+                    _lowerThirdBgColor.A, _lowerThirdBgColor.R, _lowerThirdBgColor.G, _lowerThirdBgColor.B)))
+                    g.FillRectangle(bgBrush, drawX, drawY, boxW, boxH);
+
+                // Accent bar
+                using (SolidBrush accentBrush = new SolidBrush(_lowerThirdAccentColor))
+                    g.FillRectangle(accentBrush, drawX, drawY, accentWidth, boxH);
+
+                // Title
+                if (titleAlpha > 0)
+                {
+                    using (SolidBrush tb = new SolidBrush(Color.FromArgb((int)(titleAlpha * 255), _lowerThirdTextColor)))
+                        g.DrawString(titleText, titleFont, tb, drawX + padding + accentWidth, drawY + padding / 2);
+                }
+
+                // Artist
+                if (artistAlpha > 0)
+                {
+                    using (SolidBrush ab = new SolidBrush(Color.FromArgb((int)(artistAlpha * 255), _lowerThirdTextColor)))
+                        g.DrawString(artistText, artistFont, ab, drawX + padding + accentWidth, drawY + padding / 2 + titleSize.Height);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Theme 3 - Cinematic: Two separate boxes - title box slides from left, artist box slides from right,
+        /// stacked vertically with a small gap. Different background opacities for visual depth.
+        /// </summary>
+        private void DrawLowerThirdTheme3(Graphics g, int w, int h, float progress, float scale, string titleText, string artistText)
+        {
+            using (Font titleFont = new Font(_lowerThirdFontFamily, _lowerThirdTitleFontSize * scale, FontStyle.Bold))
+            using (Font artistFont = new Font(_lowerThirdFontFamily, (_lowerThirdArtistFontSize - 2) * scale, FontStyle.Italic))
+            {
+                SizeF titleSize = g.MeasureString(titleText, titleFont);
+                SizeF artistSize = g.MeasureString(artistText, artistFont);
+
+                int padding = (int)(16 * scale);
+                int accentHeight = (int)(4 * scale);
+                int marginX = (int)(_lowerThirdMarginX * scale);
+                int marginY = (int)(_lowerThirdMarginY * scale);
+                int gap = (int)(4 * scale);
+
+                int titleBoxW = (int)titleSize.Width + padding * 2;
+                int titleBoxH = (int)titleSize.Height + padding;
+                int artistBoxW = (int)artistSize.Width + padding * 2;
+                int artistBoxH = (int)artistSize.Height + padding;
+
+                int baseY = h - titleBoxH - artistBoxH - gap - marginY;
+                int baseX = marginX;
+                switch (_lowerThirdPosition)
+                {
+                    case "BottomCenter": baseX = (w - Math.Max(titleBoxW, artistBoxW)) / 2; break;
+                    case "BottomRight": baseX = w - Math.Max(titleBoxW, artistBoxW) - marginX; break;
+                }
+
+                // Phase 1: 0-0.5 → title box slides from left
+                // Phase 2: 0.3-0.8 → artist box slides from right
+                // Phase 3: 0.6-1.0 → accent bar appears
+                float titleProgress = Math.Min(1f, progress / 0.5f);
+                float artistProgress = progress < 0.3f ? 0f : Math.Min(1f, (progress - 0.3f) / 0.5f);
+                float accentAlpha = progress < 0.6f ? 0f : Math.Min(1f, (progress - 0.6f) / 0.4f);
+
+                // Ease out
+                titleProgress = 1f - (1f - titleProgress) * (1f - titleProgress);
+                artistProgress = 1f - (1f - artistProgress) * (1f - artistProgress);
+
+                float titleDrawX = baseX - (baseX + titleBoxW) * (1f - titleProgress);
+                float titleDrawY = baseY;
+                float artistDrawX = baseX + (w - baseX) * (1f - artistProgress);
+                float artistDrawY = baseY + titleBoxH + gap;
+
+                // Title box background (darker)
+                using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(220, _lowerThirdBgColor.R, _lowerThirdBgColor.G, _lowerThirdBgColor.B)))
+                    g.FillRectangle(bgBrush, titleDrawX, titleDrawY, titleBoxW, titleBoxH);
+
+                // Title text
+                using (SolidBrush tb = new SolidBrush(Color.FromArgb((int)(titleProgress * 255), _lowerThirdTextColor)))
+                    g.DrawString(titleText, titleFont, tb, titleDrawX + padding, titleDrawY + padding / 2);
+
+                // Artist box background (lighter)
+                if (artistProgress > 0)
+                {
+                    using (SolidBrush bgBrush2 = new SolidBrush(Color.FromArgb(160, _lowerThirdBgColor.R + 20, _lowerThirdBgColor.G + 20, _lowerThirdBgColor.B + 20)))
+                        g.FillRectangle(bgBrush2, artistDrawX, artistDrawY, artistBoxW, artistBoxH);
+
+                    using (SolidBrush ab = new SolidBrush(Color.FromArgb((int)(artistProgress * 255), _lowerThirdTextColor)))
+                        g.DrawString(artistText, artistFont, ab, artistDrawX + padding, artistDrawY + padding / 2);
+                }
+
+                // Accent bar between title and artist
+                if (accentAlpha > 0)
+                {
+                    float accentX = Math.Min(titleDrawX, artistDrawX);
+                    float accentW = Math.Max(titleDrawX + titleBoxW, artistDrawX + artistBoxW) - accentX;
+                    using (SolidBrush accentBrush = new SolidBrush(Color.FromArgb((int)(accentAlpha * 255), _lowerThirdAccentColor)))
+                        g.FillRectangle(accentBrush, accentX, artistDrawY - gap, accentW, accentHeight);
+                }
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════
         // HELPERS
         // ═══════════════════════════════════════════════════════════
@@ -1143,6 +1303,7 @@ namespace AirDirector.Forms
                     _lowerThirdEnabled = GetRegBool(key, "LowerThirdEnabled", true);
                     _lowerThirdPosition = GetRegString(key, "LowerThirdPosition", "BottomLeft");
                     _lowerThirdAnimation = GetRegString(key, "LowerThirdAnimation", "SlideLeft");
+                    _lowerThirdEntranceTheme = GetRegInt(key, "LowerThirdEntranceTheme", 1);
                     _lowerThirdDelayStart = GetRegInt(key, "LowerThirdDelayStart", 2);
                     _lowerThirdDuration = GetRegInt(key, "LowerThirdDuration", 8);
                     _lowerThirdShowAtEnd = GetRegBool(key, "LowerThirdShowAtEnd", false);
@@ -1205,6 +1366,7 @@ namespace AirDirector.Forms
                     key.SetValue("LowerThirdEnabled", _lowerThirdEnabled ? 1 : 0);
                     key.SetValue("LowerThirdPosition", _lowerThirdPosition);
                     key.SetValue("LowerThirdAnimation", _lowerThirdAnimation);
+                    key.SetValue("LowerThirdEntranceTheme", _lowerThirdEntranceTheme);
                     key.SetValue("LowerThirdDelayStart", _lowerThirdDelayStart);
                     key.SetValue("LowerThirdDuration", _lowerThirdDuration);
                     key.SetValue("LowerThirdShowAtEnd", _lowerThirdShowAtEnd ? 1 : 0);
