@@ -1779,7 +1779,7 @@ namespace AirDirector.Controls
                 if (!string.IsNullOrEmpty(tagFile.Tag.Title))
                     title = tagFile.Tag.Title;
 
-                if (tagFile.Tag.Year > 0)
+                if (tagFile.Tag.Year >= 1900 && tagFile.Tag.Year <= 2200)
                     year = (int)tagFile.Tag.Year;
 
                 if (!string.IsNullOrEmpty(tagFile.Tag.FirstGenre))
@@ -1872,7 +1872,7 @@ namespace AirDirector.Controls
                 if (!string.IsNullOrEmpty(tagFile.Tag.Title))
                     title = tagFile.Tag.Title;
 
-                if (tagFile.Tag.Year > 0)
+                if (tagFile.Tag.Year >= 1900 && tagFile.Tag.Year <= 2200)
                     year = (int)tagFile.Tag.Year;
 
                 if (!string.IsNullOrEmpty(tagFile.Tag.FirstGenre))
