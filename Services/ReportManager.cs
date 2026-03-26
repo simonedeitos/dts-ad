@@ -112,6 +112,63 @@ namespace AirDirector.Services.Database
         }
 
         /// <summary>
+        /// Carica storico passaggi per un brano specifico (artista + titolo)
+        /// </summary>
+        public static List<ReportEntry> LoadTrackHistory(string artist, string title)
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    string dbPath = ConfigurationControl.GetDatabasePath();
+                    string reportPath = Path.Combine(dbPath, "Report.dbc");
+
+                    if (!File.Exists(reportPath))
+                        return new List<ReportEntry>();
+
+                    var lines = File.ReadAllLines(reportPath, Encoding.UTF8);
+                    var entries = new List<ReportEntry>();
+
+                    for (int i = 1; i < lines.Length; i++) // Skip header
+                    {
+                        var parts = lines[i].Split(';');
+                        if (parts.Length >= 8)
+                        {
+                            string entryArtist = UnescapeCsvField(parts[4]);
+                            string entryTitle = UnescapeCsvField(parts[5]);
+
+                            if (string.Equals(entryArtist, artist, StringComparison.OrdinalIgnoreCase) &&
+                                string.Equals(entryTitle, title, StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (DateTime.TryParse(parts[0], out DateTime date))
+                                {
+                                    entries.Add(new ReportEntry
+                                    {
+                                        Date = date,
+                                        StartTime = parts[1],
+                                        EndTime = parts[2],
+                                        Type = parts[3],
+                                        Artist = entryArtist,
+                                        Title = entryTitle,
+                                        PlayDuration = parts[6],
+                                        FileDuration = parts[7]
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    return entries;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ReportManager] Errore lettura storico: {ex.Message}");
+                    return new List<ReportEntry>();
+                }
+            }
+        }
+
+        /// <summary>
         /// Escape campo CSV (gestisce ; e ")
         /// </summary>
         private static string EscapeCsvField(string field)

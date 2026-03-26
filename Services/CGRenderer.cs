@@ -16,6 +16,7 @@ namespace AirDirector.Services
         private static bool _lowerThirdEnabled = true;
         private static string _lowerThirdPosition = "BottomLeft";
         private static string _lowerThirdAnimation = "SlideLeft";
+        private static int _lowerThirdEntranceTheme = 1;
         private static int _lowerThirdDelayStart = 2;
         private static int _lowerThirdDuration = 8;
         private static bool _lowerThirdShowAtEnd = false;
@@ -127,6 +128,7 @@ namespace AirDirector.Services
                     _lowerThirdEnabled = GetRegInt(key, "LowerThirdEnabled", 1) == 1;
                     _lowerThirdPosition = GetRegString(key, "LowerThirdPosition", "BottomLeft");
                     _lowerThirdAnimation = GetRegString(key, "LowerThirdAnimation", "SlideLeft");
+                    _lowerThirdEntranceTheme = GetRegInt(key, "LowerThirdEntranceTheme", 1);
                     _lowerThirdDelayStart = GetRegInt(key, "LowerThirdDelayStart", 2);
                     _lowerThirdDuration = GetRegInt(key, "LowerThirdDuration", 8);
                     _lowerThirdShowAtEnd = GetRegInt(key, "LowerThirdShowAtEnd", 0) == 1;
@@ -566,6 +568,23 @@ namespace AirDirector.Services
             string titleText = _currentTitle;
             string artistText = _currentArtist;
 
+            // Determine animation value
+            float animValue;
+            if (_isAnimatingIn) animValue = _animProgress;
+            else if (_isAnimatingOut) animValue = 1f - _animOutProgress;
+            else animValue = 1f;
+
+            if (_lowerThirdEntranceTheme == 2)
+            {
+                RenderLowerThirdTheme2(g, w, h, titleText, artistText, animValue);
+                return;
+            }
+            else if (_lowerThirdEntranceTheme == 3)
+            {
+                RenderLowerThirdTheme3(g, w, h, titleText, artistText, animValue);
+                return;
+            }
+
             using (Font titleFont = new Font(_lowerThirdFontFamily, _lowerThirdTitleFontSize, FontStyle.Bold))
             using (Font artistFont = new Font(_lowerThirdFontFamily, _lowerThirdArtistFontSize, FontStyle.Regular))
             {
@@ -607,24 +626,6 @@ namespace AirDirector.Services
                 float drawX = baseX;
                 float drawY = baseY;
                 float alpha = 1f;
-
-                // Determina il valore di animazione corretto
-                float animValue;
-                if (_isAnimatingIn)
-                {
-                    // Animazione in entrata:  da 0 a 1
-                    animValue = _animProgress;
-                }
-                else if (_isAnimatingOut)
-                {
-                    // Animazione in uscita: da 1 a 0
-                    animValue = 1f - _animOutProgress;
-                }
-                else
-                {
-                    // Completamente visibile
-                    animValue = 1f;
-                }
 
                 // Applica l'animazione
                 switch (_lowerThirdAnimation)
@@ -692,6 +693,126 @@ namespace AirDirector.Services
                         g.DrawString(artistText, artistFont, textBrush, drawX + padding + accentWidth, drawY + textY1);
                         g.DrawString(titleText, titleFont, textBrush, drawX + padding + accentWidth, drawY + textY2);
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Theme 2 - Staggered: Background slides in first, then title fades in, then artist fades in.
+        /// </summary>
+        private static void RenderLowerThirdTheme2(Graphics g, int w, int h, string titleText, string artistText, float animValue)
+        {
+            using (Font titleFont = new Font(_lowerThirdFontFamily, _lowerThirdTitleFontSize, FontStyle.Bold))
+            using (Font artistFont = new Font(_lowerThirdFontFamily, _lowerThirdArtistFontSize, FontStyle.Regular))
+            {
+                SizeF titleSize = g.MeasureString(titleText, titleFont);
+                SizeF artistSize = g.MeasureString(artistText, artistFont);
+
+                int padding = 20;
+                int accentWidth = 6;
+                int boxW = (int)Math.Max(titleSize.Width, artistSize.Width) + padding * 2 + accentWidth;
+                int boxH = (int)(titleSize.Height + artistSize.Height) + padding;
+
+                int baseX = 0, baseY = h - boxH - _lowerThirdMarginY;
+                switch (_lowerThirdPosition)
+                {
+                    case "BottomLeft": baseX = _lowerThirdMarginX; break;
+                    case "BottomCenter": baseX = (w - boxW) / 2; break;
+                    case "BottomRight": baseX = w - boxW - _lowerThirdMarginX; break;
+                }
+
+                float bgProgress = Math.Min(1f, animValue / 0.4f);
+                float titleAlpha = animValue < 0.4f ? 0f : Math.Min(1f, (animValue - 0.4f) / 0.3f);
+                float artistAlpha = animValue < 0.7f ? 0f : Math.Min(1f, (animValue - 0.7f) / 0.3f);
+
+                float drawX = baseX;
+                float drawY = baseY + (h - baseY) * (1f - bgProgress);
+
+                using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(
+                    _lowerThirdBgColor.A, _lowerThirdBgColor.R, _lowerThirdBgColor.G, _lowerThirdBgColor.B)))
+                    g.FillRectangle(bgBrush, drawX, drawY, boxW, boxH);
+
+                using (SolidBrush accentBrush = new SolidBrush(_lowerThirdAccentColor))
+                    g.FillRectangle(accentBrush, drawX, drawY, accentWidth, boxH);
+
+                if (titleAlpha > 0)
+                {
+                    using (SolidBrush tb = new SolidBrush(Color.FromArgb((int)(titleAlpha * 255), _lowerThirdTextColor)))
+                        g.DrawString(titleText, titleFont, tb, drawX + padding + accentWidth, drawY + padding / 2);
+                }
+
+                if (artistAlpha > 0)
+                {
+                    using (SolidBrush ab = new SolidBrush(Color.FromArgb((int)(artistAlpha * 255), _lowerThirdTextColor)))
+                        g.DrawString(artistText, artistFont, ab, drawX + padding + accentWidth, drawY + padding / 2 + titleSize.Height);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Theme 3 - Cinematic: Two separate boxes - title slides from left, artist slides from right.
+        /// </summary>
+        private static void RenderLowerThirdTheme3(Graphics g, int w, int h, string titleText, string artistText, float animValue)
+        {
+            using (Font titleFont = new Font(_lowerThirdFontFamily, _lowerThirdTitleFontSize, FontStyle.Bold))
+            using (Font artistFont = new Font(_lowerThirdFontFamily, _lowerThirdArtistFontSize - 2, FontStyle.Italic))
+            {
+                SizeF titleSize = g.MeasureString(titleText, titleFont);
+                SizeF artistSize = g.MeasureString(artistText, artistFont);
+
+                int padding = 16;
+                int accentHeight = 4;
+                int gap = 4;
+
+                int titleBoxW = (int)titleSize.Width + padding * 2;
+                int titleBoxH = (int)titleSize.Height + padding;
+                int artistBoxW = (int)artistSize.Width + padding * 2;
+                int artistBoxH = (int)artistSize.Height + padding;
+
+                int baseY = h - titleBoxH - artistBoxH - gap - _lowerThirdMarginY;
+                int baseX = _lowerThirdMarginX;
+                switch (_lowerThirdPosition)
+                {
+                    case "BottomCenter": baseX = (w - Math.Max(titleBoxW, artistBoxW)) / 2; break;
+                    case "BottomRight": baseX = w - Math.Max(titleBoxW, artistBoxW) - _lowerThirdMarginX; break;
+                }
+
+                float titleProgress = Math.Min(1f, animValue / 0.5f);
+                float artistProgress = animValue < 0.3f ? 0f : Math.Min(1f, (animValue - 0.3f) / 0.5f);
+                float accentAlpha = animValue < 0.6f ? 0f : Math.Min(1f, (animValue - 0.6f) / 0.4f);
+
+                titleProgress = 1f - (1f - titleProgress) * (1f - titleProgress);
+                artistProgress = 1f - (1f - artistProgress) * (1f - artistProgress);
+
+                float titleDrawX = baseX - (baseX + titleBoxW) * (1f - titleProgress);
+                float titleDrawY = baseY;
+                float artistDrawX = baseX + (w - baseX) * (1f - artistProgress);
+                float artistDrawY = baseY + titleBoxH + gap;
+
+                using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(220, _lowerThirdBgColor.R, _lowerThirdBgColor.G, _lowerThirdBgColor.B)))
+                    g.FillRectangle(bgBrush, titleDrawX, titleDrawY, titleBoxW, titleBoxH);
+
+                using (SolidBrush tb = new SolidBrush(Color.FromArgb((int)(titleProgress * 255), _lowerThirdTextColor)))
+                    g.DrawString(titleText, titleFont, tb, titleDrawX + padding, titleDrawY + padding / 2);
+
+                if (artistProgress > 0)
+                {
+                    int bgR = Math.Min(255, _lowerThirdBgColor.R + 20);
+                    int bgG = Math.Min(255, _lowerThirdBgColor.G + 20);
+                    int bgB = Math.Min(255, _lowerThirdBgColor.B + 20);
+                    using (SolidBrush bgBrush2 = new SolidBrush(Color.FromArgb(160, bgR, bgG, bgB)))
+                        g.FillRectangle(bgBrush2, artistDrawX, artistDrawY, artistBoxW, artistBoxH);
+
+                    using (SolidBrush ab = new SolidBrush(Color.FromArgb((int)(artistProgress * 255), _lowerThirdTextColor)))
+                        g.DrawString(artistText, artistFont, ab, artistDrawX + padding, artistDrawY + padding / 2);
+                }
+
+                if (accentAlpha > 0)
+                {
+                    float accentX = Math.Min(titleDrawX, artistDrawX);
+                    float accentW = Math.Max(titleDrawX + titleBoxW, artistDrawX + artistBoxW) - accentX;
+                    using (SolidBrush accentBrush = new SolidBrush(Color.FromArgb((int)(accentAlpha * 255), _lowerThirdAccentColor)))
+                        g.FillRectangle(accentBrush, accentX, artistDrawY - gap, accentW, accentHeight);
                 }
             }
         }
