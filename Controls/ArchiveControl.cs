@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -1601,13 +1601,14 @@ namespace AirDirector.Controls
 
                     try
                     {
+                        string originalPath = filePath; // ✅ SALVA PATH ORIGINALE PRIMA DEL RENAME
                         string currentPath = filePath;
                         string extension = Path.GetExtension(currentPath).ToLower();
                         bool isVideo = videoExtensions.Contains(extension);
 
-                        // Pre-editing: get detected markers from conversion form (if available)
+                        // ✅ Pre-editing: usa originalPath per recuperare i marker
                         var (markerIn, markerOut) = convForm?.IsPreEditingEnabled == true
-                            ? convForm.GetPreEditMarkers(currentPath)
+                            ? convForm.GetPreEditMarkers(originalPath)
                             : (-1, -1);
 
                         // Rename file on disk if rename mode is active
@@ -1642,7 +1643,7 @@ namespace AirDirector.Controls
                                     {
                                         File.Move(currentPath, newPath);
                                     }
-                                    currentPath = newPath;
+                                    currentPath = newPath; // ✅ currentPath cambia, originalPath NO
                                 }
                             }
                             catch (Exception ex)
@@ -1670,7 +1671,7 @@ namespace AirDirector.Controls
                             if (!string.IsNullOrWhiteSpace(importArtist)) musicEntry.Artist = importArtist;
                             if (!string.IsNullOrWhiteSpace(importTitle)) musicEntry.Title = importTitle;
 
-                            // Apply pre-editing markers if detected
+                            // ✅ Apply pre-editing markers if detected
                             if (markerIn >= 0) musicEntry.MarkerIN = markerIn;
                             if (markerOut >= 0) musicEntry.MarkerOUT = markerOut;
 
@@ -1686,7 +1687,7 @@ namespace AirDirector.Controls
                             // Override title with conversion form settings (clips have no artist)
                             if (!string.IsNullOrWhiteSpace(importTitle)) clipEntry.Title = importTitle;
 
-                            // Apply pre-editing markers if detected
+                            // ✅ Apply pre-editing markers if detected
                             if (markerIn >= 0) clipEntry.MarkerIN = markerIn;
                             if (markerOut >= 0) clipEntry.MarkerOUT = markerOut;
 
@@ -1718,7 +1719,8 @@ namespace AirDirector.Controls
                     message += $"\n\n📊 Totale:  {currentCount}/{maxAllowed}";
                 }
 
-                
+                MessageBox.Show(message, "Import Completato", MessageBoxButtons.OK,
+                    errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
             }
             finally
             {
