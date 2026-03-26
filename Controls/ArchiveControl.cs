@@ -1606,10 +1606,16 @@ namespace AirDirector.Controls
                         string extension = Path.GetExtension(currentPath).ToLower();
                         bool isVideo = videoExtensions.Contains(extension);
 
-                        // ✅ Pre-editing: usa originalPath per recuperare i marker
+                        // ✅ FIX: Pre-editing usa originalPath per recuperare i marker
                         var (markerIn, markerOut) = convForm?.IsPreEditingEnabled == true
                             ? convForm.GetPreEditMarkers(originalPath)
                             : (-1, -1);
+
+                        // ✅ DEBUG LOG: verifica valori marker letti
+                        if (markerIn >= 0 || markerOut >= 0)
+                        {
+                            Log($"[ImportFiles] 🎯 Marker pre-editing per {Path.GetFileName(originalPath)}: IN={markerIn}ms OUT={markerOut}ms");
+                        }
 
                         // Rename file on disk if rename mode is active
                         if (convForm != null && convForm.RenameMode != 0)
@@ -1671,9 +1677,23 @@ namespace AirDirector.Controls
                             if (!string.IsNullOrWhiteSpace(importArtist)) musicEntry.Artist = importArtist;
                             if (!string.IsNullOrWhiteSpace(importTitle)) musicEntry.Title = importTitle;
 
-                            // ✅ Apply pre-editing markers if detected
-                            if (markerIn >= 0) musicEntry.MarkerIN = markerIn;
-                            if (markerOut >= 0) musicEntry.MarkerOUT = markerOut;
+                            // ✅ FIX: Apply pre-editing markers if detected
+                            if (markerIn >= 0)
+                            {
+                                musicEntry.MarkerIN = markerIn;
+                                musicEntry.MarkerINTRO = markerIn; // ✅ INTRO parte dall'IN
+                            }
+
+                            if (markerOut >= 0)
+                            {
+                                musicEntry.MarkerOUT = markerOut;
+                                musicEntry.MarkerMIX = markerOut; // ✅ MIX parte dall'OUT
+                            }
+
+                            // ✅ DEBUG LOG: verifica valori marker applicati
+                            Log($"[ImportFiles] 💾 Salvataggio {musicEntry.Artist} - {musicEntry.Title}: " +
+                                $"IN={musicEntry.MarkerIN}ms INTRO={musicEntry.MarkerINTRO}ms " +
+                                $"MIX={musicEntry.MarkerMIX}ms OUT={musicEntry.MarkerOUT}ms");
 
                             if (DbcManager.Insert("Music.dbc", musicEntry)) imported++;
                             else errors++;
@@ -1687,9 +1707,22 @@ namespace AirDirector.Controls
                             // Override title with conversion form settings (clips have no artist)
                             if (!string.IsNullOrWhiteSpace(importTitle)) clipEntry.Title = importTitle;
 
-                            // ✅ Apply pre-editing markers if detected
-                            if (markerIn >= 0) clipEntry.MarkerIN = markerIn;
-                            if (markerOut >= 0) clipEntry.MarkerOUT = markerOut;
+                            // ✅ FIX: Apply pre-editing markers if detected
+                            if (markerIn >= 0)
+                            {
+                                clipEntry.MarkerIN = markerIn;
+                                clipEntry.MarkerINTRO = markerIn;
+                            }
+
+                            if (markerOut >= 0)
+                            {
+                                clipEntry.MarkerOUT = markerOut;
+                                clipEntry.MarkerMIX = markerOut;
+                            }
+
+                            // ✅ DEBUG LOG
+                            Log($"[ImportFiles] 💾 Salvataggio {clipEntry.Title}: " +
+                                $"IN={clipEntry.MarkerIN}ms OUT={clipEntry.MarkerOUT}ms");
 
                             if (DbcManager.Insert("Clips.dbc", clipEntry)) imported++;
                             else errors++;
