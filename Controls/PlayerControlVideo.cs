@@ -1021,6 +1021,8 @@ namespace AirDirector.Controls
             TimeSpan dur = item.Duration;
             if (dur.TotalMilliseconds < 100 && item.MarkerOUT > 0) dur = TimeSpan.FromMilliseconds(item.MarkerOUT);
             if (dur.TotalMilliseconds < 100 && item.MarkerMIX > 0) dur = TimeSpan.FromMilliseconds(item.MarkerMIX);
+            if (target.FileReader != null && target.FileReader.TotalTime.TotalMilliseconds > 100)
+                dur = target.FileReader.TotalTime;
             _totalDuration = dur; _markerIN = item.MarkerIN; _markerINTRO = item.MarkerINTRO;
             _markerMIX = item.MarkerMIX > 0 ? item.MarkerMIX : item.MarkerOUT > 0 ? item.MarkerOUT : (int)dur.TotalMilliseconds;
             _markerOUT = item.MarkerOUT > 0 ? item.MarkerOUT : (int)dur.TotalMilliseconds;
@@ -1291,7 +1293,7 @@ namespace AirDirector.Controls
         // ═══════════════════════════════════════════════════════════
         private void LoadWaveformForCurrentFile(string fp) { if (_waveformCache.TryGetValue(fp, out float[] c) && _currentFile == fp) { _waveformPeaks = c; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); return; } Task.Run(() => GenWaveform(fp, true)); }
         private void PreCacheNextWaveform() { if (_playlistQueue == null) return; var i = _playlistQueue.GetAllItems(); if (i.Count < 2) return; string nf = i[1].FilePath; if (!string.IsNullOrEmpty(nf) && !IsWebStream(nf) && !_waveformCache.ContainsKey(nf)) Task.Run(() => GenWaveform(nf, false)); }
-        private void GenWaveform(string fp, bool apply) { try { if (IsWebStream(fp)) return; if (_waveformCache.ContainsKey(fp)) { if (apply && _currentFile == fp) { _waveformPeaks = _waveformCache[fp]; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } float[] pk = new float[WAVEFORM_BARS]; NAudio.Wave.WaveStream rd = null; string ext = Path.GetExtension(fp).ToLowerInvariant(); try { if (ext == ".mp3") rd = new NAudio.Wave.Mp3FileReader(fp); else if (ext == ".wav") rd = new NAudio.Wave.WaveFileReader(fp); else rd = new NAudio.Wave.AudioFileReader(fp); } catch { try { rd = new NAudio.Wave.AudioFileReader(fp); } catch { } } if (rd != null) { using (rd) { int bps = rd.WaveFormat.BitsPerSample / 8; if (bps < 1) bps = 2; long tot = rd.Length / bps; long spb = Math.Max(1, tot / WAVEFORM_BARS); int bs = (int)Math.Min(spb * bps, 65536); byte[] buf = new byte[bs]; for (int b = 0; b < WAVEFORM_BARS; b++) { int r2 = rd.Read(buf, 0, Math.Min(bs, buf.Length)); if (r2 == 0) break; float mx = 0; if (bps == 2) { for (int i = 0; i < r2 - 1; i += 2) { float a = Math.Abs(BitConverter.ToInt16(buf, i) / 32768f); if (a > mx) mx = a; } } else if (bps == 4) { for (int i = 0; i < r2 - 3; i += 4) { float a = Math.Abs(BitConverter.ToSingle(buf, i)); if (a > mx) mx = a; } } else mx = 0.3f; pk[b] = Math.Min(1f, mx); } } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } var rr = new Random(fp.GetHashCode()); for (int i = 0; i < pk.Length; i++) { float t = (float)i / pk.Length, env = 1f; if (t < 0.02f) env = t / 0.02f; if (t > 0.95f) env = (1f - t) / 0.05f; pk[i] = Math.Min(1f, (0.35f + (float)(rr.NextDouble() * 0.5)) * env); } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } } catch { } }
+        private void GenWaveform(string fp, bool apply) { try { if (IsWebStream(fp)) return; if (_waveformCache.ContainsKey(fp)) { if (apply && _currentFile == fp) { _waveformPeaks = _waveformCache[fp]; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } float[] pk = new float[WAVEFORM_BARS]; NAudio.Wave.WaveStream rd = null; string ext = Path.GetExtension(fp).ToLowerInvariant(); try { if (ext == ".mp3") rd = new NAudio.Wave.Mp3FileReader(fp); else if (ext == ".wav") rd = new NAudio.Wave.WaveFileReader(fp); else rd = new NAudio.Wave.AudioFileReader(fp); } catch { try { rd = new NAudio.Wave.AudioFileReader(fp); } catch { } } if (rd != null) { TimeSpan actualDur; using (rd) { actualDur = rd.TotalTime; int bps = rd.WaveFormat.BitsPerSample / 8; if (bps < 1) bps = 2; long tot = rd.Length / bps; long spb = Math.Max(1, tot / WAVEFORM_BARS); int bs = (int)Math.Min(spb * bps, 65536); byte[] buf = new byte[bs]; for (int b = 0; b < WAVEFORM_BARS; b++) { int r2 = rd.Read(buf, 0, Math.Min(bs, buf.Length)); if (r2 == 0) break; float mx = 0; if (bps == 2) { for (int i = 0; i < r2 - 1; i += 2) { float a = Math.Abs(BitConverter.ToInt16(buf, i) / 32768f); if (a > mx) mx = a; } } else if (bps == 4) { for (int i = 0; i < r2 - 3; i += 4) { float a = Math.Abs(BitConverter.ToSingle(buf, i)); if (a > mx) mx = a; } } else mx = 0.3f; pk[b] = Math.Min(1f, mx); } } if (apply && _currentFile == fp && actualDur.TotalMilliseconds > 100) { int oldMs = (int)_totalDuration.TotalMilliseconds; int newMs = (int)actualDur.TotalMilliseconds; if (Math.Abs(newMs - oldMs) > 500) { _totalDuration = actualDur; if (_markerMIX == oldMs) _markerMIX = newMs; if (_markerOUT == oldMs) _markerOUT = newMs; } } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } var rr = new Random(fp.GetHashCode()); for (int i = 0; i < pk.Length; i++) { float t = (float)i / pk.Length, env = 1f; if (t < 0.02f) env = t / 0.02f; if (t > 0.95f) env = (1f - t) / 0.05f; pk[i] = Math.Min(1f, (0.35f + (float)(rr.NextDouble() * 0.5)) * env); } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } } catch { } }
 
         // ═══════════════════════════════════════════════════════════
         // UI
@@ -1317,16 +1319,8 @@ namespace AirDirector.Controls
             float tm = (float)_totalDuration.TotalMilliseconds;
             if (tm <= 0) return;
 
-            // Usa la durata REALE del file per calcolare le posizioni
-            // Se _markerOUT è impostato, la durata effettiva potrebbe essere minore
-            float effectiveDuration = tm;
-            if (_markerOUT > 0 && _markerOUT < tm)
-                effectiveDuration = _markerOUT;
-
-            // Calcola le posizioni dei marker come percentuale della durata totale del file (0% a 100%)
-            // Limita _positionMs alla durata effettiva per evitare overflow
-            float currentPos = Math.Min(_positionMs, effectiveDuration);
-            float pr = Math.Max(0f, Math.Min(1f, currentPos / tm));
+            // Calcola posizione corrente come percentuale della durata totale (come PlayerControl.cs)
+            float pr = Math.Max(0f, Math.Min(1f, (float)_positionMs / tm));
             int cx = (int)(pr * w);
 
             int inX = _markerIN > 0 ? (int)((_markerIN / tm) * w) : 0;
