@@ -578,9 +578,6 @@ namespace AirDirector.Forms
         {
             return Task.Run(() =>
             {
-                int markerIn = 0;
-                int markerOut = 0;
-
                 try
                 {
                     Console.WriteLine($"[PreEditing] Analisi NAudio {Path.GetFileName(filePath)} con soglie IN={thresholdInDb}dB OUT={thresholdOutDb}dB");
@@ -597,7 +594,7 @@ namespace AirDirector.Forms
                         if (totalDurationMs <= 0)
                         {
                             Console.WriteLine($"[PreEditing] ⚠️ Durata zero per {Path.GetFileName(filePath)}");
-                            return (0, 0);
+                            return (-1, -1);
                         }
 
                         Console.WriteLine($"[PreEditing] Durata: {totalDurationMs}ms, formato: {format.SampleRate}Hz {format.Channels}ch");
@@ -642,6 +639,9 @@ namespace AirDirector.Forms
                         }
 
                         // Applica margini di sicurezza
+                        int markerIn = 0; // default: inizio file
+                        int markerOut = totalDurationMs; // default: fine file
+
                         if (markerInFound >= 0)
                         {
                             markerIn = Math.Max(0, markerInFound - 100); // -100ms
@@ -651,21 +651,16 @@ namespace AirDirector.Forms
                         {
                             markerOut = Math.Min(totalDurationMs, lastAboveThresholdBlock + 100); // +100ms
                         }
-                        else
-                        {
-                            markerOut = totalDurationMs;
-                        }
 
                         Console.WriteLine($"[PreEditing] ✅ {Path.GetFileName(filePath)}: IN={markerIn}ms OUT={markerOut}ms (durata={totalDurationMs}ms)");
+                        return (markerIn, markerOut);
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[PreEditing] ❌ Errore marker detection NAudio: {ex.Message}");
-                    return (0, 0);
+                    return (-1, -1);
                 }
-
-                return (markerIn, markerOut);
             }, ct);
         }
 
