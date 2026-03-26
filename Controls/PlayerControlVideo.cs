@@ -1318,54 +1318,66 @@ namespace AirDirector.Controls
             float tm = (float)_totalDuration.TotalMilliseconds;
             if (tm <= 0) return;
 
-            // Calculate positions relative to full file duration
-            // Use (w - 1) to ensure everything fits within panel bounds [0, w-1]
-            float pr = Math.Max(0f, Math.Min(1f, _positionMs / tm));
+            // ═════ RANGE VISIBILE: da MarkerIN a MarkerMIX ═════
+            int rangeStart = _markerIN;  // inizio range visibile (ms)
+            int rangeEnd = _markerMIX > 0 ? _markerMIX : _markerOUT > 0 ? _markerOUT : (int)tm;
+            int rangeMs = rangeEnd - rangeStart;
+            if (rangeMs <= 0) return;
+
+            // Posizione cursore relativa al range visibile [0..1]
+            float pr = Math.Max(0f, Math.Min(1f, (float)(_positionMs - rangeStart) / rangeMs));
             int cx = (int)(pr * (w - 1));
 
-            int inX = _markerIN > 0 ? (int)(Math.Min(1f, _markerIN / tm) * (w - 1)) : 0;
-
+            // Marker INTRO relativo al range visibile
             float introMs = (float)_introTime.TotalMilliseconds;
-            int introX = introMs > 0 ? (int)(Math.Min(1f, introMs / tm) * (w - 1)) : inX;
+            int introX = introMs > rangeStart
+                ? (int)(Math.Min(1f, (introMs - rangeStart) / rangeMs) * (w - 1))
+                : 0;
 
-            int mixX = _markerMIX > 0 ? (int)(Math.Min(1f, _markerMIX / tm) * (w - 1)) : (w - 1);
+            // Marker MIX è sempre alla fine del range visibile (w-1)
+            int mixX = w - 1;
 
             int cy = h / 2;
 
-            // Background zones: red between IN and INTRO, gray after MIX
-            if (introX > inX)
+            // Background zone: rosso tra inizio e INTRO
+            if (introX > 0)
                 using (var b = new SolidBrush(Color.FromArgb(25, 255, 0, 0)))
-                    g.FillRectangle(b, inX, 0, introX - inX, h);
+                    g.FillRectangle(b, 0, 0, introX, h);
 
-            if (mixX < w - 1)
-                using (var b = new SolidBrush(Color.FromArgb(20, 128, 128, 128)))
-                    g.FillRectangle(b, mixX, 0, w - mixX, h);
-
-            // Waveform bars: entire file
+            // ═════ WAVEFORM: mostra solo le barre da MarkerIN a MarkerMIX ═════
             float[] pk = _waveformPeaks;
             if (pk != null && pk.Length > 0)
             {
-                int nb = pk.Length;
-                float bw2 = (float)(w - 1) / nb;
+                int nb = pk.Length; // barre totali dell'intero file
 
-                for (int i = 0; i < nb; i++)
+                // Calcola quali barre corrispondono al range visibile
+                float barStartF = (float)rangeStart / tm * nb;
+                float barEndF = (float)rangeEnd / tm * nb;
+                int barStart = (int)barStartF;
+                int barEnd = Math.Min(nb, (int)Math.Ceiling(barEndF));
+                int visibleBars = barEnd - barStart;
+                if (visibleBars <= 0) visibleBars = 1;
+
+                float bw2 = (float)(w - 1) / visibleBars;
+
+                for (int i = 0; i < visibleBars; i++)
                 {
-                    float pv = pk[Math.Min(i, nb - 1)];
+                    int srcBar = barStart + i;
+                    if (srcBar < 0 || srcBar >= nb) continue;
+
+                    float pv = pk[srcBar];
                     int bh = Math.Max(1, (int)(pv * h * 0.85f));
                     int bx = (int)(i * bw2);
 
                     Color bc;
-                    if (bx < inX)
-                        bc = Color.FromArgb(50, 50, 50);
-                    else if (bx < introX)
+                    if (bx < introX)
                         bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(255, 80, 80);
-                    else if (bx < mixX)
-                        bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(0, 200, 0);
+                    else if (bx < cx)
+                        bc = Color.FromArgb(70, 70, 70);  // già riprodotto
                     else
-                        bc = Color.FromArgb(120, 120, 120);
+                        bc = Color.FromArgb(0, 200, 0);    // da riprodurre
 
                     int barWidth = Math.Max(1, (int)Math.Ceiling(bw2));
-                    // Ensure bar doesn't overflow panel
                     if (bx + barWidth > w) barWidth = w - bx;
 
                     using (var br = new SolidBrush(bc))
@@ -1374,6 +1386,7 @@ namespace AirDirector.Controls
             }
             else
             {
+                // Fallback senza waveform: barra piena
                 if (cx < w - 1)
                     using (var b = new SolidBrush(Color.FromArgb(0, 150, 0)))
                         g.FillRectangle(b, cx, 0, w - cx, h);
@@ -1382,7 +1395,7 @@ namespace AirDirector.Controls
                         g.FillRectangle(b, 0, 0, cx, h);
             }
 
-            // Progress bar at bottom
+            // Progress bar in basso
             if (cx > 0)
                 using (var b = new SolidBrush(Color.FromArgb(70, 70, 70)))
                     g.FillRectangle(b, 0, h - 3, cx, 3);
@@ -1391,31 +1404,34 @@ namespace AirDirector.Controls
                 using (var b = new SolidBrush(Color.FromArgb(0, 255, 0)))
                     g.FillRectangle(b, cx, h - 3, w - cx, 3);
 
-            // Marker IN (white line)
-            if (inX > 0 && inX < w)
-                using (var pn = new Pen(Color.White, 2))
-                    g.DrawLine(pn, inX, 0, inX, h);
-
-            // Marker INTRO (yellow line)
+            // Marker INTRO (linea gialla)
             if (introX > 0 && introX < w)
                 using (var pn = new Pen(Color.FromArgb(200, 255, 255, 0), 1))
                     g.DrawLine(pn, introX, 0, introX, h);
 
-            // Marker MIX (yellow line, thicker)
-            if (mixX > 0 && mixX < w)
-                using (var pn = new Pen(Color.Yellow, 2))
-                    g.DrawLine(pn, mixX, 0, mixX, h);
-
-            // Playback cursor
+            // Cursore di riproduzione
             if (_isPlaying && cx > 0)
                 using (var pn = new Pen(Color.Red, 2))
                     g.DrawLine(pn, cx, 0, cx, h);
 
-            // Center line
+            // Linea centrale
             using (var pn = new Pen(Color.FromArgb(25, 255, 255, 255), 1))
                 g.DrawLine(pn, 0, cy, w, cy);
         }
-        private void WfClick(object s, MouseEventArgs e) { if (e.Button == MouseButtons.Left && ModifierKeys.HasFlag(Keys.Control) && _isPlaying && _totalDuration.TotalSeconds > 0) { float tm = (float)_totalDuration.TotalMilliseconds; int ms = (int)(Math.Max(0, Math.Min(1, (double)e.X / waveformPanel.Width)) * tm); SeekTo(TimeSpan.FromMilliseconds(ms)); } }
+        private void WfClick(object s, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left && ModifierKeys.HasFlag(Keys.Control) && _isPlaying && _totalDuration.TotalSeconds > 0)
+            {
+                int rangeStart = _markerIN;
+                int rangeEnd = _markerMIX > 0 ? _markerMIX : _markerOUT > 0 ? _markerOUT : (int)_totalDuration.TotalMilliseconds;
+                int rangeMs = rangeEnd - rangeStart;
+                if (rangeMs <= 0) return;
+                float clickRatio = Math.Max(0f, Math.Min(1f, (float)e.X / waveformPanel.Width));
+                int ms = rangeStart + (int)(clickRatio * rangeMs);
+                SeekTo(TimeSpan.FromMilliseconds(ms));
+            }
+        }
+
 
         // ═══════════════════════════════════════════════════════════
         // PUBLIC API
