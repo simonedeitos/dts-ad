@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using NAudio.Wave;
 
 namespace AirDirector.Forms
 {
@@ -569,438 +570,102 @@ namespace AirDirector.Forms
         }
 
         // ═════════════════════════════════════════════════════════════════
-        // Pre-editing: marker detection via ffmpeg
+        // Pre-editing: marker detection via NAudio (same as MusicEditorForm waveform)
         // ═════════════════════════════════════════════════════════════════
 
-        private async Task<(int MarkerInMs, int MarkerOutMs)> DetectMarkersAsync(
-    string filePath, double thresholdInDb, double thresholdOutDb, CancellationToken ct)
-        {
-            int markerIn = -1;
-            int markerOut = -1;
-
-            try
-            {
-                Console.WriteLine($"[PreEditing] Analisi {Path.GetFileName(filePath)} con soglie IN={thresholdInDb}dB OUT={thresholdOutDb}dB");
-
-                // ✅ STEP 1: Ottieni durata totale del file
-                double totalDuration = await GetFileDurationAsync(filePath, ct);
-                if (totalDuration <= 0)
-                {
-                    Console.WriteLine($"[PreEditing] ⚠️ Impossibile rilevare durata per {Path.GetFileName(filePath)}");
-                    return (-1, -1);
-                }
-
-                Console.WriteLine($"[PreEditing] Durata totale: {totalDuration:F2}s");
-
-                // ✅ STEP 2: Analizza i primi 60 secondi per trovare marker IN
-                markerIn = await FindMarkerInAsync(filePath, thresholdInDb, Math.Min(60, totalDuration), ct);
-
-                // ✅ STEP 3: Analizza gli ultimi 60 secondi per trovare marker OUT
-                markerOut = await FindMarkerOutAsync(filePath, thresholdOutDb, totalDuration, Math.Min(60, totalDuration), ct);
-
-                Console.WriteLine($"[PreEditing] ✅ {Path.GetFileName(filePath)}: IN={markerIn}ms OUT={markerOut}ms");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[PreEditing] ❌ Errore marker detection: {ex.Message}");
-            }
-
-            return (markerIn, markerOut);
-        }
-
-        private Task<double> GetFileDurationAsync(string filePath, CancellationToken ct)
+        private Task<(int MarkerInMs, int MarkerOutMs)> DetectMarkersAsync(
+            string filePath, double thresholdInDb, double thresholdOutDb, CancellationToken ct)
         {
             return Task.Run(() =>
             {
+                int markerIn = 0;
+                int markerOut = 0;
+
                 try
                 {
-                    var psi = new ProcessStartInfo
+                    Console.WriteLine($"[PreEditing] Analisi NAudio {Path.GetFileName(filePath)} con soglie IN={thresholdInDb}dB OUT={thresholdOutDb}dB");
+
+                    // Converti soglie da dB a ampiezza lineare (0.0 – 1.0)
+                    // dB è negativo (es. -25), quindi 10^(-25/20) ≈ 0.056
+                    float thresholdInLinear = (float)Math.Pow(10.0, thresholdInDb / 20.0);
+                    float thresholdOutLinear = (float)Math.Pow(10.0, thresholdOutDb / 20.0);
+
+                    using (var reader = new AudioFileReader(filePath))
                     {
-                        FileName = _ffmpegPath,
-                        Arguments = $"-i \"{filePath}\" -f null -",
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
-
-                    string stderr;
-                    using (var p = Process.Start(psi))
-                    {
-                        stderr = p.StandardError.ReadToEnd();
-                        p.WaitForExit();
-                    }
-
-                    // Cerca "Duration: HH:MM:SS.ms"
-                    var match = Regex.Match(stderr, @"Duration:\s*(\d+):(\d+):(\d+)\.(\d+)");
-                    if (match.Success)
-                    {
-                        int hours = int.Parse(match.Groups[1].Value);
-                        int minutes = int.Parse(match.Groups[2].Value);
-                        int seconds = int.Parse(match.Groups[3].Value);
-                        int centiseconds = int.Parse(match.Groups[4].Value);
-
-                        return hours * 3600 + minutes * 60 + seconds + centiseconds / 100.0;
-                    }
-
-                    return -1;
-                }
-                catch
-                {
-                    return -1;
-                }
-            }, ct);
-        }
-
-        private Task<int> FindMarkerInAsync(string filePath, double thresholdDb, double searchDuration, CancellationToken ct)
-        {
-            return Task.Run(() =>
-            {
-                try
-                {
-                    // Estrai audio dei primi N secondi e analizza con astats
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = _ffmpegPath,
-                        Arguments = $"-hide_banner -i \"{filePath}\" -t {searchDuration:F3} " +
-                                   $"-af \"astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=-\" " +
-                                   $"-f null -",
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
-
-                    var samples = new List<(double time, double rmsDb)>();
-                    string currentTime = "0";
-
-                    using (var p = Process.Start(psi))
-                    {
-                        string line;
-                        while ((line = p.StandardError.ReadLine()) != null)
+                        var format = reader.WaveFormat;
+                        int totalDurationMs = (int)reader.TotalTime.TotalMilliseconds;
+                        if (totalDurationMs <= 0)
                         {
-                            // Cerca frame time: "frame:1234 pts:1234 pts_time:12.34"
-                            var timeMatch = Regex.Match(line, @"pts_time:([\d.]+)");
-                            if (timeMatch.Success)
-                            {
-                                currentTime = timeMatch.Groups[1].Value;
-                            }
-
-                            // Cerca RMS level: "lavfi.astats.Overall.RMS_level=-45.6"
-                            var rmsMatch = Regex.Match(line, @"lavfi\.astats\.Overall\.RMS_level=([-\d.]+)");
-                            if (rmsMatch.Success && double.TryParse(currentTime, System.Globalization.NumberStyles.Any,
-                                System.Globalization.CultureInfo.InvariantCulture, out double time))
-                            {
-                                if (double.TryParse(rmsMatch.Groups[1].Value, System.Globalization.NumberStyles.Any,
-                                    System.Globalization.CultureInfo.InvariantCulture, out double rmsDb))
-                                {
-                                    samples.Add((time, rmsDb));
-                                }
-                            }
-                        }
-                        p.WaitForExit();
-                    }
-
-                    // Trova il primo sample che supera la soglia
-                    foreach (var (time, rmsDb) in samples)
-                    {
-                        if (rmsDb > thresholdDb)
-                        {
-                            int ms = Math.Max(0, (int)(time * 1000) - 100); // -100ms margine
-                            Console.WriteLine($"[PreEditing] Marker IN trovato a {ms}ms (RMS={rmsDb:F1}dB > {thresholdDb}dB)");
-                            return ms;
-                        }
-                    }
-
-                    Console.WriteLine($"[PreEditing] ⚠️ Marker IN non trovato (soglia {thresholdDb}dB troppo alta?), uso 0ms");
-                    return 0;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[PreEditing] ❌ Errore FindMarkerIn: {ex.Message}");
-                    return 0;
-                }
-            }, ct);
-        }
-
-        private Task<int> FindMarkerOutAsync(string filePath, double thresholdDb, double totalDuration, double searchDuration, CancellationToken ct)
-        {
-            return Task.Run(() =>
-            {
-                try
-                {
-                    double startTime = Math.Max(0, totalDuration - searchDuration);
-
-                    // Estrai audio degli ultimi N secondi e analizza con astats
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = _ffmpegPath,
-                        Arguments = $"-hide_banner -ss {startTime:F3} -i \"{filePath}\" " +
-                                   $"-af \"astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=-\" " +
-                                   $"-f null -",
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
-
-                    var samples = new List<(double time, double rmsDb)>();
-                    string currentTime = "0";
-
-                    using (var p = Process.Start(psi))
-                    {
-                        string line;
-                        while ((line = p.StandardError.ReadLine()) != null)
-                        {
-                            var timeMatch = Regex.Match(line, @"pts_time:([\d.]+)");
-                            if (timeMatch.Success)
-                            {
-                                currentTime = timeMatch.Groups[1].Value;
-                            }
-
-                            var rmsMatch = Regex.Match(line, @"lavfi\.astats\.Overall\.RMS_level=([-\d.]+)");
-                            if (rmsMatch.Success && double.TryParse(currentTime, System.Globalization.NumberStyles.Any,
-                                System.Globalization.CultureInfo.InvariantCulture, out double relTime))
-                            {
-                                if (double.TryParse(rmsMatch.Groups[1].Value, System.Globalization.NumberStyles.Any,
-                                    System.Globalization.CultureInfo.InvariantCulture, out double rmsDb))
-                                {
-                                    // Converti tempo relativo in tempo assoluto
-                                    double absTime = startTime + relTime;
-                                    samples.Add((absTime, rmsDb));
-                                }
-                            }
-                        }
-                        p.WaitForExit();
-                    }
-
-                    // Trova l'ultimo sample che supera la soglia (scansione inversa)
-                    for (int i = samples.Count - 1; i >= 0; i--)
-                    {
-                        var (time, rmsDb) = samples[i];
-                        if (rmsDb > thresholdDb)
-                        {
-                            int ms = (int)(time * 1000) + 100; // +100ms margine
-                            Console.WriteLine($"[PreEditing] Marker OUT trovato a {ms}ms (RMS={rmsDb:F1}dB > {thresholdDb}dB)");
-                            return ms;
-                        }
-                    }
-
-                    Console.WriteLine($"[PreEditing] ⚠️ Marker OUT non trovato (soglia {thresholdDb}dB troppo alta?), uso fine file");
-                    return (int)(totalDuration * 1000);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[PreEditing] ❌ Errore FindMarkerOut: {ex.Message}");
-                    return -1;
-                }
-            }, ct);
-        }
-
-        private Task<int> DetectAudioThresholdAsync(
-    string filePath, double thresholdDb, bool findStart, CancellationToken ct)
-        {
-            return Task.Run(() =>
-            {
-                try
-                {
-                    // ✅ STEP 1: Estrai audio in formato RAW PCM 16-bit mono 8kHz per analisi veloce
-                    string tempWav = Path.Combine(Path.GetTempPath(), $"preediting_{Guid.NewGuid()}.wav");
-
-                    try
-                    {
-                        // Estrai audio downsampled per analisi più veloce
-                        var extractPsi = new ProcessStartInfo
-                        {
-                            FileName = _ffmpegPath,
-                            Arguments = $"-hide_banner -i \"{filePath}\" -ac 1 -ar 8000 -f wav \"{tempWav}\"",
-                            RedirectStandardError = true,
-                            RedirectStandardOutput = true,
-                            UseShellExecute = false,
-                            CreateNoWindow = true
-                        };
-
-                        using (var extractProc = Process.Start(extractPsi))
-                        {
-                            extractProc.StandardOutput.ReadToEnd();
-                            extractProc.StandardError.ReadToEnd();
-                            extractProc.WaitForExit();
-
-                            if (extractProc.ExitCode != 0 || !File.Exists(tempWav))
-                            {
-                                Console.WriteLine($"[PreEditing] Failed to extract audio from {Path.GetFileName(filePath)}");
-                                return -1;
-                            }
+                            Console.WriteLine($"[PreEditing] ⚠️ Durata zero per {Path.GetFileName(filePath)}");
+                            return (0, 0);
                         }
 
-                        // ✅ STEP 2: Analizza il WAV estratto per trovare il marker
-                        return AnalyzeWaveformForMarker(tempWav, thresholdDb, findStart);
-                    }
-                    finally
-                    {
-                        // Cleanup temp file
-                        try { if (File.Exists(tempWav)) File.Delete(tempWav); } catch { }
+                        Console.WriteLine($"[PreEditing] Durata: {totalDurationMs}ms, formato: {format.SampleRate}Hz {format.Channels}ch");
+
+                        // Analisi a blocchi di ~10ms per trovare il picco di ampiezza per blocco
+                        var sampleProvider = reader.ToSampleProvider();
+                        int samplesPerBlock = format.SampleRate * format.Channels / 100; // ~10ms
+                        float[] buffer = new float[samplesPerBlock];
+                        int blockIndex = 0;
+                        int markerInFound = -1;
+                        int lastAboveThresholdBlock = -1;
+
+                        while (true)
+                        {
+                            ct.ThrowIfCancellationRequested();
+                            int samplesRead = sampleProvider.Read(buffer, 0, buffer.Length);
+                            if (samplesRead == 0) break;
+
+                            // Trova il picco nel blocco
+                            float peak = 0f;
+                            for (int i = 0; i < samplesRead; i++)
+                            {
+                                float abs = Math.Abs(buffer[i]);
+                                if (abs > peak) peak = abs;
+                            }
+
+                            int blockTimeMs = blockIndex * 10; // ogni blocco ≈ 10ms
+
+                            // MARKER IN: primo blocco sopra soglia
+                            if (markerInFound < 0 && peak >= thresholdInLinear)
+                            {
+                                markerInFound = blockTimeMs;
+                            }
+
+                            // MARKER OUT: ultimo blocco sopra soglia
+                            if (peak >= thresholdOutLinear)
+                            {
+                                lastAboveThresholdBlock = blockTimeMs;
+                            }
+
+                            blockIndex++;
+                        }
+
+                        // Applica margini di sicurezza
+                        if (markerInFound >= 0)
+                        {
+                            markerIn = Math.Max(0, markerInFound - 100); // -100ms
+                        }
+
+                        if (lastAboveThresholdBlock >= 0)
+                        {
+                            markerOut = Math.Min(totalDurationMs, lastAboveThresholdBlock + 100); // +100ms
+                        }
+                        else
+                        {
+                            markerOut = totalDurationMs;
+                        }
+
+                        Console.WriteLine($"[PreEditing] ✅ {Path.GetFileName(filePath)}: IN={markerIn}ms OUT={markerOut}ms (durata={totalDurationMs}ms)");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[PreEditing] Audio threshold detection error: {ex.Message}");
-                    return -1;
+                    Console.WriteLine($"[PreEditing] ❌ Errore marker detection NAudio: {ex.Message}");
+                    return (0, 0);
                 }
-            }, ct);
-        }
 
-        /// <summary>
-        /// Analizza un file WAV PCM per trovare il primo/ultimo punto che supera una soglia dB.
-        /// </summary>
-        private int AnalyzeWaveformForMarker(string wavPath, double thresholdDb, bool findStart)
-        {
-            try
-            {
-                // Leggi il file WAV
-                byte[] wavData = File.ReadAllBytes(wavPath);
-
-                // Salta header WAV (44 byte standard)
-                int dataStart = 44;
-                if (wavData.Length < dataStart + 2) return -1;
-
-                // Converti soglia dB in ampiezza lineare (0-32768 per 16-bit)
-                // dB = 20 * log10(amplitude / max_amplitude)
-                // amplitude = max_amplitude * 10^(dB/20)
-                double linearThreshold = 32768.0 * Math.Pow(10, thresholdDb / 20.0);
-                int thresholdInt = (int)Math.Abs(linearThreshold);
-
-                // Campiona ogni N sample (8000 Hz mono 16-bit = 2 byte per sample)
-                int sampleRate = 8000; // definito nell'estrazione
-                int bytesPerSample = 2; // 16-bit PCM
-                int stepSize = 10; // analizza ogni 10 sample (1.25ms @ 8kHz) per performance
-
-                if (findStart)
-                {
-                    // ✅ MARKER IN: cerca il primo sample che supera la soglia
-                    for (int i = dataStart; i < wavData.Length - bytesPerSample; i += bytesPerSample * stepSize)
-                    {
-                        short sample = (short)(wavData[i] | (wavData[i + 1] << 8));
-                        if (Math.Abs(sample) > thresholdInt)
-                        {
-                            // Calcola posizione in ms
-                            int sampleIndex = (i - dataStart) / bytesPerSample;
-                            int ms = (int)((double)sampleIndex / sampleRate * 1000);
-
-                            Console.WriteLine($"[PreEditing] Marker IN trovato a {ms}ms (sample {sampleIndex}, amplitude {sample}/{thresholdInt})");
-                            return Math.Max(0, ms - 100); // -100ms di margine di sicurezza
-                        }
-                    }
-
-                    // Nessun audio rilevato → marker a 0
-                    return 0;
-                }
-                else
-                {
-                    // ✅ MARKER OUT: cerca l'ultimo sample che supera la soglia (scansione inversa)
-                    for (int i = wavData.Length - bytesPerSample; i >= dataStart; i -= bytesPerSample * stepSize)
-                    {
-                        short sample = (short)(wavData[i] | (wavData[i + 1] << 8));
-                        if (Math.Abs(sample) > thresholdInt)
-                        {
-                            // Calcola posizione in ms
-                            int sampleIndex = (i - dataStart) / bytesPerSample;
-                            int ms = (int)((double)sampleIndex / sampleRate * 1000);
-
-                            Console.WriteLine($"[PreEditing] Marker OUT trovato a {ms}ms (sample {sampleIndex}, amplitude {sample}/{thresholdInt})");
-                            return ms + 100; // +100ms di margine di sicurezza
-                        }
-                    }
-
-                    // Nessun audio rilevato → marker a fine file
-                    return -1; // Segnala di usare la durata totale
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[PreEditing] Waveform analysis error: {ex.Message}");
-                return -1;
-            }
-        }
-
-        private Task<int> DetectSilenceEndAsync(
-            string filePath, string thresholdDb, bool findStart, CancellationToken ct)
-        {
-            return Task.Run(() =>
-            {
-                try
-                {
-                    // Use silencedetect filter: it reports silence_start and silence_end
-                    // For marker IN: we want the silence_end of the first silence period starting at 0
-                    // For marker OUT: we want the silence_start of the last silence period ending at EOF
-                    string args = $"-hide_banner -i \"{filePath}\" " +
-                                  $"-af \"silencedetect=noise={thresholdDb}:d={SILENCE_MIN_DURATION_SEC}\" " +
-                                  $"-f null -";
-
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = _ffmpegPath,
-                        Arguments = args,
-                        RedirectStandardError = true,
-                        RedirectStandardOutput = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
-
-                    string stderr;
-                    using (var p = Process.Start(psi))
-                    {
-                        var stdoutTask = p.StandardOutput.ReadToEndAsync();
-                        stderr = p.StandardError.ReadToEnd();
-                        stdoutTask.Wait();
-                        p.WaitForExit();
-                    }
-
-                    if (string.IsNullOrWhiteSpace(stderr))
-                        return -1;
-
-                    if (findStart)
-                    {
-                        // Find the first silence_end → that's when audio starts
-                        var match = Regex.Match(stderr,
-                            @"silence_end:\s*([\d.]+)",
-                            RegexOptions.IgnoreCase);
-                        if (match.Success &&
-                            double.TryParse(match.Groups[1].Value,
-                                System.Globalization.NumberStyles.Any,
-                                System.Globalization.CultureInfo.InvariantCulture,
-                                out double sec))
-                        {
-                            return (int)(sec * 1000);
-                        }
-
-                        // No silence detected at start → marker at 0
-                        return 0;
-                    }
-                    else
-                    {
-                        // Find the last silence_start → that's where audio effectively ends
-                        var matches = Regex.Matches(stderr,
-                            @"silence_start:\s*([\d.]+)",
-                            RegexOptions.IgnoreCase);
-                        if (matches.Count > 0)
-                        {
-                            var lastMatch = matches[matches.Count - 1];
-                            if (double.TryParse(lastMatch.Groups[1].Value,
-                                    System.Globalization.NumberStyles.Any,
-                                    System.Globalization.CultureInfo.InvariantCulture,
-                                    out double sec))
-                            {
-                                return (int)(sec * 1000);
-                            }
-                        }
-
-                        // No trailing silence → return -1 (full duration)
-                        return -1;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[PreEditing] silencedetect error: {ex.Message}");
-                    return -1;
-                }
+                return (markerIn, markerOut);
             }, ct);
         }
 
@@ -1029,8 +694,8 @@ namespace AirDirector.Forms
             if (_preEditResults.ContainsKey(filePath))
                 return _preEditResults[filePath];
 
-            // Fallback: se non trovato, restituisci 0 e durata totale
-            return (0, 0);
+            // Fallback: non trovato nel dizionario → nessun marker rilevato
+            return (-1, -1);
         }
 
         /// <summary>
@@ -2186,51 +1851,7 @@ namespace AirDirector.Forms
             _doneCount = 0;
             _errorCount = 0;
 
-            // ── 1. PRE-EDITING: ANALISI PREVENTIVA (se abilitata) ────────────────
-            // Analizza PRIMA della conversione per verificare i marker
-            if (_chkPreEditing.Checked && File.Exists(_ffmpegPath))
-            {
-                lblStatus.Text = "🔍  Analyzing audio for marker detection…";
-                var successRows = _fileRows.Where(r => r.Succeeded).ToList();
-
-                // ✅ Usa parallelizzazione per velocizzare l'analisi
-                var markerTasks = successRows.Select(async row =>
-                {
-                    try
-                    {
-                        // Use the output path for analysis (converted file), or input path if skipped
-                        string fileToAnalyze = File.Exists(row.OutputPath) ? row.OutputPath : row.InputPath;
-                        var markers = await DetectMarkersAsync(
-                            fileToAnalyze,
-                            (double)_nudMarkerInDb.Value,
-                            (double)_nudMarkerOutDb.Value,
-                            _cts.Token);
-
-                        // Store by both paths
-                        _preEditResults[row.OutputPath] = markers;
-                        if (row.InputPath != row.OutputPath)
-                            _preEditResults[row.InputPath] = markers;
-
-                        return (row, markers);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[PreEditing] Error analyzing {Path.GetFileName(row.InputPath)}: {ex.Message}");
-                        return (row, (-1, -1));
-                    }
-                }).ToList();
-
-                var markerResults = await Task.WhenAll(markerTasks);
-
-                // ✅ DEBUG: stampa riepilogo marker
-                Console.WriteLine($"\n[PreEditing] ══════ MARKER DETECTION SUMMARY ══════");
-                foreach (var (row, markers) in markerResults)
-                {
-                }
-                Console.WriteLine($"[PreEditing] ═══════════════════════════════════════\n");
-            }
-
-            // ── 2. CONVERSIONE ────────────────────────────────────────────────────
+            // ── 1. CONVERSIONE ────────────────────────────────────────────────────
             lblStatus.Text = "⏳  Starting conversion…";
 
             // split files by toggle state
@@ -2273,6 +1894,41 @@ namespace AirDirector.Forms
                 btnCancel.Enabled = false;
                 btnClose.Enabled = true;
                 return;
+            }
+
+            // ── 2. PRE-EDITING: ANALISI DOPO CONVERSIONE (se abilitata) ──────────
+            if (_chkPreEditing.Checked)
+            {
+                lblStatus.Text = "🔍  Analyzing audio for marker detection…";
+                var successRows = _fileRows.Where(r => r.Succeeded).ToList();
+
+                double thresholdIn = (double)_nudMarkerInDb.Value;
+                double thresholdOut = (double)_nudMarkerOutDb.Value;
+
+                foreach (var row in successRows)
+                {
+                    try
+                    {
+                        string fileToAnalyze = !string.IsNullOrEmpty(row.OutputPath) && File.Exists(row.OutputPath)
+                            ? row.OutputPath
+                            : row.InputPath;
+
+                        var markers = await DetectMarkersAsync(
+                            fileToAnalyze, thresholdIn, thresholdOut, _cts.Token);
+
+                        _preEditResults[row.OutputPath] = markers;
+                        if (row.InputPath != row.OutputPath)
+                            _preEditResults[row.InputPath] = markers;
+
+                        Console.WriteLine(
+                            $"[PreEditing] {Path.GetFileName(fileToAnalyze)}: " +
+                            $"IN={markers.MarkerInMs}ms OUT={markers.MarkerOutMs}ms");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[PreEditing] Error analyzing {Path.GetFileName(row.InputPath)}: {ex.Message}");
+                    }
+                }
             }
 
             // ── 3. COMPLETAMENTO ──────────────────────────────────────────────────
@@ -2319,23 +1975,21 @@ namespace AirDirector.Forms
 
             // ── PRE-EDITING: ANALISI DEI MARKER ANCHE SE SKIP ────────────────────
             // Se il flag è abilitato, analizza i file originali PRIMA dell'importazione
-            if (_chkPreEditing.Checked && File.Exists(_ffmpegPath))
+            if (_chkPreEditing.Checked)
             {
                 btnSkipConvert.Enabled = false;
                 lblStatus.Text = "🔍  Pre-editing: analyzing audio markers on original files…";
+
+                double thresholdIn = (double)_nudMarkerInDb.Value;
+                double thresholdOut = (double)_nudMarkerOutDb.Value;
 
                 foreach (var row in _fileRows)
                 {
                     try
                     {
-                        // Analizza il file ORIGINALE (InputPath)
                         var markers = await DetectMarkersAsync(
-                            row.InputPath,
-                            (double)_nudMarkerInDb.Value,
-                            (double)_nudMarkerOutDb.Value,
-                            _cts.Token);
+                            row.InputPath, thresholdIn, thresholdOut, _cts.Token);
 
-                        // Salva i marker associandoli all'InputPath
                         _preEditResults[row.InputPath] = markers;
 
                         Console.WriteLine(
