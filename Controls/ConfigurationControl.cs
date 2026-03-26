@@ -106,14 +106,8 @@ namespace AirDirector.Controls
 
         private void CmbVideoOutputType_SelectedIndexChanged(object sender, EventArgs e)
         {
-            bool isNDI = cmbVideoOutputType.SelectedIndex == 0;
-
-            grpNDI.Visible = isNDI;
-
-            if (isNDI)
-            {
-                LoadNDIDevices();
-            }
+            // NDI configuration is handled internally by PlayerControlVideo
+            grpNDI.Visible = false;
         }
 
         private void LoadNDIDevices()
@@ -412,12 +406,10 @@ namespace AirDirector.Controls
             cmbVideoOutputType.Items.Add("NDI (Network Device Interface)");
             cmbVideoOutputType.SelectedIndex = 0;
 
-            cmbVideoFrameRate.Items.Clear();
-            cmbVideoFrameRate.Items.Add("25 fps (PAL)");
-            cmbVideoFrameRate.Items.Add("30 fps (NTSC)");
-            cmbVideoFrameRate.Items.Add("50 fps");
-            cmbVideoFrameRate.Items.Add("60 fps");
-            cmbVideoFrameRate.SelectedIndex = 0;
+            // Frame rate e NDI source sono gestiti internamente da PlayerControlVideo
+            lblVideoFrameRate.Visible = false;
+            cmbVideoFrameRate.Visible = false;
+            grpNDI.Visible = false;
 
             cmbBufferMode.Items.Clear();
             cmbBufferMode.Items.Add("File Random in Loop");
@@ -511,15 +503,10 @@ namespace AirDirector.Controls
                     // Solo NDI supportato per ora
                     cmbVideoOutputType.SelectedIndex = 0; // Sempre NDI
 
-                    int videoFrameRate = int.Parse(key.GetValue("VideoFrameRate", "25").ToString());
-                    cmbVideoFrameRate.SelectedIndex = videoFrameRate == 30 ? 1 : (videoFrameRate == 50 ? 2 : (videoFrameRate == 60 ? 3 : 0));
-
                     txtBufferVideoPath.Text = key.GetValue("BufferVideoPath", "").ToString();
 
                     string bufferMode = key.GetValue("BufferVideoMode", "RandomLoop").ToString();
                     cmbBufferMode.SelectedIndex = bufferMode == "Slideshow" ? 1 : 0;
-
-                    txtNDISourceName.Text = key.GetValue("NDI_SourceName", "AirDirector Output").ToString();
 
                     // ADV Lanner
                     string advLanner = key.GetValue("AdvLannerPlayout", "YesInternal").ToString();
@@ -527,15 +514,6 @@ namespace AirDirector.Controls
 
                     // Local Audio Output
                     chkLocalAudioOutput.Checked = Convert.ToBoolean(key.GetValue("LocalAudioEnabled", 0));
-
-                    // Forza selezione "(Crea Nuova Sorgente NDI)" se modalità RadioTV
-                    if (cmbMode.SelectedIndex == 1 && cmbVideoOutputType.SelectedIndex == 0)
-                    {
-                        if (cmbNDISource.Items.Count > 0)
-                        {
-                            cmbNDISource.SelectedIndex = 0; // "(Crea Nuova Sorgente NDI)"
-                        }
-                    }
                 }
             }
             catch (Exception ex)
@@ -1008,17 +986,10 @@ namespace AirDirector.Controls
                         // Solo NDI supportato
                         key.SetValue("VideoOutputType", "NDI");
 
-                        int videoFrameRate = cmbVideoFrameRate.SelectedIndex == 1 ? 30 :
-                                            (cmbVideoFrameRate.SelectedIndex == 2 ? 50 :
-                                            (cmbVideoFrameRate.SelectedIndex == 3 ? 60 : 25));
-                        key.SetValue("VideoFrameRate", videoFrameRate.ToString());
-
                         key.SetValue("BufferVideoPath", txtBufferVideoPath.Text);
 
                         string bufferMode = cmbBufferMode.SelectedIndex == 1 ? "Slideshow" : "RandomLoop";
                         key.SetValue("BufferVideoMode", bufferMode);
-
-                        key.SetValue("NDI_SourceName", txtNDISourceName.Text);
 
                         // ADV Lanner
                         string advLanner = cmbAdvLanner.SelectedIndex == 1 ? "NoExternal" : "YesInternal";
@@ -1120,10 +1091,10 @@ namespace AirDirector.Controls
         // VIDEO GETTERS
         public static bool IsRadioTVMode() { try { return DbcManager.GetConfigValue("Mode", "Radio") == "RadioTV"; } catch { return false; } }
         public static string GetVideoOutputType() { try { return "NDI"; } catch { return "NDI"; } } // Solo NDI per ora
-        public static int GetVideoFrameRate() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return int.Parse(key?.GetValue("VideoFrameRate", "25").ToString() ?? "25"); } } catch { return 25; } }
+        public static int GetVideoFrameRate() { return 30; }
         public static string GetBufferVideoPath() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return key?.GetValue("BufferVideoPath", "").ToString() ?? ""; } } catch { return ""; } }
         public static string GetBufferVideoMode() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return key?.GetValue("BufferVideoMode", "RandomLoop").ToString() ?? "RandomLoop"; } } catch { return "RandomLoop"; } }
-        public static string GetNDISourceName() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return key?.GetValue("NDI_SourceName", "AirDirector Output").ToString() ?? "AirDirector Output"; } } catch { return "AirDirector Output"; } }
+        public static string GetNDISourceName() { return "AirDirector Output"; }
         public static string GetSDIDeviceName() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return key?.GetValue("SDI_DeviceName", "").ToString() ?? ""; } } catch { return ""; } }
         public static string GetAdvLannerPlayout() { try { using (RegistryKey key = Registry.CurrentUser.OpenSubKey(REGISTRY_KEY)) { return key?.GetValue("AdvLannerPlayout", "YesInternal").ToString() ?? "YesInternal"; } } catch { return "YesInternal"; } }
         public static bool IsAdvLannerInternal() { return GetAdvLannerPlayout() == "YesInternal"; }
