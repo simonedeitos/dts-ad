@@ -1309,54 +1309,124 @@ namespace AirDirector.Controls
         private void UpdCnt() { int p = _positionMs, ee = _markerMIX > 0 ? _markerMIX : _markerOUT; if (ee <= 0) ee = (int)_totalDuration.TotalMilliseconds; lblElapsed.Text = TimeSpan.FromMilliseconds(Math.Max(0, p - _markerIN)).ToString(@"mm\:ss"); int r = Math.Max(0, ee - p); lblRemaining.Text = "-" + TimeSpan.FromMilliseconds(r).ToString(@"mm\:ss"); if (r > 0 && r <= 10000) { if (!_blinkTimer.Enabled) _blinkTimer.Start(); lblRemaining.BackColor = _blinkState ? Color.Red : Color.Black; lblRemaining.ForeColor = _blinkState ? Color.Black : AppTheme.LEDRed; } else { _blinkTimer.Stop(); lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed; } int im = (int)_introTime.TotalMilliseconds; if (im > 0 && p < im) { lblIntro.Text = TimeSpan.FromMilliseconds(im - p).ToString(@"mm\:ss"); lblIntro.ForeColor = Color.White; lblIntro.BackColor = Color.Red; } else { lblIntro.Text = ""; lblIntro.BackColor = Color.Black; } }
         private void WfPaint(object s, PaintEventArgs e)
         {
-            Graphics g = e.Graphics; int w = waveformPanel.Width, h = waveformPanel.Height;
+            Graphics g = e.Graphics;
+            int w = waveformPanel.Width, h = waveformPanel.Height;
             g.Clear(Color.Black);
-            float tm = (float)_totalDuration.TotalMilliseconds; if (tm <= 0) return;
-            // Positions relative to full file duration
-            float pr = Math.Max(0f, Math.Min(1f, _positionMs / tm)); int cx = (int)(pr * w);
-            int inX = _markerIN > 0 ? (int)(Math.Min(1f, _markerIN / tm) * w) : 0;
+
+            // Durata totale del file (dalla durata, non dai marker)
+            float tm = (float)_totalDuration.TotalMilliseconds;
+            if (tm <= 0) return;
+
+            // Usa la durata REALE del file per calcolare le posizioni
+            // Se _markerOUT è impostato, la durata effettiva potrebbe essere minore
+            float effectiveDuration = tm;
+            if (_markerOUT > 0 && _markerOUT < tm)
+                effectiveDuration = _markerOUT;
+
+            // Calcola le posizioni dei marker come percentuale della durata totale del file (0% a 100%)
+            // Limita _positionMs alla durata effettiva per evitare overflow
+            float currentPos = Math.Min(_positionMs, effectiveDuration);
+            float pr = Math.Max(0f, Math.Min(1f, currentPos / tm));
+            int cx = (int)(pr * w);
+
+            int inX = _markerIN > 0 ? (int)((_markerIN / tm) * w) : 0;
+
             float introMs = (float)_introTime.TotalMilliseconds;
-            int introX = introMs > 0 ? (int)(Math.Min(1f, introMs / tm) * w) : inX;
-            int mixX = _markerMIX > 0 ? (int)(Math.Min(1f, _markerMIX / tm) * w) : w;
+            int introX = introMs > 0 ? (int)((introMs / tm) * w) : inX;
+
+            // In modalità manuale, mixX è invisibile (= w, fuori schermo)
+            int mixX = w;
+            if (_autoMode && _markerMIX > 0)
+                mixX = (int)((_markerMIX / tm) * w);
+
             int cy = h / 2;
-            // Background zones: red between IN and INTRO, gray after MIX
-            if (introX > inX) using (var b = new SolidBrush(Color.FromArgb(25, 255, 0, 0))) g.FillRectangle(b, inX, 0, introX - inX, h);
-            if (mixX < w) using (var b = new SolidBrush(Color.FromArgb(20, 128, 128, 128))) g.FillRectangle(b, mixX, 0, w - mixX, h);
-            // Waveform bars: entire file
+
+            // Background zone: rosso tra IN e INTRO, grigio dopo MIX (solo in AUTO)
+            if (introX > inX)
+                using (var b = new SolidBrush(Color.FromArgb(25, 255, 0, 0)))
+                    g.FillRectangle(b, inX, 0, introX - inX, h);
+
+            if (_autoMode && mixX < w)
+                using (var b = new SolidBrush(Color.FromArgb(20, 128, 128, 128)))
+                    g.FillRectangle(b, mixX, 0, w - mixX, h);
+
+            // Waveform bars: rappresenta tutto il file da 0% a 100%
             float[] pk = _waveformPeaks;
             if (pk != null && pk.Length > 0)
             {
-                int nb = pk.Length; float bw2 = (float)w / nb;
+                int nb = pk.Length;
+                float bw2 = (float)w / nb;
+
                 for (int i = 0; i < nb; i++)
                 {
                     float pv = pk[Math.Min(i, nb - 1)];
-                    int bh = Math.Max(1, (int)(pv * h * 0.85f)), bx = (int)(i * bw2);
+                    int bh = Math.Max(1, (int)(pv * h * 0.85f));
+                    int bx = (int)(i * bw2);
+
+                    // Limita rigorosamente a w
+                    if (bx >= w) break;
+
+                    int barWidth = Math.Max(1, (int)Math.Ceiling(bw2));
+                    if (bx + barWidth > w) barWidth = w - bx;
+
+                    // Colori: grigio scuro se già riprodotto (bx < cx), altrimenti colore zona
                     Color bc;
-                    if (bx < inX) bc = Color.FromArgb(50, 50, 50);
-                    else if (bx < introX) bc = Color.FromArgb(255, 80, 80);
-                    else if (bx < mixX) bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(0, 200, 0);
-                    else bc = Color.FromArgb(120, 120, 120);
-                    using (var br = new SolidBrush(bc)) g.FillRectangle(br, bx, cy - bh / 2, Math.Max(1, (int)bw2 - 1), bh);
+                    if (bx < inX)
+                        bc = Color.FromArgb(50, 50, 50);  // Prima di IN: grigio scuro
+                    else if (bx < introX)
+                        bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(255, 80, 80);  // Intro: grigio se riprodotto, rosso se no
+                    else if (bx < mixX)
+                        bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(0, 200, 0);  // Zona normale: grigio se riprodotto, verde se no
+                    else
+                        bc = Color.FromArgb(120, 120, 120);  // Dopo MIX: grigio chiaro
+
+                    using (var br = new SolidBrush(bc))
+                        g.FillRectangle(br, bx, cy - bh / 2, barWidth, bh);
                 }
             }
             else
             {
-                if (cx < w) using (var b = new SolidBrush(Color.FromArgb(0, 150, 0))) g.FillRectangle(b, cx, 0, w - cx, h);
-                if (cx > 0) using (var b = new SolidBrush(Color.FromArgb(60, 60, 60))) g.FillRectangle(b, 0, 0, cx, h);
+                // Fallback: nessuna waveform disponibile
+                if (cx < w)
+                    using (var b = new SolidBrush(Color.FromArgb(0, 150, 0)))
+                        g.FillRectangle(b, cx, 0, w - cx, h);
+                if (cx > 0)
+                    using (var b = new SolidBrush(Color.FromArgb(60, 60, 60)))
+                        g.FillRectangle(b, 0, 0, cx, h);
             }
-            // Progress bar at bottom
-            if (cx > 0) using (var b = new SolidBrush(Color.FromArgb(70, 70, 70))) g.FillRectangle(b, 0, h - 3, cx, 3);
-            if (cx < w) using (var b = new SolidBrush(Color.FromArgb(0, 255, 0))) g.FillRectangle(b, cx, h - 3, w - cx, 3);
-            // Marker IN (white line)
-            if (inX > 0 && inX < w) using (var pn = new Pen(Color.White, 2)) g.DrawLine(pn, inX, 0, inX, h);
-            // Marker INTRO (yellow line)
-            if (introX > 0 && introX < w) using (var pn = new Pen(Color.FromArgb(200, 255, 255, 0), 1)) g.DrawLine(pn, introX, 0, introX, h);
-            // Marker MIX (yellow line, thicker)
-            if (mixX > 0 && mixX < w) using (var pn = new Pen(Color.Yellow, 2)) g.DrawLine(pn, mixX, 0, mixX, h);
-            // Playback cursor
-            if (_isPlaying && cx > 0) using (var pn = new Pen(Color.Red, 2)) g.DrawLine(pn, cx, 0, cx, h);
-            // Center line
-            using (var pn = new Pen(Color.FromArgb(25, 255, 255, 255), 1)) g.DrawLine(pn, 0, cy, w, cy);
+
+            // Progress bar in basso (barra orizzontale di 3px)
+            if (cx > 0 && cx <= w)
+                using (var b = new SolidBrush(Color.FromArgb(70, 70, 70)))
+                    g.FillRectangle(b, 0, h - 3, Math.Min(cx, w), 3);
+            if (cx < w)
+                using (var b = new SolidBrush(Color.FromArgb(0, 255, 0)))
+                    g.FillRectangle(b, Math.Min(cx, w), h - 3, w - Math.Min(cx, w), 3);
+
+            // Marker IN (linea bianca spessa)
+            if (inX > 0 && inX < w)
+                using (var pn = new Pen(Color.White, 2))
+                    g.DrawLine(pn, inX, 0, inX, h);
+
+            // Marker INTRO (linea gialla sottile) - solo se diverso da IN
+            if (introX > 0 && introX < w && introX != inX)
+                using (var pn = new Pen(Color.FromArgb(200, 255, 255, 0), 1))
+                    g.DrawLine(pn, introX, 0, introX, h);
+
+            // Marker MIX (linea gialla spessa) - visibile SOLO in modalità AUTO
+            if (_autoMode && mixX > 0 && mixX < w)
+                using (var pn = new Pen(Color.Yellow, 2))
+                    g.DrawLine(pn, mixX, 0, mixX, h);
+
+            // Cursore di playback (linea rossa spessa) - limitato rigorosamente a w
+            int cursorX = Math.Min(cx, w - 1);
+            if (_isPlaying && cursorX >= 0 && cursorX < w)
+                using (var pn = new Pen(Color.Red, 2))
+                    g.DrawLine(pn, cursorX, 0, cursorX, h);
+
+            // Linea centrale orizzontale
+            using (var pn = new Pen(Color.FromArgb(25, 255, 255, 255), 1))
+                g.DrawLine(pn, 0, cy, w, cy);
         }
         private void WfClick(object s, MouseEventArgs e) { if (e.Button == MouseButtons.Left && ModifierKeys.HasFlag(Keys.Control) && _isPlaying && _totalDuration.TotalSeconds > 0) { float tm = (float)_totalDuration.TotalMilliseconds; int ms = (int)(Math.Max(0, Math.Min(1, (double)e.X / waveformPanel.Width)) * tm); SeekTo(TimeSpan.FromMilliseconds(ms)); } }
 
