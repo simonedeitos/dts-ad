@@ -1342,7 +1342,7 @@ namespace AirDirector.Controls
 
                 var lblTitle = new Label
                 {
-                    Text = "⏳ " + LanguageManager.GetString("Archive.BatchInProgress", "Modifica batch in corso..."),
+                    Text = "⏳ " + LanguageManager.GetString("Archive.BatchInProgress", "Update Files..."),
                     ForeColor = Color.White,
                     Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                     AutoSize = true,
@@ -1376,7 +1376,7 @@ namespace AirDirector.Controls
             _pbBatch.Maximum = total > 0 ? total : 1;
             _pbBatch.Value = 0;
             _lblBatchProgress.Text = string.Format(
-                LanguageManager.GetString("Archive.BatchFileProgress", "File 0 di {0}"), total);
+                LanguageManager.GetString("Archive.BatchFileProgress", "File 0 / {0}"), total);
 
             // Center over the grid
             _batchProgressPanel.Location = new Point(
