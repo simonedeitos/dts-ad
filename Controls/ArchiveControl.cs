@@ -117,6 +117,24 @@ namespace AirDirector.Controls
             if (lblPreviewTitle != null && lblPreviewTitle.Text.Contains("Nessun"))
                 lblPreviewTitle.Text = LanguageManager.GetString("Archive.NoPreview", "Nessun file in preascolto");
 
+            if (dgvArchive?.ContextMenuStrip != null)
+            {
+                foreach (ToolStripItem item in dgvArchive.ContextMenuStrip.Items)
+                {
+                    if (item is ToolStripMenuItem mi)
+                    {
+                        switch (mi.Tag as string)
+                        {
+                            case "ctx_preview":  mi.Text = "🎧 " + LanguageManager.GetString("Archive.Preview", "Preascolto"); break;
+                            case "ctx_associate": mi.Text = "🎬 " + LanguageManager.GetString("Archive.AssociateVideo", "Associa Video..."); break;
+                            case "ctx_remove":   mi.Text = "🗑️ " + LanguageManager.GetString("Archive.RemoveVideo", "Rimuovi Video"); break;
+                            case "ctx_edit":     mi.Text = "✏️ " + LanguageManager.GetString("Archive.EditGenreCategory", "Modifica Genere/Categoria"); break;
+                            case "ctx_history":  mi.Text = "📋 " + LanguageManager.GetString("Archive.ShowPlayHistory", "Mostra Storico Passaggi"); break;
+                        }
+                    }
+                }
+            }
+
             UpdateHeaderCount(_archiveType == "Music" ? _allMusicData.Count : _allClipsData.Count);
 
             if (!_isInitializing)
@@ -501,23 +519,29 @@ namespace AirDirector.Controls
             }
 
             ContextMenuStrip contextMenu = new ContextMenuStrip();
-            contextMenu.Items.Add("🎧 " + LanguageManager.GetString("Archive.Preview", "Preascolto"), null, MenuPreview_Click);
+            var miCtxPreview = new ToolStripMenuItem("🎧 " + LanguageManager.GetString("Archive.Preview", "Preascolto"), null, MenuPreview_Click) { Tag = "ctx_preview" };
+            contextMenu.Items.Add(miCtxPreview);
             contextMenu.Items.Add(new ToolStripSeparator());
 
             if (_archiveType == "Music")
             {
-                contextMenu.Items.Add("🎬 " + LanguageManager.GetString("Archive.AssociateVideo", "Associa Video..."), null, MenuAssociateVideo_Click);
+                var miCtxAssociate = new ToolStripMenuItem("🎬 " + LanguageManager.GetString("Archive.AssociateVideo", "Associa Video..."), null, MenuAssociateVideo_Click) { Tag = "ctx_associate" };
+                contextMenu.Items.Add(miCtxAssociate);
             }
             else // Clips
             {
-                contextMenu.Items.Add("🎬 " + LanguageManager.GetString("Archive.AssociateVideo", "Associa Video..."), null, MenuAssociateVideo_Click);
+                var miCtxAssociate = new ToolStripMenuItem("🎬 " + LanguageManager.GetString("Archive.AssociateVideo", "Associa Video..."), null, MenuAssociateVideo_Click) { Tag = "ctx_associate" };
+                contextMenu.Items.Add(miCtxAssociate);
             }
 
-            contextMenu.Items.Add("🗑️ " + LanguageManager.GetString("Archive.RemoveVideo", "Rimuovi Video"), null, MenuRemoveVideo_Click);
+            var miCtxRemove = new ToolStripMenuItem("🗑️ " + LanguageManager.GetString("Archive.RemoveVideo", "Rimuovi Video"), null, MenuRemoveVideo_Click) { Tag = "ctx_remove" };
+            contextMenu.Items.Add(miCtxRemove);
             contextMenu.Items.Add(new ToolStripSeparator());
-            contextMenu.Items.Add("✏️ " + LanguageManager.GetString("Archive.EditGenreCategory", "Modifica Genere/Categoria"), null, MenuBatchEdit_Click);
+            var miCtxEdit = new ToolStripMenuItem("✏️ " + LanguageManager.GetString("Archive.EditGenreCategory", "Modifica Genere/Categoria"), null, MenuBatchEdit_Click) { Tag = "ctx_edit" };
+            contextMenu.Items.Add(miCtxEdit);
             contextMenu.Items.Add(new ToolStripSeparator());
-            contextMenu.Items.Add("📋 " + LanguageManager.GetString("Archive.ShowPlayHistory", "Mostra Storico Passaggi"), null, MenuShowPlayHistory_Click);
+            var miCtxHistory = new ToolStripMenuItem("📋 " + LanguageManager.GetString("Archive.ShowPlayHistory", "Mostra Storico Passaggi"), null, MenuShowPlayHistory_Click) { Tag = "ctx_history" };
+            contextMenu.Items.Add(miCtxHistory);
             dgvArchive.ContextMenuStrip = contextMenu;
 
             dgvArchive.CellDoubleClick += DgvArchive_CellDoubleClick;
