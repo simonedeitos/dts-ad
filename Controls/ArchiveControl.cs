@@ -16,7 +16,7 @@ namespace AirDirector.Controls
     public partial class ArchiveControl : UserControl
     {
         private string _archiveType;
-        private DataGridView dgvArchive;
+        private ArchiveDataGridView dgvArchive;
         private Panel headerPanel;
         private Label lblHeader;
         private TextBox txtSearch;
@@ -339,7 +339,7 @@ namespace AirDirector.Controls
 
             this.Controls.Add(headerPanel);
 
-            dgvArchive = new DataGridView
+            dgvArchive = new ArchiveDataGridView
             {
                 Location = new Point(0, 80),
                 Size = new Size(this.Width, this.Height - 80 - 70), // ✅ Spazio per mini player
@@ -2606,6 +2606,32 @@ namespace AirDirector.Controls
                 try { _dailyLogger?.Dispose(); } catch { }
             }
             base.Dispose(disposing);
+        }
+
+        /// <summary>
+        /// DataGridView subclass that preserves multi-row selection on right-click.
+        /// Without this, the DataGridView internal OnMouseDown processing resets
+        /// the selection even when the right-clicked row is already selected.
+        /// </summary>
+        private class ArchiveDataGridView : DataGridView
+        {
+            protected override void OnMouseDown(MouseEventArgs e)
+            {
+                if (e.Button == MouseButtons.Right)
+                {
+                    var hitTest = HitTest(e.X, e.Y);
+                    if (hitTest.RowIndex >= 0 && hitTest.RowIndex < Rows.Count
+                        && Rows[hitTest.RowIndex].Selected)
+                    {
+                        // Right-clicked on an already-selected row: skip base processing
+                        // to prevent DataGridView from resetting the multi-selection.
+                        // The context menu still opens via WM_CONTEXTMENU on mouse-up.
+                        return;
+                    }
+                }
+
+                base.OnMouseDown(e);
+            }
         }
     }
 }
