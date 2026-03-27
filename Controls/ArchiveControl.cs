@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO;
 using NAudio.Wave;
@@ -51,6 +52,11 @@ namespace AirDirector.Controls
 
         private Services.Core.DailyLogger _dailyLogger;
         private Point _dragStartPoint;
+
+        // Batch progress overlay
+        private Panel _batchProgressPanel;
+        private Label _lblBatchProgress;
+        private ProgressBar _pbBatch;
 
         public event EventHandler<string> StatusChanged;
 
@@ -1030,7 +1036,7 @@ namespace AirDirector.Controls
             }
         }
 
-        private void MenuBatchEdit_Click(object sender, EventArgs e)
+        private async void MenuBatchEdit_Click(object sender, EventArgs e)
         {
             if (dgvArchive.SelectedRows.Count == 0)
             {
@@ -1046,7 +1052,7 @@ namespace AirDirector.Controls
             {
                 if (batchForm.ShowDialog() == DialogResult.OK)
                 {
-                    ApplyBatchEdit(batchForm.ModifyGenre, batchForm.NewGenre, batchForm.ModifyCategory, batchForm.NewCategory);
+                    await ApplyBatchEditAsync(batchForm.ModifyGenre, batchForm.NewGenre, batchForm.ModifyCategory, batchForm.NewCategory);
                 }
             }
         }
@@ -1203,7 +1209,7 @@ namespace AirDirector.Controls
             }
         }
 
-        private void ApplyBatchEdit(bool modifyGenre, string newGenre, bool modifyCategory, string newCategory)
+        private async Task ApplyBatchEditAsync(bool modifyGenre, string newGenre, bool modifyCategory, string newCategory)
         {
             if (!modifyGenre && !modifyCategory)
             {
@@ -1215,83 +1221,186 @@ namespace AirDirector.Controls
                 return;
             }
 
+            // Capture selected rows on UI thread before Task.Run
+            var rows = dgvArchive.SelectedRows.Cast<DataGridViewRow>().ToList();
+            int total = rows.Count;
+            string archiveType = _archiveType;
+
+            SetBatchEditButtonsEnabled(false);
             this.Cursor = Cursors.WaitCursor;
-            int updated = 0;
-            int errors = 0;
+            ShowBatchProgressPanel(total);
+
+            int updated = 0, errors = 0;
+
+            var progress = new Progress<int>(current =>
+            {
+                UpdateBatchProgressPanel(current, total);
+            });
 
             try
             {
-                foreach (DataGridViewRow row in dgvArchive.SelectedRows)
+                (updated, errors) = await Task.Run(() =>
                 {
-                    try
+                    int updatedCount = 0, errorCount = 0;
+                    int current = 0;
+                    foreach (var row in rows)
                     {
-                        if (_archiveType == "Music" && row.Tag is MusicEntry musicEntry)
+                        current++;
+                        ((IProgress<int>)progress).Report(current);
+                        try
                         {
-                            bool changed = false;
-
-                            if (modifyGenre && !string.IsNullOrWhiteSpace(newGenre))
+                            if (archiveType == "Music" && row.Tag is MusicEntry musicEntry)
                             {
-                                if (UpdateGenreInFile(musicEntry.FilePath, newGenre))
+                                bool changed = false;
+
+                                if (modifyGenre && !string.IsNullOrWhiteSpace(newGenre))
                                 {
-                                    musicEntry.Genre = newGenre;
+                                    if (UpdateGenreInFile(musicEntry.FilePath, newGenre))
+                                    {
+                                        musicEntry.Genre = newGenre;
+                                        changed = true;
+                                    }
+                                }
+
+                                if (modifyCategory && !string.IsNullOrWhiteSpace(newCategory))
+                                {
+                                    musicEntry.Categories = newCategory;
                                     changed = true;
                                 }
-                            }
 
-                            if (modifyCategory && !string.IsNullOrWhiteSpace(newCategory))
-                            {
-                                musicEntry.Categories = newCategory;
-                                changed = true;
-                            }
-
-                            if (changed && DbcManager.Update("Music.dbc", musicEntry))
-                            {
-                                updated++;
-                            }
-                        }
-                        else if (_archiveType == "Clips" && row.Tag is ClipEntry clipEntry)
-                        {
-                            bool changed = false;
-
-                            if (modifyGenre && !string.IsNullOrWhiteSpace(newGenre))
-                            {
-                                if (UpdateGenreInFile(clipEntry.FilePath, newGenre))
+                                if (changed && DbcManager.Update("Music.dbc", musicEntry))
                                 {
-                                    clipEntry.Genre = newGenre;
-                                    changed = true;
+                                    updatedCount++;
                                 }
                             }
-
-                            if (modifyCategory && !string.IsNullOrWhiteSpace(newCategory))
+                            else if (archiveType == "Clips" && row.Tag is ClipEntry clipEntry)
                             {
-                                clipEntry.Categories = newCategory;
-                                changed = true;
-                            }
+                                bool changed = false;
 
-                            if (changed && DbcManager.Update("Clips.dbc", clipEntry))
-                            {
-                                updated++;
+                                if (modifyGenre && !string.IsNullOrWhiteSpace(newGenre))
+                                {
+                                    if (UpdateGenreInFile(clipEntry.FilePath, newGenre))
+                                    {
+                                        clipEntry.Genre = newGenre;
+                                        changed = true;
+                                    }
+                                }
+
+                                if (modifyCategory && !string.IsNullOrWhiteSpace(newCategory))
+                                {
+                                    clipEntry.Categories = newCategory;
+                                    changed = true;
+                                }
+
+                                if (changed && DbcManager.Update("Clips.dbc", clipEntry))
+                                {
+                                    updatedCount++;
+                                }
                             }
                         }
+                        catch
+                        {
+                            errorCount++;
+                        }
                     }
-                    catch
-                    {
-                        errors++;
-                    }
-                }
-
-                RefreshArchive();
-
-                MessageBox.Show(
-                    string.Format(LanguageManager.GetString("Archive.BatchEditComplete", "✅ Aggiornati:  {0}\n❌ Errori: {1}"), updated, errors),
-                    LanguageManager.GetString("Archive.BatchEditCompletedTitle", "Modifica Batch Completata"),
-                    MessageBoxButtons.OK,
-                    errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+                    return (updatedCount, errorCount);
+                });
             }
             finally
             {
+                HideBatchProgressPanel();
+                SetBatchEditButtonsEnabled(true);
                 this.Cursor = Cursors.Default;
             }
+
+            RefreshArchive();
+
+            MessageBox.Show(
+                string.Format(LanguageManager.GetString("Archive.BatchEditComplete", "✅ Aggiornati:  {0}\n❌ Errori: {1}"), updated, errors),
+                LanguageManager.GetString("Archive.BatchEditCompletedTitle", "Modifica Batch Completata"),
+                MessageBoxButtons.OK,
+                errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+        }
+
+        private void SetBatchEditButtonsEnabled(bool enabled)
+        {
+            if (btnImport != null) btnImport.Enabled = enabled;
+            if (btnEdit != null) btnEdit.Enabled = enabled;
+            if (btnDelete != null) btnDelete.Enabled = enabled;
+        }
+
+        private void ShowBatchProgressPanel(int total)
+        {
+            if (_batchProgressPanel == null)
+            {
+                _batchProgressPanel = new Panel
+                {
+                    BackColor = Color.FromArgb(50, 50, 50),
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Padding = new Padding(10)
+                };
+
+                var lblTitle = new Label
+                {
+                    Text = "⏳ " + LanguageManager.GetString("Archive.BatchInProgress", "Modifica batch in corso..."),
+                    ForeColor = Color.White,
+                    Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                    AutoSize = true,
+                    Location = new Point(10, 10)
+                };
+
+                _lblBatchProgress = new Label
+                {
+                    ForeColor = Color.LightGray,
+                    Font = new Font("Segoe UI", 9f),
+                    AutoSize = true,
+                    Location = new Point(10, 38)
+                };
+
+                _pbBatch = new ProgressBar
+                {
+                    Location = new Point(10, 62),
+                    Size = new Size(220, 18),
+                    Minimum = 0,
+                    Style = ProgressBarStyle.Continuous
+                };
+
+                _batchProgressPanel.Controls.Add(lblTitle);
+                _batchProgressPanel.Controls.Add(_lblBatchProgress);
+                _batchProgressPanel.Controls.Add(_pbBatch);
+                _batchProgressPanel.Size = new Size(242, 92);
+
+                dgvArchive.Controls.Add(_batchProgressPanel);
+            }
+
+            _pbBatch.Maximum = total > 0 ? total : 1;
+            _pbBatch.Value = 0;
+            _lblBatchProgress.Text = string.Format(
+                LanguageManager.GetString("Archive.BatchFileProgress", "File 0 di {0}"), total);
+
+            // Center over the grid
+            _batchProgressPanel.Location = new Point(
+                (dgvArchive.Width - _batchProgressPanel.Width) / 2,
+                (dgvArchive.Height - _batchProgressPanel.Height) / 2);
+
+            _batchProgressPanel.BringToFront();
+            _batchProgressPanel.Visible = true;
+        }
+
+        private void UpdateBatchProgressPanel(int current, int total)
+        {
+            if (_batchProgressPanel == null || !_batchProgressPanel.Visible) return;
+            if (_pbBatch != null && current <= _pbBatch.Maximum)
+                _pbBatch.Value = current;
+            if (_lblBatchProgress != null)
+                _lblBatchProgress.Text = string.Format(
+                    LanguageManager.GetString("Archive.BatchFileProgressCurrent", "File {0} di {1}"), current, total);
+        }
+
+        private void HideBatchProgressPanel()
+        {
+            if (_batchProgressPanel != null)
+                _batchProgressPanel.Visible = false;
         }
 
         private bool UpdateGenreInFile(string filePath, string newGenre)
