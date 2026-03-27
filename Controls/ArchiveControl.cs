@@ -125,11 +125,13 @@ namespace AirDirector.Controls
                     {
                         switch (mi.Tag as string)
                         {
-                            case "ctx_preview":  mi.Text = "🎧 " + LanguageManager.GetString("Archive.Preview", "Preascolto"); break;
-                            case "ctx_associate": mi.Text = "🎬 " + LanguageManager.GetString("Archive.AssociateVideo", "Associa Video..."); break;
-                            case "ctx_remove":   mi.Text = "🗑️ " + LanguageManager.GetString("Archive.RemoveVideo", "Rimuovi Video"); break;
-                            case "ctx_edit":     mi.Text = "✏️ " + LanguageManager.GetString("Archive.EditGenreCategory", "Modifica Genere/Categoria"); break;
-                            case "ctx_history":  mi.Text = "📋 " + LanguageManager.GetString("Archive.ShowPlayHistory", "Mostra Storico Passaggi"); break;
+                            case "ctx_preview":     mi.Text = "🎧 " + LanguageManager.GetString("Archive.Preview", "Preascolto"); break;
+                            case "ctx_associate":   mi.Text = "🎬 " + LanguageManager.GetString("Archive.AssociateVideo", "Associa Video..."); break;
+                            case "ctx_remove":      mi.Text = "🗑️ " + LanguageManager.GetString("Archive.RemoveVideo", "Rimuovi Video"); break;
+                            case "ctx_edit":        mi.Text = "✏️ " + LanguageManager.GetString("Archive.EditGenreCategory", "Modifica Genere/Categoria"); break;
+                            case "ctx_history":     mi.Text = "📋 " + LanguageManager.GetString("Archive.ShowPlayHistory", "Mostra Storico Passaggi"); break;
+                            case "ctx_show_folder": mi.Text = "📁 " + LanguageManager.GetString("Archive.ShowFileFolder", "Mostra cartella del file"); break;
+                            case "ctx_export":      mi.Text = "📤 " + LanguageManager.GetString("Archive.ExportSelectedFiles", "Esporta file selezionati"); break;
                         }
                     }
                 }
@@ -521,7 +523,7 @@ namespace AirDirector.Controls
             ContextMenuStrip contextMenu = new ContextMenuStrip();
             var miCtxPreview = new ToolStripMenuItem("🎧 " + LanguageManager.GetString("Archive.Preview", "Preascolto"), null, MenuPreview_Click) { Tag = "ctx_preview" };
             contextMenu.Items.Add(miCtxPreview);
-            contextMenu.Items.Add(new ToolStripSeparator());
+            contextMenu.Items.Add(new ToolStripSeparator() { Tag = "ctx_sep1" });
 
             if (_archiveType == "Music")
             {
@@ -536,12 +538,18 @@ namespace AirDirector.Controls
 
             var miCtxRemove = new ToolStripMenuItem("🗑️ " + LanguageManager.GetString("Archive.RemoveVideo", "Rimuovi Video"), null, MenuRemoveVideo_Click) { Tag = "ctx_remove" };
             contextMenu.Items.Add(miCtxRemove);
-            contextMenu.Items.Add(new ToolStripSeparator());
+            contextMenu.Items.Add(new ToolStripSeparator() { Tag = "ctx_sep2" });
             var miCtxEdit = new ToolStripMenuItem("✏️ " + LanguageManager.GetString("Archive.EditGenreCategory", "Modifica Genere/Categoria"), null, MenuBatchEdit_Click) { Tag = "ctx_edit" };
             contextMenu.Items.Add(miCtxEdit);
-            contextMenu.Items.Add(new ToolStripSeparator());
+            contextMenu.Items.Add(new ToolStripSeparator() { Tag = "ctx_sep3" });
             var miCtxHistory = new ToolStripMenuItem("📋 " + LanguageManager.GetString("Archive.ShowPlayHistory", "Mostra Storico Passaggi"), null, MenuShowPlayHistory_Click) { Tag = "ctx_history" };
             contextMenu.Items.Add(miCtxHistory);
+            contextMenu.Items.Add(new ToolStripSeparator() { Tag = "ctx_sep4" });
+            var miCtxShowFolder = new ToolStripMenuItem("📁 " + LanguageManager.GetString("Archive.ShowFileFolder", "Mostra cartella del file"), null, MenuShowFileFolder_Click) { Tag = "ctx_show_folder" };
+            contextMenu.Items.Add(miCtxShowFolder);
+            var miCtxExport = new ToolStripMenuItem("📤 " + LanguageManager.GetString("Archive.ExportSelectedFiles", "Esporta file selezionati"), null, MenuExportFiles_Click) { Tag = "ctx_export" };
+            contextMenu.Items.Add(miCtxExport);
+            contextMenu.Opening += ContextMenu_Opening;
             dgvArchive.ContextMenuStrip = contextMenu;
 
             dgvArchive.CellDoubleClick += DgvArchive_CellDoubleClick;
@@ -1076,6 +1084,130 @@ namespace AirDirector.Controls
 
             var historyForm = new TrackHistoryForm(artist, title);
             historyForm.ShowDialog(this.FindForm());
+        }
+
+        private void ContextMenu_Opening(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (dgvArchive.SelectedRows.Count == 0)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            bool multiSelection = dgvArchive.SelectedRows.Count > 1;
+
+            foreach (ToolStripItem item in dgvArchive.ContextMenuStrip.Items)
+            {
+                switch (item.Tag as string)
+                {
+                    case "ctx_preview":
+                    case "ctx_sep1":
+                    case "ctx_associate":
+                    case "ctx_remove":
+                    case "ctx_sep2":
+                    case "ctx_sep3":
+                    case "ctx_history":
+                        item.Visible = !multiSelection;
+                        break;
+                    default:
+                        item.Visible = true;
+                        break;
+                }
+            }
+        }
+
+        private void MenuShowFileFolder_Click(object sender, EventArgs e)
+        {
+            if (dgvArchive.SelectedRows.Count == 0) return;
+
+            DataGridViewRow row = dgvArchive.SelectedRows[0];
+            string filePath = "";
+
+            if (row.Tag is MusicEntry musicEntry)
+                filePath = musicEntry.FilePath;
+            else if (row.Tag is ClipEntry clipEntry)
+                filePath = clipEntry.FilePath;
+
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                MessageBox.Show(
+                    LanguageManager.GetString("Archive.FileNotFound", "File non trovato! "),
+                    LanguageManager.GetString("Common.Error", "Errore"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+
+            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
+        }
+
+        private void MenuExportFiles_Click(object sender, EventArgs e)
+        {
+            if (dgvArchive.SelectedRows.Count == 0) return;
+
+            using (var folderDialog = new FolderBrowserDialog())
+            {
+                folderDialog.Description = LanguageManager.GetString("Archive.ExportSelectFolder", "Seleziona la cartella di destinazione");
+                if (folderDialog.ShowDialog() != DialogResult.OK) return;
+
+                string destFolder = folderDialog.SelectedPath;
+                int copied = 0;
+                int errors = 0;
+
+                this.Cursor = Cursors.WaitCursor;
+                try
+                {
+                    foreach (DataGridViewRow row in dgvArchive.SelectedRows)
+                    {
+                        string filePath = "";
+                        if (row.Tag is MusicEntry me)
+                            filePath = me.FilePath;
+                        else if (row.Tag is ClipEntry ce)
+                            filePath = ce.FilePath;
+
+                        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                        {
+                            errors++;
+                            continue;
+                        }
+
+                        try
+                        {
+                            string fileName = Path.GetFileNameWithoutExtension(filePath);
+                            string ext = Path.GetExtension(filePath);
+                            string destFile = Path.Combine(destFolder, Path.GetFileName(filePath));
+                            int counter = 1;
+                            while (File.Exists(destFile))
+                            {
+                                destFile = Path.Combine(destFolder, $"{fileName} ({counter}){ext}");
+                                counter++;
+                            }
+                            File.Copy(filePath, destFile, false);
+                            copied++;
+                        }
+                        catch (IOException ex)
+                        {
+                            Log($"[ArchiveControl] Export error for '{filePath}': {ex.Message}");
+                            errors++;
+                        }
+                        catch (UnauthorizedAccessException ex)
+                        {
+                            Log($"[ArchiveControl] Export access denied for '{filePath}': {ex.Message}");
+                            errors++;
+                        }
+                    }
+                }
+                finally
+                {
+                    this.Cursor = Cursors.Default;
+                }
+
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Archive.ExportComplete", "✅ Esportati: {0}\n❌ Errori: {1}"), copied, errors),
+                    LanguageManager.GetString("Archive.ExportCompleteTitle", "Esportazione Completata"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
         }
 
         private void ApplyBatchEdit(bool modifyGenre, string newGenre, bool modifyCategory, string newCategory)
