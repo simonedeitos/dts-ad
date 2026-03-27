@@ -45,12 +45,6 @@ namespace AirDirector.Forms
         private bool _isClip = false;
         private int _originalClipId = 0;
 
-        // ✅ Backup marker originali per ripristino su Annulla
-        private int _originalMarkerIN;
-        private int _originalMarkerINTRO;
-        private int _originalMarkerMIX;
-        private int _originalMarkerOUT;
-
         private Button btnResetIn;
         private Button btnResetIntro;
         private Button btnResetMix;
@@ -59,7 +53,6 @@ namespace AirDirector.Forms
         // ✅ ZOOM
         private float _zoomLevel = 1.0f;
         private int _scrollOffset = 0; // offset in waveformData samples
-        private bool _userScrolledManually = false; // disabilita auto-scroll se l'utente ha scrollato manualmente
 
         // ✅ VOLUME BOOST
         private float _volumeBoostDb = 0f;
@@ -77,15 +70,12 @@ namespace AirDirector.Forms
         // ✅ AUTOCOMPLETE suggerimenti
         private AutoCompleteStringCollection _genreSuggestions;
         private AutoCompleteStringCollection _categorySuggestions;
-        private List<string> _allCategoryNames = new List<string>(); // tutte le categorie disponibili
-        private Button _btnCategoryDropdown; // pulsante ▼ per dropdown categorie
 
         // ✅ VIDEO PREVIEW (RadioTV mode) – separate preview window
         private string _videoPath;  // resolved video file path (null if no video)
         private int _videoSyncTickCounter;  // rate-limiter for drift correction
         private VideoPreviewForm _videoPreviewForm;
         private Button _btnVideoPreview;
-        private static bool _videoPreviewWasOpen = true; // ricorda stato video preview tra aperture
 
         public MusicEditorForm(MusicEntry musicEntry, bool isClip = false)
         {
@@ -93,12 +83,6 @@ namespace AirDirector.Forms
 
             _musicEntry = musicEntry;
             _isClip = isClip;
-
-            // ✅ Salva marker originali per ripristino su Annulla
-            _originalMarkerIN = musicEntry.MarkerIN;
-            _originalMarkerINTRO = musicEntry.MarkerINTRO;
-            _originalMarkerMIX = musicEntry.MarkerMIX;
-            _originalMarkerOUT = musicEntry.MarkerOUT;
 
             if (_isClip)
             {
@@ -150,18 +134,6 @@ namespace AirDirector.Forms
 
             // ✅ ASCOLTA CAMBIO LINGUA
             LanguageManager.LanguageChanged += (s, e) => ApplyLanguage();
-
-            // ✅ Ripristina marker originali su Annulla/chiusura senza salvataggio
-            this.FormClosing += (s, e) =>
-            {
-                if (this.DialogResult != DialogResult.OK)
-                {
-                    _musicEntry.MarkerIN = _originalMarkerIN;
-                    _musicEntry.MarkerINTRO = _originalMarkerINTRO;
-                    _musicEntry.MarkerMIX = _originalMarkerMIX;
-                    _musicEntry.MarkerOUT = _originalMarkerOUT;
-                }
-            };
         }
 
         #region ============ GENRE / CATEGORY SUGGESTIONS ============
@@ -231,8 +203,6 @@ namespace AirDirector.Forms
                     }
                 }
 
-                _allCategoryNames = allCats.OrderBy(c => c).ToList();
-
                 foreach (var cat in allCats)
                 {
                     _categorySuggestions.Add(cat);
@@ -242,101 +212,12 @@ namespace AirDirector.Forms
                 txtCategories.AutoCompleteSource = AutoCompleteSource.CustomSource;
                 txtCategories.AutoCompleteCustomSource = _categorySuggestions;
 
-                // ✅ Aggiungi pulsante dropdown per selezione multipla categorie
-                SetupCategoryDropdownButton();
-
                 Console.WriteLine($"[MusicEditor] ✅ Caricate {allCats.Count} categorie da {dbcFile}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[MusicEditor] ⚠️ Errore LoadCategorySuggestions: {ex.Message}");
             }
-        }
-
-        private void SetupCategoryDropdownButton()
-        {
-            _btnCategoryDropdown = new Button
-            {
-                Text = "▼",
-                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(60, 60, 60),
-                ForeColor = Color.White,
-                Size = new Size(25, txtCategories.Height),
-                Location = new Point(txtCategories.Right + 2, txtCategories.Top),
-                Cursor = Cursors.Hand
-            };
-            _btnCategoryDropdown.FlatAppearance.BorderSize = 1;
-            _btnCategoryDropdown.FlatAppearance.BorderColor = Color.Gray;
-            _btnCategoryDropdown.Click += BtnCategoryDropdown_Click;
-            txtCategories.Parent.Controls.Add(_btnCategoryDropdown);
-        }
-
-        private void BtnCategoryDropdown_Click(object sender, EventArgs e)
-        {
-            // Crea popup con CheckedListBox per selezione multipla categorie
-            var popup = new ToolStripDropDown();
-            popup.AutoClose = true;
-
-            var host = new ToolStripControlHost(CreateCategoryCheckedListBox());
-            host.AutoSize = true;
-            host.Margin = Padding.Empty;
-            popup.Items.Add(host);
-
-            popup.Show(txtCategories, new Point(0, txtCategories.Height));
-        }
-
-        private Panel CreateCategoryCheckedListBox()
-        {
-            var panel = new Panel
-            {
-                BackColor = Color.FromArgb(45, 45, 45),
-                Size = new Size(txtCategories.Width + 27, Math.Min(200, _allCategoryNames.Count * 22 + 10))
-            };
-
-            var clb = new CheckedListBox
-            {
-                BackColor = Color.FromArgb(45, 45, 45),
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9F),
-                BorderStyle = BorderStyle.None,
-                CheckOnClick = true,
-                Dock = DockStyle.Fill
-            };
-
-            // Popola con tutte le categorie disponibili
-            var currentCats = (txtCategories.Text ?? "")
-                .Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(c => c.Trim())
-                .Where(c => !string.IsNullOrWhiteSpace(c))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var cat in _allCategoryNames)
-            {
-                bool isChecked = currentCats.Contains(cat);
-                clb.Items.Add(cat, isChecked);
-            }
-
-            clb.ItemCheck += (s, ev) =>
-            {
-                // Aggiorna txtCategories con le categorie selezionate
-                this.BeginInvoke((Action)(() =>
-                {
-                    var selected = new List<string>();
-                    for (int i = 0; i < clb.Items.Count; i++)
-                    {
-                        bool check = clb.GetItemChecked(i);
-                        if (i == ev.Index)
-                            check = (ev.NewValue == CheckState.Checked);
-                        if (check)
-                            selected.Add(clb.Items[i].ToString());
-                    }
-                    txtCategories.Text = string.Join(";", selected);
-                }));
-            };
-
-            panel.Controls.Add(clb);
-            return panel;
         }
 
         /// <summary>
@@ -398,8 +279,6 @@ namespace AirDirector.Forms
         {
             _zoomLevel = trkZoom.Value / 100f;
             lblZoomPercent.Text = $"{trkZoom.Value}%";
-            if (_zoomLevel <= 1.01f)
-                _userScrolledManually = false;
             UpdateScrollBarForZoom();
             RecreateWaveformBitmapWithBoost();
             picWaveform.Invalidate();
@@ -414,8 +293,6 @@ namespace AirDirector.Forms
                 trkZoom.Value = newVal0;
                 return;
             }
-
-            _userScrolledManually = true;
 
             float oldZoom = _zoomLevel;
             int delta = e.Delta > 0 ? 50 : -50;
@@ -450,8 +327,6 @@ namespace AirDirector.Forms
         private void HScrollWaveform_Scroll(object sender, ScrollEventArgs e)
         {
             if (_waveformData == null || _waveformData.Length == 0) return;
-
-            _userScrolledManually = true;
 
             int visibleSamples = (int)(_waveformData.Length / _zoomLevel);
             int maxOffset = Math.Max(0, _waveformData.Length - visibleSamples);
@@ -849,11 +724,10 @@ namespace AirDirector.Forms
             _btnVideoPreview.Click += BtnVideoPreview_Click;
             toolbarPanel.Controls.Add(_btnVideoPreview);
 
-            // In RadioTV mode, auto-open video preview se era aperto l'ultima volta
+            // In RadioTV mode, auto-open video preview at bottom-left of screen
             this.Shown += (s, ev) =>
             {
-                if (_videoPreviewWasOpen)
-                    OpenVideoPreviewBottomLeft();
+                OpenVideoPreviewBottomLeft();
             };
         }
 
@@ -868,13 +742,8 @@ namespace AirDirector.Forms
             _videoPreviewForm.Location = new Point(
                 screen.WorkingArea.Left,
                 screen.WorkingArea.Bottom - _videoPreviewForm.Height);
-            _videoPreviewForm.FormClosed += (s2, ev2) =>
-            {
-                _videoPreviewForm = null;
-                _videoPreviewWasOpen = false;
-            };
+            _videoPreviewForm.FormClosed += (s2, ev2) => _videoPreviewForm = null;
             _videoPreviewForm.Show(this);
-            _videoPreviewWasOpen = true;
         }
 
         private void BtnVideoPreview_Click(object sender, EventArgs e)
@@ -890,13 +759,8 @@ namespace AirDirector.Forms
             }
 
             _videoPreviewForm = new VideoPreviewForm(_videoPath);
-            _videoPreviewForm.FormClosed += (s, ev) =>
-            {
-                _videoPreviewForm = null;
-                _videoPreviewWasOpen = false;
-            };
+            _videoPreviewForm.FormClosed += (s, ev) => _videoPreviewForm = null;
             _videoPreviewForm.Show(this);
-            _videoPreviewWasOpen = true;
 
             // Sync to current audio state
             if (_isPlaying)
@@ -2039,8 +1903,7 @@ namespace AirDirector.Forms
                 }
 
                 // ✅ Auto-scroll zoom: centra la posizione corrente se fuori dalla vista
-                // Solo se l'utente NON ha scrollato manualmente
-                if (!_userScrolledManually && _zoomLevel > 1.01f && _waveformData != null && _waveformData.Length > 0)
+                if (_zoomLevel > 1.01f && _waveformData != null && _waveformData.Length > 0)
                 {
                     int totalMs = (int)_audioReader.TotalTime.TotalMilliseconds;
                     int visibleSamples = (int)(_waveformData.Length / _zoomLevel);
