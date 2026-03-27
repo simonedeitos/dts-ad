@@ -67,9 +67,10 @@ namespace AirDirector.Controls
             public string VideoFilePath = "", VideoSource = "", NDISourceName = "";
             public TimeSpan Intro = TimeSpan.Zero, Duration = TimeSpan.Zero;
             public int MarkerIN, MarkerINTRO, MarkerMIX, MarkerOUT;
+            public int FileDurationMs;
             public bool IsScheduled = false;
             public static PlayItem FromQueueItem(PlaylistQueueItem qi) => new PlayItem
-            { FilePath = qi.FilePath ?? "", Artist = qi.Artist ?? "", Title = qi.Title ?? "", Intro = qi.Intro, MarkerIN = qi.MarkerIN, MarkerINTRO = qi.MarkerINTRO, MarkerMIX = qi.MarkerMIX, MarkerOUT = qi.MarkerOUT, ItemType = qi.ItemType ?? "Music", VideoFilePath = qi.VideoFilePath ?? "", VideoSource = qi.VideoSource ?? "", NDISourceName = qi.NDISourceName ?? "", Duration = qi.Duration, IsScheduled = qi.IsScheduled };
+            { FilePath = qi.FilePath ?? "", Artist = qi.Artist ?? "", Title = qi.Title ?? "", Intro = qi.Intro, MarkerIN = qi.MarkerIN, MarkerINTRO = qi.MarkerINTRO, MarkerMIX = qi.MarkerMIX, MarkerOUT = qi.MarkerOUT, ItemType = qi.ItemType ?? "Music", VideoFilePath = qi.VideoFilePath ?? "", VideoSource = qi.VideoSource ?? "", NDISourceName = qi.NDISourceName ?? "", Duration = qi.Duration, FileDurationMs = qi.FileDurationMs, IsScheduled = qi.IsScheduled };
         }
 
         private enum DeckType { VideoClip, AudioTrack, WebStream, Buffer }
@@ -724,7 +725,7 @@ namespace AirDirector.Controls
                 if (!d.StreamClock.IsRunning) return;
                 int ms = (int)d.StreamClock.ElapsedMilliseconds;
                 _positionMs = ms;
-                if (_markerMIX > 0 && ms >= _markerMIX) { if (TryTriggerMix()) { Log("[POS] WebStream MIX at " + ms + "ms"); SafeInvoke(() => { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); }); } return; }
+                if (_autoMode && _markerMIX > 0 && ms >= _markerMIX) { if (TryTriggerMix()) { Log("[POS] WebStream MIX at " + ms + "ms"); SafeInvoke(() => { _mixCheckTimer.Stop(); OnMixReached(); }); } return; }
                 if (_markerOUT > 0 && ms >= _markerOUT) { if (TryTriggerMix()) { Log("[POS] WebStream OUT at " + ms + "ms"); SafeInvoke(() => { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); else { _isPlaying = false; OnTrackEnded(); } }); } }
                 return;
             }
@@ -732,7 +733,7 @@ namespace AirDirector.Controls
             int fileMs = 0;
             try { if (d.Type == DeckType.VideoClip) fileMs = (int)d.VlcTimeMs; else if (d.FileReader != null) fileMs = (int)d.FileReader.CurrentTime.TotalMilliseconds; } catch { return; }
             if (fileMs > 0) _positionMs = fileMs;
-            if (_markerMIX > 0 && fileMs >= _markerMIX) { if (TryTriggerMix()) { SafeInvoke(() => { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); }); } return; }
+            if (_autoMode && _markerMIX > 0 && fileMs >= _markerMIX) { if (TryTriggerMix()) { SafeInvoke(() => { _mixCheckTimer.Stop(); OnMixReached(); }); } return; }
             if (_markerOUT > 0 && fileMs >= _markerOUT) { if (TryTriggerMix()) { SafeInvoke(() => { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); else { _isPlaying = false; OnTrackEnded(); } }); } return; }
             if (d.Type == DeckType.AudioTrack && d.FileReader != null && d.FileReader.Position >= d.FileReader.Length) _commandQueue.Enqueue(() => HandleDeckEnded(d, d.SessionId));
         }
@@ -1018,14 +1019,18 @@ namespace AirDirector.Controls
             }
 
             _waveformPeaks = null; _waveformCurrentFile = "";
-            TimeSpan dur = item.Duration;
-            if (dur.TotalMilliseconds < 100 && item.MarkerOUT > 0) dur = TimeSpan.FromMilliseconds(item.MarkerOUT);
-            if (dur.TotalMilliseconds < 100 && item.MarkerMIX > 0) dur = TimeSpan.FromMilliseconds(item.MarkerMIX);
+            // Durata totale file: priorità FileReader > FileDurationMs > item.Duration
+            TimeSpan dur = TimeSpan.Zero;
             if (target.FileReader != null && target.FileReader.TotalTime.TotalMilliseconds > 100)
                 dur = target.FileReader.TotalTime;
+            if (dur.TotalMilliseconds < 100 && item.FileDurationMs > 100)
+                dur = TimeSpan.FromMilliseconds(item.FileDurationMs);
+            if (dur.TotalMilliseconds < 100) dur = item.Duration;
+            if (dur.TotalMilliseconds < 100 && item.MarkerOUT > 0) dur = TimeSpan.FromMilliseconds(item.MarkerOUT);
+            if (dur.TotalMilliseconds < 100 && item.MarkerMIX > 0) dur = TimeSpan.FromMilliseconds(item.MarkerMIX);
             _totalDuration = dur; _markerIN = item.MarkerIN; _markerINTRO = item.MarkerINTRO;
-            _markerMIX = item.MarkerMIX > 0 ? item.MarkerMIX : item.MarkerOUT > 0 ? item.MarkerOUT : (int)dur.TotalMilliseconds;
-            _markerOUT = item.MarkerOUT > 0 ? item.MarkerOUT : (int)dur.TotalMilliseconds;
+            _markerMIX = item.MarkerMIX;
+            _markerOUT = item.MarkerOUT;
             _introTime = item.Intro; if (_introTime.TotalMilliseconds <= 0 && _markerINTRO > 0) _introTime = TimeSpan.FromMilliseconds(_markerINTRO);
             _isPlaying = true; _isPaused = false; _positionMs = item.MarkerIN > 0 ? item.MarkerIN : 0;
             _currentFile = fp; CurrentFilePath = fp; CurrentArtist = item.Artist; CurrentTitle = item.Title;
@@ -1214,7 +1219,7 @@ namespace AirDirector.Controls
         // ═══════════════════════════════════════════════════════════
         // MIX
         // ═══════════════════════════════════════════════════════════
-        private void MixCheckTimer_Tick(object s, EventArgs e) { if (!_isPlaying || _isPaused) return; if (_activeDeck == null || !_activeDeck.IsPlaying) return; if (_markerMIX > 0 && _positionMs >= _markerMIX) { if (TryTriggerMix()) { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); } } }
+        private void MixCheckTimer_Tick(object s, EventArgs e) { if (!_isPlaying || _isPaused) return; if (_activeDeck == null || !_activeDeck.IsPlaying) return; if (_autoMode && _markerMIX > 0 && _positionMs >= _markerMIX) { if (TryTriggerMix()) { _mixCheckTimer.Stop(); OnMixReached(); } } }
         private void OnMixReached() { if (_playlistQueue == null) return; _mixCheckTimer.Stop(); int gen = _mixGeneration; var items = _playlistQueue.GetAllItems(); if (items.Count <= 1) { Log("[MIX] No next"); return; } if (gen != _mixGeneration) return; _mixGeneration++; Log("[MIX] → " + (items[1].Title ?? "?")); _playlistQueue.RemoveItem(0); _playlistQueue.SetCurrentPlaying(0); var next = _playlistQueue.GetAllItems(); if (next.Count > 0) LoadAndPlay(next[0]); MixPointReached?.Invoke(this, EventArgs.Empty); }
         private void OnTrackEnded() { _isPlaying = false; _updateTimer.Stop(); _mixCheckTimer.Stop(); _blinkTimer.Stop(); if (_autoMode) OnMixReached(); else { ClearPlayer(); TrackEndedInManualMode?.Invoke(this, EventArgs.Empty); } }
         public void SeekTo(TimeSpan pos) { if (!_isPlaying) return; _commandQueue.Enqueue(() => { var d = _activeDeck; if (d == null || d.Type == DeckType.WebStream) return; try { if (d.Type == DeckType.VideoClip) d.VlcPlayer.Time = (long)pos.TotalMilliseconds; else if (d.FileReader != null) d.FileReader.CurrentTime = pos; d.Ring.Reset(); d.WarmupDone = false; _positionMs = (int)pos.TotalMilliseconds; _audioDelay.Reset(); } catch { } }); }
@@ -1354,8 +1359,6 @@ namespace AirDirector.Controls
                     if (Math.Abs(newMs - oldMs) > 500)
                     {
                         _totalDuration = actualDur;
-                        if (_markerMIX == oldMs) _markerMIX = newMs;
-                        if (_markerOUT == oldMs) _markerOUT = newMs;
                     }
                 }
 
@@ -1468,7 +1471,7 @@ namespace AirDirector.Controls
         private void UpdateTimerLabels() { if (_lblElapsedHeader != null) _lblElapsedHeader.Text = LanguageManager.GetString("Player.TimeElapsed", "Tempo trascorso"); if (_lblRemainingHeader != null) _lblRemainingHeader.Text = LanguageManager.GetString("Player.TimeRemaining", "Tempo restante"); }
         private void UpdateBtnStates() { if (btnPlay == null) return; btnPlay.BackColor = _isPlaying && !_isPaused ? AppTheme.Success : Color.FromArgb(80, 80, 80); btnPause.BackColor = _isPaused ? AppTheme.Warning : Color.FromArgb(80, 80, 80); btnStop.BackColor = !_isPlaying && !_isPaused ? AppTheme.Danger : Color.FromArgb(80, 80, 80); }
         private void InitTimers() { _updateTimer = new System.Windows.Forms.Timer { Interval = 33 }; _updateTimer.Tick += (s, e) => { if (!_isPlaying || _isPaused) return; UpdCnt(); waveformPanel?.Invalidate(); vuMeterLeftPanel?.Invalidate(); vuMeterRightPanel?.Invalidate(); }; _mixCheckTimer = new System.Windows.Forms.Timer { Interval = 50 }; _mixCheckTimer.Tick += MixCheckTimer_Tick; _blinkTimer = new System.Windows.Forms.Timer { Interval = 500 }; _blinkTimer.Tick += (s, e) => { _blinkState = !_blinkState; }; }
-        private void UpdCnt() { int p = _positionMs, ee = _markerMIX > 0 ? _markerMIX : _markerOUT; if (ee <= 0) ee = (int)_totalDuration.TotalMilliseconds; lblElapsed.Text = TimeSpan.FromMilliseconds(Math.Max(0, p - _markerIN)).ToString(@"mm\:ss"); int r = Math.Max(0, ee - p); lblRemaining.Text = "-" + TimeSpan.FromMilliseconds(r).ToString(@"mm\:ss"); if (r > 0 && r <= 10000) { if (!_blinkTimer.Enabled) _blinkTimer.Start(); lblRemaining.BackColor = _blinkState ? Color.Red : Color.Black; lblRemaining.ForeColor = _blinkState ? Color.Black : AppTheme.LEDRed; } else { _blinkTimer.Stop(); lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed; } int im = (int)_introTime.TotalMilliseconds; if (im > 0 && p < im) { lblIntro.Text = TimeSpan.FromMilliseconds(im - p).ToString(@"mm\:ss"); lblIntro.ForeColor = Color.White; lblIntro.BackColor = Color.Red; } else { lblIntro.Text = ""; lblIntro.BackColor = Color.Black; } }
+        private void UpdCnt() { int p = _positionMs; int ee; if (_autoMode && _markerMIX > 0) ee = _markerMIX; else if (_markerOUT > 0) ee = _markerOUT; else ee = (int)_totalDuration.TotalMilliseconds; lblElapsed.Text = TimeSpan.FromMilliseconds(Math.Max(0, p - _markerIN)).ToString(@"mm\:ss"); int r = Math.Max(0, ee - p); lblRemaining.Text = "-" + TimeSpan.FromMilliseconds(r).ToString(@"mm\:ss"); if (r > 0 && r <= 10000) { if (!_blinkTimer.Enabled) _blinkTimer.Start(); lblRemaining.BackColor = _blinkState ? Color.Red : Color.Black; lblRemaining.ForeColor = _blinkState ? Color.Black : AppTheme.LEDRed; } else { _blinkTimer.Stop(); lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed; } int im = (int)_introTime.TotalMilliseconds; if (im > 0 && p < im) { lblIntro.Text = TimeSpan.FromMilliseconds(im - p).ToString(@"mm\:ss"); lblIntro.ForeColor = Color.White; lblIntro.BackColor = Color.Red; } else { lblIntro.Text = ""; lblIntro.BackColor = Color.Black; } }
         private void WfPaint(object s, PaintEventArgs e)
         {
             Graphics g = e.Graphics;
@@ -1486,8 +1489,14 @@ namespace AirDirector.Controls
             // Marker IN posizione sulla waveform
             int markerInX = _markerIN > 0 ? (int)((float)_markerIN / tm * (w - 1)) : 0;
 
-            // Marker MIX posizione sulla waveform
-            int markerMixMs = _markerMIX > 0 ? _markerMIX : _markerOUT > 0 ? _markerOUT : (int)tm;
+            // Marker MIX posizione sulla waveform (in MANUAL mode MIX sparisce)
+            int markerMixMs;
+            if (_autoMode && _markerMIX > 0)
+                markerMixMs = _markerMIX;
+            else if (_markerOUT > 0)
+                markerMixMs = _markerOUT;
+            else
+                markerMixMs = (int)tm;
             int markerMixX = (int)((float)markerMixMs / tm * (w - 1));
 
             // Marker INTRO posizione sulla waveform
@@ -1511,7 +1520,8 @@ namespace AirDirector.Controls
                 for (int i = 0; i < nb; i++)
                 {
                     float pv = pk[i];
-                    int bh = Math.Max(1, (int)(pv * h * 0.95f));
+                    float boosted = (float)Math.Pow(pv, 0.6);
+                    int bh = Math.Max(1, (int)(boosted * h * 0.95f));
                     int bx = (int)(i * bw2);
 
                     Color bc;
@@ -1556,10 +1566,19 @@ namespace AirDirector.Controls
                 using (var pn = new Pen(Color.FromArgb(200, 0, 200, 255), 2))
                     g.DrawLine(pn, markerInX, 0, markerInX, h);
 
-            // Marker MIX (linea arancione)
-            if (markerMixX > 0 && markerMixX < w)
+            // Marker MIX (linea arancione) - solo in AUTO mode
+            if (_autoMode && _markerMIX > 0 && markerMixX > 0 && markerMixX < w)
                 using (var pn = new Pen(Color.FromArgb(200, 255, 128, 0), 2))
                     g.DrawLine(pn, markerMixX, 0, markerMixX, h);
+
+            // Marker OUT (linea arancione chiara) - se diverso da MIX e fine file
+            if (_markerOUT > 0 && _markerOUT < (int)tm)
+            {
+                int markerOutX = (int)((float)_markerOUT / tm * (w - 1));
+                if (markerOutX > 0 && markerOutX < w && (!_autoMode || _markerOUT != _markerMIX))
+                    using (var pn = new Pen(Color.FromArgb(150, 255, 128, 0), 1))
+                        g.DrawLine(pn, markerOutX, 0, markerOutX, h);
+            }
 
             // Marker INTRO (linea gialla)
             if (introX > 0 && introX < w)
