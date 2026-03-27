@@ -272,12 +272,12 @@ namespace AirDirector.Controls
 
         private void ApplyLanguage()
         {
-            tabGeneral.Text = "⚙️ " + LanguageManager.GetString("Configuration. Tab.General", "Generale");
+            tabGeneral.Text = "⚙️ " + LanguageManager.GetString("Configuration.Tab.General", "Generale");
             tabStation.Text = "📻 " + LanguageManager.GetString("Configuration.Tab.Station", "Stazione");
-            tabAudio.Text = "🔊 " + LanguageManager.GetString("Configuration.Tab. Audio", "Audio");
+            tabAudio.Text = "🔊 " + LanguageManager.GetString("Configuration.Tab.Audio", "Audio");
             tabVideo.Text = "🎬 " + LanguageManager.GetString("Configuration.Tab.Video", "Video");
-            tabPaths.Text = "📂 " + LanguageManager.GetString("Configuration.Tab. Paths", "Percorsi");
-            tabMetadata.Text = "📡 " + LanguageManager.GetString("Configuration.Tab. Metadata", "Metadata");
+            tabPaths.Text = "📂 " + LanguageManager.GetString("Configuration.Tab.Paths", "Percorsi");
+            tabMetadata.Text = "📡 " + LanguageManager.GetString("Configuration.Tab.Metadata", "Metadata");
             tabBackup.Text = "💾 " + LanguageManager.GetString("Configuration.Tab.Backup", "Backup");
 
             lblGeneralTitle.Text = LanguageManager.GetString("Configuration.General.Title", "⚙️ IMPOSTAZIONI GENERALI");
@@ -315,12 +315,12 @@ namespace AirDirector.Controls
             btnSaveVideo.Text = "💾 " + LanguageManager.GetString("Common.Save", "Salva");
 
             grpNDI.Text = LanguageManager.GetString("Configuration.NDI.Title", "⚡ Configurazione NDI");
-            lblNDISource.Text = LanguageManager.GetString("Configuration.NDI. SourceName", "Nome Sorgente NDI:");
+            lblNDISource.Text = LanguageManager.GetString("Configuration.NDI.SourceName", "Nome Sorgente NDI:");
 
-            lblPathsTitle.Text = LanguageManager.GetString("Configuration. Paths.Title", "📂 PERCORSI E MAPPATURE");
+            lblPathsTitle.Text = LanguageManager.GetString("Configuration.Paths.Title", "📂 PERCORSI E MAPPATURE");
             lblDatabasePath.Text = LanguageManager.GetString("Configuration.DatabasePath", "Path Database:");
             lblDriveX.Text = LanguageManager.GetString("Configuration.DriveX", "Drive X (Database Condiviso):");
-            lblDriveY.Text = LanguageManager.GetString("Configuration. DriveY", "Drive Y (Archivio Commercial):");
+            lblDriveY.Text = LanguageManager.GetString("Configuration.DriveY", "Drive Y (Archivio Commercial):");
             lblDriveZ.Text = LanguageManager.GetString("Configuration.DriveZ", "Drive Z (Archivio Musica):");
             lblTimeSignalPath.Text = LanguageManager.GetString("Configuration.TimeSignalPath", "Cartella Segnale Orario:");
             btnBrowseDatabase.Text = "📁";
@@ -343,7 +343,7 @@ namespace AirDirector.Controls
             btnBrowseRds.Text = "📁";
             btnSaveMetadata.Text = "💾 " + LanguageManager.GetString("Common.Save", "Salva");
 
-            lblBackupTitle.Text = LanguageManager.GetString("Configuration. Backup.Title", "💾 BACKUP AUTOMATICO");
+            lblBackupTitle.Text = LanguageManager.GetString("Configuration.Backup.Title", "💾 BACKUP AUTOMATICO");
             lblBackupPath.Text = LanguageManager.GetString("Configuration.BackupPath", "Cartella Backup:");
             lblBackupTime.Text = LanguageManager.GetString("Configuration.BackupTime", "Orario Backup Automatico:");
             btnBrowseBackup.Text = "📁";
@@ -367,8 +367,8 @@ namespace AirDirector.Controls
 
             int selectedBufferMode = cmbBufferMode.SelectedIndex;
             cmbBufferMode.Items.Clear();
-            cmbBufferMode.Items.Add(LanguageManager.GetString("Configuration.BufferMode. RandomLoop", "File Random in Loop"));
-            cmbBufferMode.Items.Add(LanguageManager.GetString("Configuration.BufferMode. Slideshow", "Slideshow Sequenziale"));
+            cmbBufferMode.Items.Add(LanguageManager.GetString("Configuration.BufferMode.RandomLoop", "File Random in Loop"));
+            cmbBufferMode.Items.Add(LanguageManager.GetString("Configuration.BufferMode.Slideshow", "Slideshow Sequenziale"));
             if (selectedBufferMode >= 0 && selectedBufferMode < cmbBufferMode.Items.Count)
                 cmbBufferMode.SelectedIndex = selectedBufferMode;
 
@@ -576,7 +576,7 @@ namespace AirDirector.Controls
             LoadNDIDevices();
 
             MessageBox.Show(
-                LanguageManager.GetString("Configuration. NDI. Refreshed", "✅ Aggiornamento completato!\n\nControlla la console per i dettagli."),
+                LanguageManager.GetString("Configuration.NDI.Refreshed", "✅ Aggiornamento completato!\n\nControlla la console per i dettagli."),
                 LanguageManager.GetString("Common.Info", "Info"),
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
@@ -586,7 +586,7 @@ namespace AirDirector.Controls
         {
             using (FolderBrowserDialog fbd = new FolderBrowserDialog())
             {
-                fbd.Description = LanguageManager.GetString("Configuration.Dialog. DatabaseDescription", "Seleziona cartella Database");
+                fbd.Description = LanguageManager.GetString("Configuration.Dialog.DatabaseDescription", "Seleziona cartella Database");
                 fbd.SelectedPath = txtDatabasePath.Text;
 
                 if (fbd.ShowDialog() == DialogResult.OK)
@@ -600,7 +600,7 @@ namespace AirDirector.Controls
         {
             using (FolderBrowserDialog fbd = new FolderBrowserDialog())
             {
-                fbd.Description = LanguageManager.GetString("Configuration. Dialog.DriveXDescription", "Seleziona percorso Drive X (Database Condiviso)");
+                fbd.Description = LanguageManager.GetString("Configuration.Dialog.DriveXDescription", "Seleziona percorso Drive X (Database Condiviso)");
                 if (fbd.ShowDialog() == DialogResult.OK)
                 {
                     txtDriveX.Text = fbd.SelectedPath;
@@ -636,7 +636,7 @@ namespace AirDirector.Controls
         {
             using (FolderBrowserDialog fbd = new FolderBrowserDialog())
             {
-                fbd.Description = LanguageManager.GetString("Configuration.Dialog. TimeSignalDescription", "Seleziona cartella Segnale Orario");
+                fbd.Description = LanguageManager.GetString("Configuration.Dialog.TimeSignalDescription", "Seleziona cartella Segnale Orario");
                 if (fbd.ShowDialog() == DialogResult.OK)
                 {
                     txtTimeSignalPath.Text = fbd.SelectedPath;
@@ -781,7 +781,7 @@ namespace AirDirector.Controls
                     else
                     {
                         MessageBox.Show(
-                            string.Format(LanguageManager.GetString("Configuration.Drive. NetworkMappingError", "❌ Errore durante la mappatura di rete:\n\n{0}\n\nVerifica che:\n- Il percorso di rete sia raggiungibile\n- Hai i permessi necessari\n- Il formato sia corretto (es. \\\\server\\cartella)"), error),
+                            string.Format(LanguageManager.GetString("Configuration.Drive.NetworkMappingError", "❌ Errore durante la mappatura di rete:\n\n{0}\n\nVerifica che:\n- Il percorso di rete sia raggiungibile\n- Hai i permessi necessari\n- Il formato sia corretto (es. \\\\server\\cartella)"), error),
                             LanguageManager.GetString("Configuration.Drive.ErrorTitle", "Errore Mappatura"),
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Error);
@@ -1028,7 +1028,7 @@ namespace AirDirector.Controls
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    string.Format(LanguageManager.GetString("Configuration.Error. SaveFailed", "❌ Errore salvataggio:\n{0}"), ex.Message),
+                    string.Format(LanguageManager.GetString("Configuration.Error.SaveFailed", "❌ Errore salvataggio:\n{0}"), ex.Message),
                     LanguageManager.GetString("Common.Error", "Errore"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -1042,7 +1042,7 @@ namespace AirDirector.Controls
             LoadAudioDevices(cmbPaletteOutput);
 
             MessageBox.Show(
-                LanguageManager.GetString("Configuration. DevicesRefreshed", "✅ Dispositivi audio aggiornati! "),
+                LanguageManager.GetString("Configuration.DevicesRefreshed", "✅ Dispositivi audio aggiornati! "),
                 LanguageManager.GetString("Common.Info", "Info"),
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
