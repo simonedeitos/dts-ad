@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using LibVLCSharp.Shared;
+using AirDirector.Services.Localization;
 
 namespace AirDirector.Forms
 {
@@ -22,7 +23,7 @@ namespace AirDirector.Forms
         {
             _videoPath = videoPath;
 
-            this.Text = "📺 Video Preview";
+            this.Text = "📺 " + LanguageManager.GetString("VideoPreview.Title", "Video Preview");
             this.Size = new Size(640, 400);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.SizableToolWindow;
