@@ -1166,7 +1166,21 @@ namespace AirDirector.Controls
         public void Stop()
         {
             _isPlaying = false; _isPaused = false; ResetMixTrigger();
-            SafeInvoke(() => { _updateTimer.Stop(); _mixCheckTimer.Stop(); _blinkTimer.Stop(); UpdateBtnStates(); lblIntro.Text = "--:--"; lblIntro.ForeColor = AppTheme.LEDYellow; lblIntro.BackColor = Color.Black; lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed; lblElapsed.Text = "--:--"; lblRemaining.Text = "--:--"; _waveformPeaks = null; _waveformCurrentFile = ""; _positionMs = 0; _totalDuration = TimeSpan.Zero; _markerIN = 0; _markerOUT = 0; _markerMIX = 0; waveformPanel.Invalidate(); });
+            SafeInvoke(() => {
+                _updateTimer.Stop(); _mixCheckTimer.Stop(); _blinkTimer.Stop(); UpdateBtnStates();
+                lblIntro.Text = "--:--"; lblIntro.ForeColor = AppTheme.LEDYellow; lblIntro.BackColor = Color.Black;
+                lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed;
+                lblElapsed.Text = "--:--"; lblRemaining.Text = "--:--";
+                // Reset playback state only if a new track hasn't started
+                // (PlayInternal sets _isPlaying = true before this SafeInvoke runs)
+                if (!_isPlaying)
+                {
+                    _waveformPeaks = null; _waveformCurrentFile = "";
+                    _positionMs = 0; _totalDuration = TimeSpan.Zero;
+                    _markerIN = 0; _markerOUT = 0; _markerMIX = 0;
+                }
+                waveformPanel.Invalidate();
+            });
             _commandQueue.Enqueue(() =>
             {
                 if (_pendingDeck != null) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
