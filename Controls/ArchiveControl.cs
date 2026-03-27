@@ -764,37 +764,37 @@ namespace AirDirector.Controls
         }
 
         private void DgvArchive_MouseDown(object sender, MouseEventArgs e)
+{
+    var hitTest = dgvArchive.HitTest(e.X, e.Y);
+
+    // ✅ Tasto destro: seleziona la riga sotto il cursore PRIMA di mostrare il menu
+    if (e.Button == MouseButtons.Right)
+    {
+        if (hitTest.RowIndex >= 0 && hitTest.RowIndex < dgvArchive.Rows.Count)
         {
-            var hitTest = dgvArchive.HitTest(e.X, e.Y);
-
-            // ✅ Tasto destro: seleziona la riga sotto il cursore PRIMA di mostrare il menu
-            if (e.Button == MouseButtons.Right)
+            // Se la riga cliccata NON è già nella selezione, seleziona solo quella
+            if (!dgvArchive.Rows[hitTest.RowIndex].Selected)
             {
-                if (hitTest.RowIndex >= 0 && hitTest.RowIndex < dgvArchive.Rows.Count)
-                {
-                    // Se la riga cliccata NON è già nella selezione, seleziona solo quella
-                    if (!dgvArchive.Rows[hitTest.RowIndex].Selected)
-                    {
-                        dgvArchive.ClearSelection();
-                        dgvArchive.Rows[hitTest.RowIndex].Selected = true;
-                    }
-                    // Se è già selezionata (es. multi-selezione), lascia la selezione com'è
-
-                    dgvArchive.CurrentCell = dgvArchive.Rows[hitTest.RowIndex].Cells[0];
-                }
-                return;
+                dgvArchive.ClearSelection();
+                dgvArchive.Rows[hitTest.RowIndex].Selected = true;
+                dgvArchive.CurrentCell = dgvArchive.Rows[hitTest.RowIndex].Cells[0]; // ✅ solo se nuova riga
             }
-
-            // ✅ Tasto sinistro: drag & drop (invariato)
-            if (e.Button == MouseButtons.Left)
-            {
-                if (hitTest.RowIndex >= 0 && hitTest.RowIndex < dgvArchive.Rows.Count)
-                {
-                    _dragStartPoint = e.Location;
-                    _isDragging = false;
-                }
-            }
+            // Se è già selezionata (es. multi-selezione), lascia la selezione com'è
+            // NON aggiornare CurrentCell per evitare il reset della multi-selezione
         }
+        return;
+    }
+
+    // ✅ Tasto sinistro: drag & drop (invariato)
+    if (e.Button == MouseButtons.Left)
+    {
+        if (hitTest.RowIndex >= 0 && hitTest.RowIndex < dgvArchive.Rows.Count)
+        {
+            _dragStartPoint = e.Location;
+            _isDragging = false;
+        }
+    }
+}
 
         private void DgvArchive_MouseMove(object sender, MouseEventArgs e)
         {
