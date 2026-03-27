@@ -35,6 +35,7 @@ namespace AirDirector.Controls
 
 		private bool _isInitialStartup = true;
 		private string _currentClockName = "";
+		private bool _isGeneratingClock = false;
 
 		private PlaylistQueueItem _lastPlayedForReport = null;
 
@@ -954,13 +955,7 @@ namespace AirDirector.Controls
                         {
                             Log($"[ExecuteSchedule] ? Clock: {schedule.ClockName}");
                             ClearNonPlayingItems();
-                            int clockStartIndex = _items.Count;
                             GeneratePlaylistFromClock(schedule.ClockName, 1000);
-                            if (!string.IsNullOrEmpty(_pendingScheduleVideoBufferPath))
-                            {
-                                for (int i = clockStartIndex; i < _items.Count; i++)
-                                    ApplyScheduleVideoBuffer(_items[i]);
-                            }
                         }
                         else
                         {
@@ -1376,8 +1371,6 @@ namespace AirDirector.Controls
 			ClearNonPlayingItems();
 			_isInitialStartup = false;
 			GeneratePlaylistFromClock(newClockName, 1000);
-			_currentClockName = newClockName;
-			ClockChanged?.Invoke(this, newClockName);
 		}
 
 		private class ClockItem
@@ -1507,8 +1500,16 @@ namespace AirDirector.Controls
         // METODO GeneratePlaylistFromClock - CORRETTO
         // ═══════════════════════════════════════════════════════════
 
-        public void GeneratePlaylistFromClock(string clockName, int maxItems = 1000)
+        public async void GeneratePlaylistFromClock(string clockName, int maxItems = 1000)
         {
+            if (_isGeneratingClock)
+            {
+                Log($"[GenerateClock] ⚠️ Generazione già in corso, richiesta ignorata");
+                return;
+            }
+
+            _isGeneratingClock = true;
+
             try
             {
                 Log($"");
@@ -1558,6 +1559,8 @@ namespace AirDirector.Controls
                 int addedCount = 0;
                 int totalAttempts = 0;
                 int maxAttemptsPerItem = 10;
+                int batchCount = 0;
+                const int batchSize = 5;
 
                 for (int clockIndex = 0; clockIndex < clockItems.Count; clockIndex++)
                 {
@@ -1635,9 +1638,19 @@ namespace AirDirector.Controls
 
                         if (queueItem != null)
                         {
+                            if (!string.IsNullOrEmpty(_pendingScheduleVideoBufferPath))
+                                ApplyScheduleVideoBuffer(queueItem);
                             AddItemBatch(queueItem);
                             addedCount++;
                             addedForThisItem++;
+                            batchCount++;
+
+                            if (batchCount >= batchSize)
+                            {
+                                FinalizeBatchModification();
+                                batchCount = 0;
+                                await Task.Yield();
+                            }
                         }
                         else
                         {
@@ -1648,7 +1661,7 @@ namespace AirDirector.Controls
                     Log($"[GenerateClock] ✅ Aggiunti {addedForThisItem}/{itemsToAdd} per questo elemento");
                 }
 
-                if (addedCount > 0)
+                if (batchCount > 0)
                     FinalizeBatchModification();
 
                 _currentClockName = clockName;
@@ -1670,6 +1683,10 @@ namespace AirDirector.Controls
             {
                 Log($"[GenerateClock] ❌ ERRORE CRITICO: {ex.Message}");
                 Log($"[GenerateClock] StackTrace: {ex.StackTrace}");
+            }
+            finally
+            {
+                _isGeneratingClock = false;
             }
         }
 
