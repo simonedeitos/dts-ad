@@ -111,11 +111,7 @@ namespace AirDirector.Controls
 
         private double NormalizeDuration(double duration)
         {
-            if (duration > 1000)
-            {
-                return duration / 1000.0;
-            }
-            return duration;
+            return duration / 1000.0;
         }
 
         private void ClocksControl_Resize(object sender, EventArgs e)

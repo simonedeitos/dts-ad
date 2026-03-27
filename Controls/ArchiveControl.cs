@@ -143,16 +143,9 @@ namespace AirDirector.Controls
                 UpdateColumnHeaders();
         }
 
-        private double NormalizeDuration(double duration)
+        private string FormatDurationMs(double durationMs)
         {
-            if (duration > 1000)
-                return duration / 1000.0;
-            return duration;
-        }
-
-        private string FormatDuration(double duration)
-        {
-            double seconds = NormalizeDuration(duration);
+            double seconds = durationMs / 1000.0;
             int minutes = (int)(seconds / 60);
             int secs = (int)(seconds % 60);
             return $"{minutes: 00}:{secs:00}";
@@ -1971,7 +1964,7 @@ namespace AirDirector.Controls
                 if (!string.IsNullOrEmpty(tagFile.Tag.FirstGenre))
                     genre = tagFile.Tag.FirstGenre;
 
-                duration = (int)tagFile.Properties.Duration.TotalSeconds;
+                duration = (int)tagFile.Properties.Duration.TotalMilliseconds;
 
                 tagFile.Dispose();
             }
@@ -1988,12 +1981,11 @@ namespace AirDirector.Controls
                 try
                 {
                     using (var reader = new AudioFileReader(filePath))
-                        duration = (int)reader.TotalTime.TotalSeconds;
+                        duration = (int)reader.TotalTime.TotalMilliseconds;
                 }
-                catch { duration = 180; }
+                catch { duration = 180000; }
             }
 
-            int durationMs = duration * 1000;
             int mixDuration = ConfigurationControl.GetMixDuration();
 
             return new MusicEntry
@@ -2013,8 +2005,8 @@ namespace AirDirector.Controls
                 Categories = "",
                 MarkerIN = 0,
                 MarkerINTRO = 0,
-                MarkerMIX = Math.Max(0, durationMs - mixDuration),
-                MarkerOUT = durationMs,
+                MarkerMIX = Math.Max(0, duration - mixDuration),
+                MarkerOUT = duration,
                 ValidMonths = "1;2;3;4;5;6;7;8;9;10;11;12",
                 ValidDays = "Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday",
                 ValidHours = "0;1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16;17;18;19;20;21;22;23",
@@ -2036,7 +2028,7 @@ namespace AirDirector.Controls
             string title = Path.GetFileNameWithoutExtension(filePath);
             int year = DateTime.Now.Year;
             string genre = "";
-            int duration = 180; // Default 3 minuti
+            int duration = 180000; // Default 3 minuti in ms
 
             // ✅ Estrai Artista e Titolo dal nome file "Artista - Titolo.mp4"
             string fileName = Path.GetFileNameWithoutExtension(filePath);
@@ -2064,7 +2056,7 @@ namespace AirDirector.Controls
                 if (!string.IsNullOrEmpty(tagFile.Tag.FirstGenre))
                     genre = tagFile.Tag.FirstGenre;
 
-                duration = (int)tagFile.Properties.Duration.TotalSeconds;
+                duration = (int)tagFile.Properties.Duration.TotalMilliseconds;
 
                 tagFile.Dispose();
             }
@@ -2073,7 +2065,6 @@ namespace AirDirector.Controls
                 Log($"[ArchiveControl] ⚠️ Impossibile leggere metadata video: {ex.Message}");
             }
 
-            int durationMs = duration * 1000;
             int mixDuration = ConfigurationControl.GetMixDuration();
 
             return new MusicEntry
@@ -2093,8 +2084,8 @@ namespace AirDirector.Controls
                 Categories = "",
                 MarkerIN = 0,
                 MarkerINTRO = 0,
-                MarkerMIX = Math.Max(0, durationMs - mixDuration),
-                MarkerOUT = durationMs,
+                MarkerMIX = Math.Max(0, duration - mixDuration),
+                MarkerOUT = duration,
                 ValidMonths = "1;2;3;4;5;6;7;8;9;10;11;12",
                 ValidDays = "Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday",
                 ValidHours = "0;1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16;17;18;19;20;21;22;23",
@@ -2125,7 +2116,7 @@ namespace AirDirector.Controls
                 if (!string.IsNullOrEmpty(tagFile.Tag.FirstGenre))
                     genre = tagFile.Tag.FirstGenre;
 
-                duration = (int)tagFile.Properties.Duration.TotalSeconds;
+                duration = (int)tagFile.Properties.Duration.TotalMilliseconds;
                 tagFile.Dispose();
             }
             catch
@@ -2133,12 +2124,11 @@ namespace AirDirector.Controls
                 try
                 {
                     using (var reader = new AudioFileReader(filePath))
-                        duration = (int)reader.TotalTime.TotalSeconds;
+                        duration = (int)reader.TotalTime.TotalMilliseconds;
                 }
-                catch { duration = 30; }
+                catch { duration = 30000; }
             }
 
-            int durationMs = duration * 1000;
             int mixDuration = ConfigurationControl.GetMixDuration();
 
             return new ClipEntry
@@ -2150,8 +2140,8 @@ namespace AirDirector.Controls
                 Categories = "",
                 MarkerIN = 0,
                 MarkerINTRO = 0,
-                MarkerMIX = Math.Max(0, durationMs - mixDuration),
-                MarkerOUT = durationMs,
+                MarkerMIX = Math.Max(0, duration - mixDuration),
+                MarkerOUT = duration,
                 ValidMonths = "1;2;3;4;5;6;7;8;9;10;11;12",
                 ValidDays = "Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday",
                 ValidHours = "0;1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16;17;18;19;20;21;22;23",
@@ -2171,7 +2161,7 @@ namespace AirDirector.Controls
         {
             string title = Path.GetFileNameWithoutExtension(filePath);
             string genre = "Video";
-            int duration = 30; // Default 30 secondi
+            int duration = 30000; // Default 30 secondi in ms
 
             // ✅ Prova a leggere metadata video
             try
@@ -2184,7 +2174,7 @@ namespace AirDirector.Controls
                 if (!string.IsNullOrEmpty(tagFile.Tag.FirstGenre))
                     genre = tagFile.Tag.FirstGenre;
 
-                duration = (int)tagFile.Properties.Duration.TotalSeconds;
+                duration = (int)tagFile.Properties.Duration.TotalMilliseconds;
 
                 tagFile.Dispose();
             }
@@ -2193,7 +2183,6 @@ namespace AirDirector.Controls
                 Log($"[ArchiveControl] ⚠️ Impossibile leggere metadata video:  {ex.Message}");
             }
 
-            int durationMs = duration * 1000;
             int mixDuration = ConfigurationControl.GetMixDuration();
 
             return new ClipEntry
@@ -2205,8 +2194,8 @@ namespace AirDirector.Controls
                 Categories = "",
                 MarkerIN = 0,
                 MarkerINTRO = 0,
-                MarkerMIX = Math.Max(0, durationMs - mixDuration),
-                MarkerOUT = durationMs,
+                MarkerMIX = Math.Max(0, duration - mixDuration),
+                MarkerOUT = duration,
                 ValidMonths = "1;2;3;4;5;6;7;8;9;10;11;12",
                 ValidDays = "Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday",
                 ValidHours = "0;1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16;17;18;19;20;21;22;23",
@@ -2541,14 +2530,18 @@ namespace AirDirector.Controls
 
                 foreach (var entry in filtered)
                 {
+                    int displayDurationMs = entry.MarkerMIX > entry.MarkerIN
+                        ? entry.MarkerMIX - entry.MarkerIN
+                        : entry.Duration - entry.MarkerIN;
+                    int introMs = Math.Max(0, entry.MarkerINTRO - entry.MarkerIN);
                     int rowIndex = dgvArchive.Rows.Add(
                         GetVideoIcon(entry),
                         entry.Artist ?? "",
                         entry.Title ?? "",
                         entry.Genre ?? "",
                         entry.Year.ToString(),
-                        FormatDuration(entry.Duration),
-                        $"{NormalizeDuration(Math.Max(0, entry.MarkerINTRO - entry.MarkerIN)):F0}s",
+                        FormatDurationMs(displayDurationMs),
+                        $"{introMs / 1000}s",
                         entry.Categories ?? "",
                         entry.AddedDate ?? ""
                     );
@@ -2574,12 +2567,16 @@ namespace AirDirector.Controls
 
                 foreach (var entry in filtered)
                 {
+                    int displayDurationMs = entry.MarkerMIX > entry.MarkerIN
+                        ? entry.MarkerMIX - entry.MarkerIN
+                        : entry.Duration - entry.MarkerIN;
+                    int introMs = Math.Max(0, entry.MarkerINTRO - entry.MarkerIN);
                     int rowIndex = dgvArchive.Rows.Add(
                         GetVideoIcon(entry),
                         entry.Title ?? "",
                         entry.Genre ?? "",
-                        FormatDuration(entry.Duration),
-                        $"{NormalizeDuration(Math.Max(0, entry.MarkerINTRO - entry.MarkerIN)):F0}s",
+                        FormatDurationMs(displayDurationMs),
+                        $"{introMs / 1000}s",
                         entry.Categories ?? "",
                         entry.AddedDate ?? ""
                     );

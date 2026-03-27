@@ -154,11 +154,7 @@ namespace AirDirector.Forms
 
         private double NormalizeDuration(double duration)
         {
-            if (duration > 1000)
-            {
-                return duration / 1000.0;
-            }
-            return duration;
+            return duration / 1000.0;
         }
 
         private void LoadAvailableData()
