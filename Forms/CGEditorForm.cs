@@ -1,5 +1,6 @@
 ﻿using AirDirector.Controls;
 using AirDirector.Services;
+using AirDirector.Services.Localization;
 using Microsoft.Win32;
 using System;
 using System.Drawing;
@@ -129,7 +130,7 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
-            this.Text = "CG Editor - Character Generator";
+            this.Text = LanguageManager.GetString("CGEditor.Title", "CG Editor - Character Generator");
             this.Size = new Size(1050, 820);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -1444,7 +1445,7 @@ namespace AirDirector.Forms
             SaveSettings();
             CGRenderer.ReloadSettings();
 
-            MessageBox.Show("✅ Settings saved and applied!", "CG Editor",
+            MessageBox.Show(LanguageManager.GetString("CGEditor.SettingsSaved", "✅ Settings saved and applied!"), LanguageManager.GetString("CGEditor.AppName", "CG Editor"),
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 

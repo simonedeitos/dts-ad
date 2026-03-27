@@ -141,7 +141,7 @@ namespace AirDirector.Controls
                 lblLastPlayedHeader.Text = "⏮️ " + LanguageManager.GetString("Overview.LastPlayed", "APPENA SUONATO");
 
             if (lblClockActiveHeader != null)
-                lblClockActiveHeader.Text = "🕐 " + LanguageManager.GetString("Overview. ActiveClock", "CLOCK ATTIVO");
+                lblClockActiveHeader.Text = "🕐 " + LanguageManager.GetString("Overview.ActiveClock", "CLOCK ATTIVO");
 
             if (lblNextScheduleHeader != null)
                 lblNextScheduleHeader.Text = "⏰ " + LanguageManager.GetString("Overview.NextSchedule", "PROSSIMA SCHEDULAZIONE");
@@ -153,7 +153,7 @@ namespace AirDirector.Controls
                 lblEncodersHeader.Text = "📡 " + LanguageManager.GetString("Overview.Encoders", "ENCODERS");
 
             if (lblRecordersHeader != null)
-                lblRecordersHeader.Text = "🎙️ " + LanguageManager.GetString("Overview. Recorders", "RECORDERS");
+                lblRecordersHeader.Text = "🎙️ " + LanguageManager.GetString("Overview.Recorders", "RECORDERS");
         }
 
         public void SetReferences(PlaylistQueueControl playlistQueue, EncodersControl encoders, RecordersControl recorders)
@@ -216,7 +216,7 @@ namespace AirDirector.Controls
                 else
                 {
                     ShowPreviewPlaceholder(LanguageManager.GetString("Overview.WaitingNDI", "Waiting for NDI... ") + $"\n{_ndiSourceName}");
-                    UpdateVideoStatus("🔴 " + LanguageManager.GetString("Overview. Disconnected", "Disconnected"), Color.FromArgb(200, 0, 0));
+                    UpdateVideoStatus("🔴 " + LanguageManager.GetString("Overview.Disconnected", "Disconnected"), Color.FromArgb(200, 0, 0));
                 }
             }
             else
@@ -1135,14 +1135,14 @@ namespace AirDirector.Controls
                 }
                 else
                 {
-                    lblNextScheduleInfo.Text = LanguageManager.GetString("Overview. NoSchedule", "Nessuna schedulazione prevista");
+                    lblNextScheduleInfo.Text = LanguageManager.GetString("Overview.NoSchedule", "Nessuna schedulazione prevista");
                     lblCountdown.Text = "--:--:--";
                     lblCountdown.ForeColor = Color.White;
                 }
             }
             catch
             {
-                lblNextScheduleInfo.Text = LanguageManager.GetString("Overview. ScheduleError", "Errore lettura schedulazioni");
+                lblNextScheduleInfo.Text = LanguageManager.GetString("Overview.ScheduleError", "Errore lettura schedulazioni");
                 lblCountdown.Text = "--:--:--";
                 lblCountdown.ForeColor = Color.White;
             }
@@ -1221,7 +1221,7 @@ namespace AirDirector.Controls
                 }
                 else
                 {
-                    lblNextAdInfo.Text = LanguageManager.GetString("Overview. NoAdsScheduled", "Nessuna pubblicità programmata");
+                    lblNextAdInfo.Text = LanguageManager.GetString("Overview.NoAdsScheduled", "Nessuna pubblicità programmata");
                     lblNextAdCountdown.Text = "--:--:--";
                     lblNextAdCountdown.ForeColor = Color.White;
                 }
@@ -1294,7 +1294,7 @@ namespace AirDirector.Controls
             }
             catch
             {
-                lblSystemInfo.Text = LanguageManager.GetString("Overview. LoadError", "Errore\ncaricamento");
+                lblSystemInfo.Text = LanguageManager.GetString("Overview.LoadError", "Errore\ncaricamento");
             }
         }
 

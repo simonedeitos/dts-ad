@@ -48,7 +48,7 @@ namespace AirDirector.Controls
 
             Label lblTitle = new Label
             {
-                Text = "📝 SYSTEM LOG",
+                Text = "📝 " + LanguageManager.GetString("LogControl.Title", "SYSTEM LOG"),
                 Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 ForeColor = AppTheme.TextPrimary,
                 Location = new Point(10, 12),
@@ -58,7 +58,7 @@ namespace AirDirector.Controls
 
             Button btnClear = new Button
             {
-                Text = "🗑️ Pulisci Log",
+                Text = "🗑️ " + LanguageManager.GetString("LogControl.ClearButton", "Pulisci Log"),
                 Location = new Point(headerPanel.Width - 130, 10),
                 Size = new Size(120, 30),
                 BackColor = AppTheme.Danger,
@@ -72,20 +72,20 @@ namespace AirDirector.Controls
             btnClear.Click += (s, e) =>
             {
                 txtLog.Clear();
-                AddLog("Log pulito dall'utente");
+                AddLog(LanguageManager.GetString("LogControl.LogCleared", "Log pulito dall'utente"));
             };
             headerPanel.Controls.Add(btnClear);
         }
 
         private void InitializeLog()
         {
-            AddLog("AirDirector avviato");
+            AddLog(LanguageManager.GetString("LogControl.Started", "AirDirector avviato"));
             AddLog($"Database: {DbcManager.GetDatabasePath()}");
             AddLog($"Lingua: {LanguageManager.GetCurrentLanguage()}");
-            AddLog($"Licenza: {(LicenseManager.IsDemoMode() ? "DEMO" : "ATTIVA")}");
-            AddLog("FileWatcher: attivo");
-            AddLog("Playlist Queue: inizializzata");
-            AddLog("Tutti i sistemi operativi");
+            AddLog(string.Format(LanguageManager.GetString("LogControl.License", "Licenza: {0}"), LicenseManager.IsDemoMode() ? "DEMO" : LanguageManager.GetString("LogControl.LicenseActive", "ATTIVA")));
+            AddLog(LanguageManager.GetString("LogControl.FileWatcherActive", "FileWatcher: attivo"));
+            AddLog(LanguageManager.GetString("LogControl.PlaylistQueueInit", "Playlist Queue: inizializzata"));
+            AddLog(LanguageManager.GetString("LogControl.AllSystemsReady", "Tutti i sistemi operativi"));
         }
 
         public void AddLog(string message)

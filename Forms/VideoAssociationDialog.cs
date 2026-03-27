@@ -42,7 +42,7 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
-            this.Text = "🎬 Associa Video";
+            this.Text = "🎬 " + LanguageManager.GetString("VideoAssociation.Title", "Associa Video");
             this.Size = new Size(600, 430);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -56,7 +56,7 @@ namespace AirDirector.Forms
             // ═══════════════════════════════════════════════
             Label lblTitle = new Label
             {
-                Text = "🎬 ASSOCIA VIDEO",
+                Text = "🎬 " + LanguageManager.GetString("VideoAssociation.Header", "ASSOCIA VIDEO"),
                 Font = new Font("Segoe UI", 14, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(20, 20),
@@ -87,7 +87,7 @@ namespace AirDirector.Forms
 
             rbNone = new RadioButton
             {
-                Text = "🎵 Nessun video (solo audio)",
+                Text = "🎵 " + LanguageManager.GetString("VideoAssociation.NoVideo", "Nessun video (solo audio)"),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(30, yPos),
@@ -101,7 +101,7 @@ namespace AirDirector.Forms
 
             rbStaticVideo = new RadioButton
             {
-                Text = "🎬 File video statico (MP4, MOV, AVI, MKV)",
+                Text = "🎬 " + LanguageManager.GetString("VideoAssociation.StaticVideo", "File video statico (MP4, MOV, AVI, MKV)"),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(30, yPos),
@@ -135,7 +135,7 @@ namespace AirDirector.Forms
 
             btnBrowseVideo = new Button
             {
-                Text = "📁 Sfoglia",
+                Text = "📁 " + LanguageManager.GetString("VideoAssociation.Browse", "Sfoglia"),
                 Location = new Point(440, 8),
                 Size = new Size(70, 28),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -150,7 +150,7 @@ namespace AirDirector.Forms
 
             lblVideoInfo = new Label
             {
-                Text = "Formati supportati: MP4, MOV, AVI, MKV, WMV",
+                Text = LanguageManager.GetString("VideoAssociation.SupportedFormats", "Formati supportati: MP4, MOV, AVI, MKV, WMV"),
                 Location = new Point(10, 45),
                 Size = new Size(500, 20),
                 Font = new Font("Segoe UI", 8),
@@ -167,7 +167,7 @@ namespace AirDirector.Forms
             // ═══════════════════════════════════════════════
             rbBufferVideo = new RadioButton
             {
-                Text = "🖼️ Video tampone casuale (dalla cartella configurata)",
+                Text = "🖼️ " + LanguageManager.GetString("VideoAssociation.BufferVideo", "Video tampone casuale (dalla cartella configurata)"),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(30, yPos),
@@ -193,7 +193,7 @@ namespace AirDirector.Forms
             // ═══════════════════════════════════════════════
             btnCancel = new Button
             {
-                Text = "❌ Annulla",
+                Text = "❌ " + LanguageManager.GetString("Common.Cancel", "Annulla"),
                 Location = new Point(350, 350),
                 Size = new Size(110, 35),
                 BackColor = Color.FromArgb(220, 53, 69),
@@ -208,7 +208,7 @@ namespace AirDirector.Forms
 
             btnSave = new Button
             {
-                Text = "💾 Salva",
+                Text = "💾 " + LanguageManager.GetString("Common.Save", "Salva"),
                 Location = new Point(470, 350),
                 Size = new Size(110, 35),
                 BackColor = Color.FromArgb(40, 167, 69),
@@ -273,7 +273,7 @@ namespace AirDirector.Forms
         {
             using (OpenFileDialog ofd = new OpenFileDialog())
             {
-                ofd.Title = "Seleziona file video";
+                ofd.Title = LanguageManager.GetString("VideoAssociation.SelectFile", "Seleziona file video");
                 ofd.Filter = "Video Files|*.mp4;*. mov;*.avi;*.mkv;*. wmv;*.m4v|All Files|*.*";
                 ofd.Multiselect = false;
 
@@ -291,7 +291,7 @@ namespace AirDirector.Forms
                     }
                     catch
                     {
-                        lblVideoInfo.Text = "✅ File selezionato";
+                        lblVideoInfo.Text = LanguageManager.GetString("VideoAssociation.FileSelected", "✅ File selezionato");
                         lblVideoInfo.ForeColor = Color.LightGreen;
                     }
                 }
@@ -310,8 +310,8 @@ namespace AirDirector.Forms
                 if (string.IsNullOrWhiteSpace(txtVideoPath.Text))
                 {
                     MessageBox.Show(
-                        "⚠️ Seleziona un file video! ",
-                        "Video Mancante",
+                        LanguageManager.GetString("VideoAssociation.SelectVideoWarning", "⚠️ Seleziona un file video!"),
+                        LanguageManager.GetString("VideoAssociation.MissingVideo", "Video Mancante"),
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
                     return;
@@ -320,8 +320,8 @@ namespace AirDirector.Forms
                 if (!File.Exists(txtVideoPath.Text))
                 {
                     MessageBox.Show(
-                        "❌ Il file video selezionato non esiste!",
-                        "File Non Trovato",
+                        LanguageManager.GetString("VideoAssociation.FileNotFound", "❌ Il file video selezionato non esiste!"),
+                        LanguageManager.GetString("VideoAssociation.FileNotFoundTitle", "File Non Trovato"),
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error);
                     return;
@@ -337,9 +337,8 @@ namespace AirDirector.Forms
                 if (string.IsNullOrWhiteSpace(bufferPath) || !Directory.Exists(bufferPath))
                 {
                     MessageBox.Show(
-                        "⚠️ Cartella video tampone non configurata!\n\n" +
-                        "Vai in Configurazione → Video → Cartella Video Tampone",
-                        "Cartella Tampone Mancante",
+                        LanguageManager.GetString("VideoAssociation.BufferNotConfigured", "⚠️ Cartella video tampone non configurata!\n\nVai in Configurazione → Video → Cartella Video Tampone"),
+                        LanguageManager.GetString("VideoAssociation.BufferMissing", "Cartella Tampone Mancante"),
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
                     return;

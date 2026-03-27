@@ -324,7 +324,7 @@ namespace AirDirector.Controls
                 Log($"[DragDrop] ========================================");
                 Log($"");
 
-                MessageBox.Show($"Errore drop: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(string.Format(LanguageManager.GetString("Queue.DropError", "Errore drop: {0}"), ex.Message), LanguageManager.GetString("Common.Error", "Errore"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -1403,14 +1403,14 @@ namespace AirDirector.Controls
 
 				_executedSchedules.Clear();
 
-				MessageBox.Show($"✅ Schedulazioni aggiornate!\n\n{todaySchedules.Count} schedulazioni attive per oggi.",
-					"Aggiornamento Schedulazioni",
+				MessageBox.Show(string.Format(LanguageManager.GetString("Queue.SchedulesUpdated", "✅ Schedulazioni aggiornate!\n\n{0} schedulazioni attive per oggi."), todaySchedules.Count),
+					LanguageManager.GetString("Queue.SchedulesUpdatedTitle", "Aggiornamento Schedulazioni"),
 					MessageBoxButtons.OK,
 					MessageBoxIcon.Information);
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show($"Errore:\n{ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				MessageBox.Show(string.Format(LanguageManager.GetString("Queue.UpdateError", "Errore:\n{0}"), ex.Message), LanguageManager.GetString("Common.Error", "Errore"), MessageBoxButtons.OK, MessageBoxIcon.Error);
 			}
 		}
 
@@ -2423,7 +2423,7 @@ namespace AirDirector.Controls
 							}
 							else
 							{
-								MessageBox.Show("File non trovato!", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
+								MessageBox.Show(LanguageManager.GetString("Queue.FileNotFound", "File non trovato!"), LanguageManager.GetString("Common.Error", "Errore"), MessageBoxButtons.OK, MessageBoxIcon.Error);
 							}
 							return;
 						}

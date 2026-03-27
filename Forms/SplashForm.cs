@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.Windows.Forms;
 using AirDirector.Themes;
+using AirDirector.Services.Localization;
 
 namespace AirDirector.Forms
 {
@@ -24,7 +25,7 @@ namespace AirDirector.Forms
             // Logo Label
             Label lblLogo = new Label
             {
-                Text = "🎵 AirDirector",
+                Text = "🎵 " + LanguageManager.GetString("Splash.AppName", "AirDirector"),
                 Font = new Font("Segoe UI", 48, FontStyle.Bold),
                 ForeColor = AppTheme.TextInverse,
                 AutoSize = false,
@@ -37,7 +38,7 @@ namespace AirDirector.Forms
             // Version Label
             Label lblVersion = new Label
             {
-                Text = "Versione 1.0.0",
+                Text = LanguageManager.GetString("Splash.Version", "Versione 1.0.0"),
                 Font = new Font("Segoe UI", 12, FontStyle.Regular),
                 ForeColor = AppTheme.TextInverse,
                 AutoSize = false,
@@ -50,7 +51,7 @@ namespace AirDirector.Forms
             // Loading Label
             Label lblLoading = new Label
             {
-                Text = "Caricamento...",
+                Text = LanguageManager.GetString("Splash.Loading", "Caricamento..."),
                 Font = new Font("Segoe UI", 11, FontStyle.Italic),
                 ForeColor = AppTheme.LEDGreen,
                 AutoSize = false,
@@ -63,7 +64,7 @@ namespace AirDirector.Forms
             // Copyright Label
             Label lblCopyright = new Label
             {
-                Text = "© 2025 AirDirector - Professional Playout",
+                Text = LanguageManager.GetString("Splash.Copyright", "© 2025 AirDirector - Professional Playout"),
                 Font = new Font("Segoe UI", 9, FontStyle.Regular),
                 ForeColor = Color.FromArgb(200, 255, 255, 255),
                 AutoSize = false,

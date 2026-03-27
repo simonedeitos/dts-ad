@@ -140,7 +140,7 @@ namespace AirDirector.Forms
 
             Label lblFormat = new Label
             {
-                Text = "Formato: ADR-XXXX-XXXX-XXXX",
+                Text = LanguageManager.GetString("License.Format", "Formato: ADR-XXXX-XXXX-XXXX"),
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = AppTheme.TextSecondary,
                 Location = new Point(24, 160),
@@ -178,7 +178,7 @@ namespace AirDirector.Forms
 
             Label lblOr = new Label
             {
-                Text = "— oppure —",
+                Text = LanguageManager.GetString("License.OrSeparator", "— oppure —"),
                 Font = new Font("Segoe UI", 9, FontStyle.Italic),
                 ForeColor = AppTheme.TextSecondary,
                 Location = new Point(230, sepTop + 8),
@@ -228,7 +228,7 @@ namespace AirDirector.Forms
         {
             if (string.IsNullOrWhiteSpace(serial))
             {
-                MessageBox.Show("Inserisci il codice seriale", "Errore",
+                MessageBox.Show(LanguageManager.GetString("License.EnterSerial", "Inserisci il codice seriale"), LanguageManager.GetString("Common.Error", "Errore"),
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -239,7 +239,7 @@ namespace AirDirector.Forms
             {
                 MessageBox.Show(
                     LanguageManager.GetString("License_Success", "Licenza attivata con successo!"),
-                    "Successo",
+                    LanguageManager.GetString("Common.Success", "Successo"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
@@ -252,7 +252,7 @@ namespace AirDirector.Forms
             {
                 MessageBox.Show(
                     LanguageManager.GetString("License_Error", "Errore durante l'attivazione") + ":\n\n" + errorMessage,
-                    "Errore",
+                    LanguageManager.GetString("Common.Error", "Errore"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
                 );
@@ -262,9 +262,8 @@ namespace AirDirector.Forms
         private void BtnDemo_Click(object sender, EventArgs e)
         {
             var result = MessageBox.Show(
-                "Continuerai in modalità demo con funzionalità limitate.\n\n" +
-                "Vuoi proseguire?",
-                "Modalità Demo",
+                LanguageManager.GetString("License.DemoConfirmMessage", "Continuerai in modalità demo con funzionalità limitate.\n\nVuoi proseguire?"),
+                LanguageManager.GetString("License.DemoMode", "Modalità Demo"),
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question
             );
