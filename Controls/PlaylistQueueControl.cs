@@ -2375,7 +2375,7 @@ namespace AirDirector.Controls
 		{
 			int effectiveDurationMs = entry.MarkerMIX > entry.MarkerIN
 				? entry.MarkerMIX - entry.MarkerIN
-				: entry.Duration - entry.MarkerIN;
+				: entry.Duration * 1000 - entry.MarkerIN;
 
 			return new PlaylistQueueItem
 			{
@@ -2391,7 +2391,7 @@ namespace AirDirector.Controls
 				MarkerINTRO = entry.MarkerINTRO,
 				MarkerMIX = entry.MarkerMIX,
 				MarkerOUT = entry.MarkerOUT,
-				FileDurationMs = entry.Duration,
+				FileDurationMs = entry.Duration * 1000,
 				IsScheduled = false,
 				VideoFilePath = entry.VideoFilePath ?? "",
 				VideoSource = entry.VideoSource.ToString(),

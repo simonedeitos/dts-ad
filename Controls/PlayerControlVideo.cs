@@ -1029,8 +1029,8 @@ namespace AirDirector.Controls
             if (dur.TotalMilliseconds < 100 && item.MarkerOUT > 0) dur = TimeSpan.FromMilliseconds(item.MarkerOUT);
             if (dur.TotalMilliseconds < 100 && item.MarkerMIX > 0) dur = TimeSpan.FromMilliseconds(item.MarkerMIX);
             _totalDuration = dur; _markerIN = item.MarkerIN; _markerINTRO = item.MarkerINTRO;
-            _markerMIX = item.MarkerMIX;
-            _markerOUT = item.MarkerOUT;
+            _markerMIX = item.MarkerMIX > 0 ? item.MarkerMIX : item.MarkerOUT > 0 ? item.MarkerOUT : (int)dur.TotalMilliseconds;
+            _markerOUT = item.MarkerOUT > 0 ? item.MarkerOUT : (int)dur.TotalMilliseconds;
             _introTime = item.Intro; if (_introTime.TotalMilliseconds <= 0 && _markerINTRO > 0) _introTime = TimeSpan.FromMilliseconds(_markerINTRO);
             _isPlaying = true; _isPaused = false; _positionMs = item.MarkerIN > 0 ? item.MarkerIN : 0;
             _currentFile = fp; CurrentFilePath = fp; CurrentArtist = item.Artist; CurrentTitle = item.Title;
@@ -1566,9 +1566,9 @@ namespace AirDirector.Controls
                 using (var pn = new Pen(Color.FromArgb(200, 0, 200, 255), 2))
                     g.DrawLine(pn, markerInX, 0, markerInX, h);
 
-            // Marker MIX (linea arancione) - solo in AUTO mode
+            // Marker MIX (linea gialla) - solo in AUTO mode
             if (_autoMode && _markerMIX > 0 && markerMixX > 0 && markerMixX < w)
-                using (var pn = new Pen(Color.FromArgb(200, 255, 128, 0), 2))
+                using (var pn = new Pen(Color.Yellow, 3))
                     g.DrawLine(pn, markerMixX, 0, markerMixX, h);
 
             // Marker OUT (linea arancione chiara) - se diverso da MIX e fine file

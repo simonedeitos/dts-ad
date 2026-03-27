@@ -2185,8 +2185,8 @@ namespace AirDirector.Forms
 
                 if (_audioReader != null)
                 {
-                    _musicEntry.Duration = (int)_audioReader.TotalTime.TotalMilliseconds;
-                    Console.WriteLine($"[MusicEditor] Duration aggiornata: {_musicEntry.Duration}ms");
+                    _musicEntry.Duration = (int)_audioReader.TotalTime.TotalSeconds;
+                    Console.WriteLine($"[MusicEditor] Duration aggiornata: {_musicEntry.Duration}s");
                 }
 
                 if (!_isClip)
@@ -2241,7 +2241,7 @@ namespace AirDirector.Forms
                     Console.WriteLine($"[MusicEditor] ========== DATI CLIP DA SALVARE ==========");
                     Console.WriteLine($"  ID: {clipEntry.ID}");
                     Console.WriteLine($"  Title: {clipEntry.Title}");
-                    Console.WriteLine($"  Duration: {clipEntry.Duration}ms");
+                    Console.WriteLine($"  Duration: {clipEntry.Duration}s");
                     Console.WriteLine($"  MarkerIN: {clipEntry.MarkerIN}ms");
                     Console.WriteLine($"  MarkerMIX: {clipEntry.MarkerMIX}ms");
                     Console.WriteLine($"  MarkerOUT: {clipEntry.MarkerOUT}ms");
@@ -2255,7 +2255,7 @@ namespace AirDirector.Forms
                     Console.WriteLine($"  ID: {_musicEntry.ID}");
                     Console.WriteLine($"  Title: {_musicEntry.Title}");
                     Console.WriteLine($"  Artist: {_musicEntry.Artist}");
-                    Console.WriteLine($"  Duration: {_musicEntry.Duration}ms");
+                    Console.WriteLine($"  Duration: {_musicEntry.Duration}s");
                     Console.WriteLine($"  MarkerIN: {_musicEntry.MarkerIN}ms");
                     Console.WriteLine($"  MarkerMIX: {_musicEntry.MarkerMIX}ms");
                     Console.WriteLine($"  MarkerOUT: {_musicEntry.MarkerOUT}ms");
