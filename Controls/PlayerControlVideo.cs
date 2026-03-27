@@ -1293,7 +1293,145 @@ namespace AirDirector.Controls
         // ═══════════════════════════════════════════════════════════
         private void LoadWaveformForCurrentFile(string fp) { if (_waveformCache.TryGetValue(fp, out float[] c) && _currentFile == fp) { _waveformPeaks = c; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); return; } Task.Run(() => GenWaveform(fp, true)); }
         private void PreCacheNextWaveform() { if (_playlistQueue == null) return; var i = _playlistQueue.GetAllItems(); if (i.Count < 2) return; string nf = i[1].FilePath; if (!string.IsNullOrEmpty(nf) && !IsWebStream(nf) && !_waveformCache.ContainsKey(nf)) Task.Run(() => GenWaveform(nf, false)); }
-        private void GenWaveform(string fp, bool apply) { try { if (IsWebStream(fp)) return; if (_waveformCache.ContainsKey(fp)) { if (apply && _currentFile == fp) { _waveformPeaks = _waveformCache[fp]; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } float[] pk = new float[WAVEFORM_BARS]; NAudio.Wave.WaveStream rd = null; string ext = Path.GetExtension(fp).ToLowerInvariant(); try { if (ext == ".mp3") rd = new NAudio.Wave.Mp3FileReader(fp); else if (ext == ".wav") rd = new NAudio.Wave.WaveFileReader(fp); else rd = new NAudio.Wave.AudioFileReader(fp); } catch { try { rd = new NAudio.Wave.AudioFileReader(fp); } catch { } } if (rd != null) { TimeSpan actualDur; using (rd) { actualDur = rd.TotalTime; int bps = rd.WaveFormat.BitsPerSample / 8; if (bps < 1) bps = 2; long tot = rd.Length / bps; long spb = Math.Max(1, tot / WAVEFORM_BARS); int bs = (int)Math.Min(spb * bps, 65536); byte[] buf = new byte[bs]; for (int b = 0; b < WAVEFORM_BARS; b++) { int r2 = rd.Read(buf, 0, Math.Min(bs, buf.Length)); if (r2 == 0) break; float mx = 0; if (bps == 2) { for (int i = 0; i < r2 - 1; i += 2) { float a = Math.Abs(BitConverter.ToInt16(buf, i) / 32768f); if (a > mx) mx = a; } } else if (bps == 4) { for (int i = 0; i < r2 - 3; i += 4) { float a = Math.Abs(BitConverter.ToSingle(buf, i)); if (a > mx) mx = a; } } else mx = 0.3f; pk[b] = Math.Min(1f, mx); } } if (apply && _currentFile == fp && actualDur.TotalMilliseconds > 100) { int oldMs = (int)_totalDuration.TotalMilliseconds; int newMs = (int)actualDur.TotalMilliseconds; if (Math.Abs(newMs - oldMs) > 500) { _totalDuration = actualDur; if (_markerMIX == oldMs) _markerMIX = newMs; if (_markerOUT == oldMs) _markerOUT = newMs; } } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } return; } var rr = new Random(fp.GetHashCode()); for (int i = 0; i < pk.Length; i++) { float t = (float)i / pk.Length, env = 1f; if (t < 0.02f) env = t / 0.02f; if (t > 0.95f) env = (1f - t) / 0.05f; pk[i] = Math.Min(1f, (0.35f + (float)(rr.NextDouble() * 0.5)) * env); } _waveformCache[fp] = pk; if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); } } catch { } }
+        private void GenWaveform(string fp, bool apply)
+        {
+            try
+            {
+                if (IsWebStream(fp)) return;
+                if (_waveformCache.ContainsKey(fp))
+                {
+                    if (apply && _currentFile == fp) { _waveformPeaks = _waveformCache[fp]; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); }
+                    return;
+                }
+
+                float[] pk = new float[WAVEFORM_BARS];
+                bool success = false;
+                TimeSpan actualDur = TimeSpan.Zero;
+
+                // ── Metodo 1: NAudio WaveStream (Mp3/Wav/AudioFileReader) ──
+                NAudio.Wave.WaveStream rd = null;
+                string ext = Path.GetExtension(fp).ToLowerInvariant();
+                try
+                {
+                    if (ext == ".mp3") rd = new NAudio.Wave.Mp3FileReader(fp);
+                    else if (ext == ".wav") rd = new NAudio.Wave.WaveFileReader(fp);
+                    else rd = new NAudio.Wave.AudioFileReader(fp);
+                }
+                catch { try { rd = new NAudio.Wave.AudioFileReader(fp); } catch { } }
+
+                if (rd != null)
+                {
+                    int filledBars = 0;
+                    using (rd)
+                    {
+                        actualDur = rd.TotalTime;
+                        int bps = rd.WaveFormat.BitsPerSample / 8; if (bps < 1) bps = 2;
+                        long tot = rd.Length / bps;
+                        long spb = Math.Max(1, tot / WAVEFORM_BARS);
+                        int bs = (int)Math.Min(spb * bps, 65536);
+                        byte[] buf = new byte[bs];
+                        for (int b = 0; b < WAVEFORM_BARS; b++)
+                        {
+                            int r2 = rd.Read(buf, 0, Math.Min(bs, buf.Length));
+                            if (r2 == 0) break;
+                            float mx = 0;
+                            if (bps == 2) { for (int i = 0; i < r2 - 1; i += 2) { float a = Math.Abs(BitConverter.ToInt16(buf, i) / 32768f); if (a > mx) mx = a; } }
+                            else if (bps == 4) { for (int i = 0; i < r2 - 3; i += 4) { float a = Math.Abs(BitConverter.ToSingle(buf, i)); if (a > mx) mx = a; } }
+                            else mx = 0.3f;
+                            pk[b] = Math.Min(1f, mx);
+                            filledBars++;
+                        }
+                    }
+                    // Consider successful only if we filled at least 80% of bars
+                    success = filledBars >= WAVEFORM_BARS * 80 / 100;
+                }
+
+                // ── Metodo 2: MediaFoundationReader (fallback per video) ──
+                if (!success)
+                {
+                    try
+                    {
+                        using (var mfr = new NAudio.Wave.MediaFoundationReader(fp))
+                        {
+                            actualDur = mfr.TotalTime;
+                            var fmt = mfr.WaveFormat;
+                            if (fmt != null)
+                            {
+                                ISampleProvider samples = mfr.ToSampleProvider();
+                                if (samples != null)
+                                {
+                                    int sampleRate = fmt.SampleRate > 0 ? fmt.SampleRate : 44100;
+                                    int channels = fmt.Channels > 0 ? fmt.Channels : 2;
+                                    long totalSamples = (long)(Math.Max(0.1, mfr.TotalTime.TotalSeconds) * sampleRate * channels);
+                                    int samplesPerBar = Math.Max(1, (int)(totalSamples / WAVEFORM_BARS));
+
+                                    float[] buf = new float[2048];
+                                    int barIdx = 0; float curMax = 0f; int samplesInBar = 0;
+                                    Array.Clear(pk, 0, pk.Length);
+
+                                    while (barIdx < WAVEFORM_BARS)
+                                    {
+                                        int read = 0;
+                                        try { read = samples.Read(buf, 0, buf.Length); } catch { break; }
+                                        if (read <= 0) break;
+                                        for (int i = 0; i < read && barIdx < WAVEFORM_BARS; i++)
+                                        {
+                                            float abs = Math.Abs(buf[i]);
+                                            if (abs > curMax) curMax = abs;
+                                            samplesInBar++;
+                                            if (samplesInBar >= samplesPerBar)
+                                            {
+                                                pk[barIdx++] = Math.Min(1f, curMax);
+                                                curMax = 0f; samplesInBar = 0;
+                                            }
+                                        }
+                                    }
+                                    // Flush last partial bar
+                                    if (barIdx < WAVEFORM_BARS && samplesInBar > 0)
+                                        pk[barIdx++] = Math.Min(1f, curMax);
+                                    // Fill remaining with decay
+                                    float lastVal = barIdx > 0 ? pk[barIdx - 1] : 0f;
+                                    while (barIdx < WAVEFORM_BARS) { pk[barIdx++] = lastVal * 0.8f; lastVal *= 0.8f; }
+
+                                    success = true;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // ── Metodo 3: pseudo-random fallback ──
+                if (!success)
+                {
+                    var rr = new Random(fp.GetHashCode());
+                    for (int i = 0; i < pk.Length; i++)
+                    {
+                        float t = (float)i / pk.Length, env = 1f;
+                        if (t < 0.02f) env = t / 0.02f;
+                        if (t > 0.95f) env = (1f - t) / 0.05f;
+                        pk[i] = Math.Min(1f, (0.35f + (float)(rr.NextDouble() * 0.5)) * env);
+                    }
+                }
+
+                // ── Aggiorna durata se significativamente diversa ──
+                if (apply && _currentFile == fp && actualDur.TotalMilliseconds > 100)
+                {
+                    int oldMs = (int)_totalDuration.TotalMilliseconds;
+                    int newMs = (int)actualDur.TotalMilliseconds;
+                    if (Math.Abs(newMs - oldMs) > 500)
+                    {
+                        _totalDuration = actualDur;
+                        if (_markerMIX == oldMs) _markerMIX = newMs;
+                        if (_markerOUT == oldMs) _markerOUT = newMs;
+                    }
+                }
+
+                _waveformCache[fp] = pk;
+                if (apply && _currentFile == fp) { _waveformPeaks = pk; _waveformCurrentFile = fp; SafeInvoke(() => waveformPanel.Invalidate()); }
+            }
+            catch { }
+        }
 
         // ═══════════════════════════════════════════════════════════
         // UI
