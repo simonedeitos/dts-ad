@@ -1052,7 +1052,7 @@ namespace AirDirector.Controls
             {
                 if (batchForm.ShowDialog() == DialogResult.OK)
                 {
-                    await ApplyBatchEditAsync(batchForm.ModifyGenre, batchForm.NewGenre, batchForm.ModifyCategory, batchForm.NewCategory);
+                    await ApplyBatchEditAsync(batchForm.ModifyGenre, batchForm.NewGenre, batchForm.ModifyCategory, batchForm.NewCategory, batchForm.ModifyYear, batchForm.NewYear);
                 }
             }
         }
@@ -1209,9 +1209,9 @@ namespace AirDirector.Controls
             }
         }
 
-        private async Task ApplyBatchEditAsync(bool modifyGenre, string newGenre, bool modifyCategory, string newCategory)
+        private async Task ApplyBatchEditAsync(bool modifyGenre, string newGenre, bool modifyCategory, string newCategory, bool modifyYear = false, int newYear = 0)
         {
-            if (!modifyGenre && !modifyCategory)
+            if (!modifyGenre && !modifyCategory && !modifyYear)
             {
                 MessageBox.Show(
                     LanguageManager.GetString("Archive.NoModificationSelected", "Nessuna modifica selezionata! "),
@@ -1265,6 +1265,12 @@ namespace AirDirector.Controls
                                 if (modifyCategory && !string.IsNullOrWhiteSpace(newCategory))
                                 {
                                     musicEntry.Categories = newCategory;
+                                    changed = true;
+                                }
+
+                                if (modifyYear)
+                                {
+                                    musicEntry.Year = newYear;
                                     changed = true;
                                 }
 
