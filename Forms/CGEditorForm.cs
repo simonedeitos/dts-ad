@@ -172,7 +172,7 @@ namespace AirDirector.Forms
             _tabControl = new TabControl
             {
                 Location = new Point(20, tabTop),
-                Size = new Size(850, 200),
+                Size = new Size(850, 220),
                 Font = new Font("Segoe UI", 9)
             };
             this.Controls.Add(_tabControl);
