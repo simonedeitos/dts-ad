@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using NAudio.Wave;
+using AirDirector.Services.Localization;
 
 namespace AirDirector.Forms
 {
@@ -749,23 +750,23 @@ namespace AirDirector.Forms
 
             if (hasAudio && hasVideo)
             {
-                lblTitle.Text = "🎬🎵  Media Conversion Queue";
-                lblHint.Text =
+                lblTitle.Text = "🎬🎵  " + LanguageManager.GetString("VideoConversion.MediaQueueTitle", "Media Conversion Queue");
+                lblHint.Text = LanguageManager.GetString("VideoConversion.VideoHint",
                     "ℹ️  Video → H.264 16:9 AAC 48kHz 2ch MP4.  " +
-                    "Audio → MP3 CBR 320kbps or WAV 16bit (44.1/48kHz).\r\n" +
+                    "Audio → MP3 CBR 320kbps or WAV 16bit (44.1/48kHz).\\n" +
                     "    Compatible files can be skipped via per-file toggles.  " +
-                    "Originals → \"Original Video Files\" / \"Original Audio Files\" subfolder.";
+                    "Originals → \"Original Video Files\" / \"Original Audio Files\" subfolder.");
             }
             else if (hasAudio)
             {
-                lblTitle.Text = "🎵  Audio Conversion Queue";
-                lblHint.Text =
-                    "ℹ️  Target: MP3 CBR 320 kbps (44.1/48 kHz) or WAV 16-bit (44.1/48 kHz).\r\n" +
+                lblTitle.Text = "🎵  " + LanguageManager.GetString("VideoConversion.AudioQueueTitle", "Audio Conversion Queue");
+                lblHint.Text = LanguageManager.GetString("VideoConversion.AudioHint",
+                    "ℹ️  Target: MP3 CBR 320 kbps (44.1/48 kHz) or WAV 16-bit (44.1/48 kHz).\\n" +
                     "    Compatible files can be skipped via per-file toggles.  " +
-                    "Originals → \"Original Audio Files\" subfolder.";
+                    "Originals → \"Original Audio Files\" subfolder.");
             }
 
-            lblStatus.Text = "⏳  Reading file specifications…";
+            lblStatus.Text = LanguageManager.GetString("VideoConversion.ReadingSpecs", "⏳  Reading file specifications…");
             btnStart.Enabled = false;
             btnSkipConvert.Enabled = false;
 
@@ -1832,9 +1833,8 @@ namespace AirDirector.Forms
             if (!File.Exists(_ffmpegPath))
             {
                 MessageBox.Show(
-                    $"ffmpeg.exe not found at:\n{_ffmpegPath}\n\n" +
-                    "Place ffmpeg.exe in the application folder.",
-                    "ffmpeg Not Found",
+                    string.Format(LanguageManager.GetString("VideoConversion.FFmpegNotFound", "ffmpeg.exe not found at:\\n{0}\\n\\nPlace ffmpeg.exe in the application folder."), _ffmpegPath),
+                    LanguageManager.GetString("VideoConversion.FFmpegNotFoundTitle", "ffmpeg Not Found"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 return;
@@ -1847,7 +1847,7 @@ namespace AirDirector.Forms
             _errorCount = 0;
 
             // ── 1. CONVERSIONE ────────────────────────────────────────────────────
-            lblStatus.Text = "⏳  Starting conversion…";
+            lblStatus.Text = LanguageManager.GetString("VideoConversion.StartingConversion", "⏳  Starting conversion…");
 
             // split files by toggle state
             var toConvert = _fileRows.Where(r => r.ChkConvert.Checked).ToList();
@@ -1885,7 +1885,7 @@ namespace AirDirector.Forms
             }
             catch (OperationCanceledException)
             {
-                lblStatus.Text = "⏹  Conversion cancelled.";
+                lblStatus.Text = LanguageManager.GetString("VideoConversion.Cancelled", "⏹  Conversion cancelled.");
                 btnCancel.Enabled = false;
                 btnClose.Enabled = true;
                 return;
@@ -1894,7 +1894,7 @@ namespace AirDirector.Forms
             // ── 2. PRE-EDITING: ANALISI DOPO CONVERSIONE (se abilitata) ──────────
             if (_chkPreEditing.Checked)
             {
-                lblStatus.Text = "🔍  Analyzing audio for marker detection…";
+                lblStatus.Text = LanguageManager.GetString("VideoConversion.AnalyzingMarkers", "🔍  Analyzing audio for marker detection…");
                 var successRows = _fileRows.Where(r => r.Succeeded).ToList();
 
                 double thresholdIn = (double)_nudMarkerInDb.Value;
@@ -1959,11 +1959,12 @@ namespace AirDirector.Forms
         private async void btnSkipConvert_Click(object sender, EventArgs e)
         {
             if (MessageBox.Show(
-                    "⚠️  Skip Conversion (Not Recommended)\n\n" +
+                    LanguageManager.GetString("VideoConversion.SkipConfirmMessage",
+                    "⚠️  Skip Conversion (Not Recommended)\\n\\n" +
                     "Importing unconverted files may cause playback issues or errors " +
-                    "with the VLC-NDI output at 1920×1080 / 48 kHz.\n\n" +
-                    "Are you sure you want to import the original files without converting them?",
-                    "Skip Conversion — Are you sure?",
+                    "with the VLC-NDI output at 1920×1080 / 48 kHz.\\n\\n" +
+                    "Are you sure you want to import the original files without converting them?"),
+                    LanguageManager.GetString("VideoConversion.SkipConfirmTitle", "Skip Conversion — Are you sure?"),
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning) != DialogResult.Yes)
                 return;
@@ -1973,7 +1974,7 @@ namespace AirDirector.Forms
             if (_chkPreEditing.Checked)
             {
                 btnSkipConvert.Enabled = false;
-                lblStatus.Text = "🔍  Pre-editing: analyzing audio markers on original files…";
+                lblStatus.Text = LanguageManager.GetString("VideoConversion.PreEditingAnalysis", "🔍  Pre-editing: analyzing audio markers on original files…");
 
                 double thresholdIn = (double)_nudMarkerInDb.Value;
                 double thresholdOut = (double)_nudMarkerOutDb.Value;
@@ -2386,7 +2387,7 @@ namespace AirDirector.Forms
         {
             _cts.Cancel();
             btnCancel.Enabled = false;
-            lblStatus.Text = "Cancelling…";
+            lblStatus.Text = LanguageManager.GetString("VideoConversion.Cancelling", "Cancelling…");
         }
 
         private void btnClose_Click(object sender, EventArgs e)
