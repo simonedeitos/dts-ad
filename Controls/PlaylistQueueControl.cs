@@ -2340,7 +2340,7 @@ namespace AirDirector.Controls
         {
             int effectiveDurationMs = entry.MarkerMIX > entry.MarkerIN
                 ? entry.MarkerMIX - entry.MarkerIN
-                : entry.Duration * 1000 - entry.MarkerIN;
+                : entry.Duration - entry.MarkerIN;
 
             return new PlaylistQueueItem
             {
@@ -2356,7 +2356,7 @@ namespace AirDirector.Controls
                 MarkerINTRO = entry.MarkerINTRO,
                 MarkerMIX = entry.MarkerMIX,
                 MarkerOUT = entry.MarkerOUT,
-                FileDurationMs = entry.Duration * 1000,
+                FileDurationMs = entry.Duration,
                 IsScheduled = false,
                 OriginalMusicEntry = originalEntry,
                 // ✅ Campi video - converti enum a string
