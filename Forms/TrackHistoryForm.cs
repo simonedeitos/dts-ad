@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using AirDirector.Services.Database;
+using AirDirector.Services.Localization;
 
 namespace AirDirector.Forms
 {
@@ -23,7 +24,7 @@ namespace AirDirector.Forms
             _artist = artist ?? "";
             _title = title ?? "";
 
-            this.Text = $"📋 Storico Passaggi - {_artist} - {_title}";
+            this.Text = $"📋 {LanguageManager.GetString("TrackHistory.Title", "Storico Passaggi")} - {_artist} - {_title}";
             this.Size = new Size(750, 500);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.Sizable;
@@ -62,7 +63,7 @@ namespace AirDirector.Forms
 
             Button btnExport = new Button
             {
-                Text = "📥 Esporta CSV",
+                Text = "📥 " + LanguageManager.GetString("TrackHistory.ExportCsv", "Esporta CSV"),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 BackColor = Color.FromArgb(0, 120, 215),
                 ForeColor = Color.White,
@@ -87,7 +88,7 @@ namespace AirDirector.Forms
 
             Button btnClose = new Button
             {
-                Text = "Chiudi",
+                Text = LanguageManager.GetString("Common.Close", "Chiudi"),
                 Font = new Font("Segoe UI", 9),
                 BackColor = Color.FromArgb(60, 60, 60),
                 ForeColor = Color.White,
@@ -148,11 +149,11 @@ namespace AirDirector.Forms
                 EnableHeadersVisualStyles = false
             };
 
-            _dgv.Columns.Add("Date", "Data");
-            _dgv.Columns.Add("StartTime", "Ora Inizio");
-            _dgv.Columns.Add("EndTime", "Ora Fine");
-            _dgv.Columns.Add("PlayDuration", "Durata Play");
-            _dgv.Columns.Add("Type", "Tipo");
+            _dgv.Columns.Add("Date", LanguageManager.GetString("TrackHistory.ColumnDate", "Data"));
+            _dgv.Columns.Add("StartTime", LanguageManager.GetString("TrackHistory.ColumnStartTime", "Ora Inizio"));
+            _dgv.Columns.Add("EndTime", LanguageManager.GetString("TrackHistory.ColumnEndTime", "Ora Fine"));
+            _dgv.Columns.Add("PlayDuration", LanguageManager.GetString("TrackHistory.ColumnPlayDuration", "Durata Play"));
+            _dgv.Columns.Add("Type", LanguageManager.GetString("TrackHistory.ColumnType", "Tipo"));
 
             this.Controls.Add(_dgv);
 
@@ -178,11 +179,11 @@ namespace AirDirector.Forms
                     );
                 }
 
-                lblCount.Text = $"Totale passaggi: {entries.Count}";
+                lblCount.Text = string.Format(LanguageManager.GetString("TrackHistory.TotalEntries", "Totale passaggi: {0}"), entries.Count);
             }
             catch (Exception ex)
             {
-                lblCount.Text = $"Errore: {ex.Message}";
+                lblCount.Text = string.Format(LanguageManager.GetString("Common.Error", "Errore") + ": {0}", ex.Message);
             }
         }
 
@@ -194,7 +195,7 @@ namespace AirDirector.Forms
                 {
                     sfd.Filter = "CSV files (*.csv)|*.csv";
                     sfd.FileName = $"Storico_{_artist}_{_title}.csv".Replace(" ", "_");
-                    sfd.Title = "Esporta Storico Passaggi";
+                    sfd.Title = LanguageManager.GetString("TrackHistory.ExportTitle", "Esporta Storico Passaggi");
 
                     if (sfd.ShowDialog() == DialogResult.OK)
                     {
@@ -208,14 +209,14 @@ namespace AirDirector.Forms
                         }
 
                         File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8);
-                        MessageBox.Show($"✅ Esportati {_dgv.Rows.Count} passaggi in:\n{sfd.FileName}",
-                            "Export Completato", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show(string.Format(LanguageManager.GetString("TrackHistory.ExportSuccess", "✅ Esportati {0} passaggi in:\n{1}"), _dgv.Rows.Count, sfd.FileName),
+                            LanguageManager.GetString("TrackHistory.ExportCompleted", "Export Completato"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"❌ Errore esportazione:\n{ex.Message}", "Errore",
+                MessageBox.Show(string.Format(LanguageManager.GetString("TrackHistory.ExportError", "❌ Errore esportazione:\n{0}"), ex.Message), LanguageManager.GetString("Common.Error", "Errore"),
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
