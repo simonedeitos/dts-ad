@@ -1498,7 +1498,9 @@ namespace AirDirector.Controls
         }
 
         /// <summary>
-        /// Genera waveform con MediaFoundationReader (per video)
+        /// Genera waveform con MediaFoundationReader usando position-seeking (per video).
+        /// Per ogni punto calcola la posizione target nel file, fa seek e legge i campioni.
+        /// Garantisce una waveform completa dall'inizio alla fine del file.
         /// </summary>
         private bool TryGenerateWaveformMediaFoundation(string filePath, float[] data)
         {
@@ -1513,55 +1515,80 @@ namespace AirDirector.Controls
                 var format = reader.WaveFormat;
                 if (format == null) { reader?.Dispose(); return false; }
 
-                ISampleProvider samples = null;
-                try { samples = reader.ToSampleProvider(); }
-                catch { reader?.Dispose(); return false; }
-
-                if (samples == null) { reader?.Dispose(); return false; }
+                long totalBytes = reader.Length;
+                if (totalBytes <= 0) { reader?.Dispose(); return false; }
 
                 int targetPoints = data.Length;
-                double totalSec = Math.Max(0.1, reader.TotalTime.TotalSeconds);
-                int sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100;
-                int channels = format.Channels > 0 ? format.Channels : 2;
-                long totalSamples = (long)(totalSec * sampleRate * channels);
-                int samplesPerPoint = Math.Max(1, (int)(totalSamples / targetPoints));
+                int bps = format.BitsPerSample / 8;
+                if (bps < 1) bps = 2;
+                int blockAlign = format.BlockAlign > 0 ? format.BlockAlign : bps;
+                byte[] buffer = new byte[4096];
+                int consecutiveErrors = 0;
 
-                float[] buffer = new float[2048];
-                int pointIndex = 0;
-                float currentMax = 0f;
-                int samplesInPoint = 0;
-
-                while (!_waveformAbort && pointIndex < targetPoints)
+                for (int i = 0; i < targetPoints; i++)
                 {
-                    int read = 0;
-                    try { read = samples.Read(buffer, 0, buffer.Length); }
-                    catch { break; }
+                    if (_waveformAbort) { reader?.Dispose(); return false; }
 
-                    if (read <= 0) break;
-
-                    for (int i = 0; i < read && pointIndex < targetPoints; i++)
+                    try
                     {
-                        if (_waveformAbort) break;
+                        long targetPos = (long)i * totalBytes / targetPoints;
+                        targetPos = (targetPos / blockAlign) * blockAlign;
+                        targetPos = Math.Max(0, Math.Min(targetPos, Math.Max(0, totalBytes - blockAlign * 2)));
 
-                        float abs = Math.Abs(buffer[i]);
-                        if (abs > currentMax) currentMax = abs;
-
-                        samplesInPoint++;
-                        if (samplesInPoint >= samplesPerPoint)
+                        try { reader.Position = targetPos; }
+                        catch
                         {
-                            data[pointIndex++] = currentMax;
-                            currentMax = 0f;
-                            samplesInPoint = 0;
+                            data[i] = i > 0 ? data[i - 1] : 0f;
+                            if (++consecutiveErrors >= 10) { reader?.Dispose(); return false; }
+                            continue;
+                        }
+
+                        int bytesRead = 0;
+                        try { bytesRead = reader.Read(buffer, 0, buffer.Length); }
+                        catch
+                        {
+                            data[i] = i > 0 ? data[i - 1] : 0f;
+                            if (++consecutiveErrors >= 10) { reader?.Dispose(); return false; }
+                            continue;
+                        }
+
+                        consecutiveErrors = 0;
+
+                        if (bytesRead > 0)
+                        {
+                            float mx = 0f;
+                            if (bps == 2)
+                            {
+                                for (int j = 0; j < bytesRead - 1; j += 2)
+                                {
+                                    float a = Math.Abs(BitConverter.ToInt16(buffer, j) / 32768f);
+                                    if (a > mx) mx = a;
+                                }
+                            }
+                            else if (bps == 4)
+                            {
+                                for (int j = 0; j < bytesRead - 3; j += 4)
+                                {
+                                    float a = Math.Abs(BitConverter.ToSingle(buffer, j));
+                                    if (a > mx) mx = a;
+                                }
+                            }
+                            else
+                            {
+                                mx = i > 0 ? data[i - 1] : 0f;
+                            }
+                            data[i] = Math.Min(1f, mx);
+                        }
+                        else
+                        {
+                            data[i] = i > 0 ? data[i - 1] : 0f;
                         }
                     }
-                }
-
-                // Riempi punti mancanti
-                float lastVal = pointIndex > 0 ? data[pointIndex - 1] : 0f;
-                while (pointIndex < targetPoints)
-                {
-                    data[pointIndex++] = lastVal * 0.8f;
-                    lastVal *= 0.8f;
+                    catch
+                    {
+                        data[i] = i > 0 ? data[i - 1] : 0f;
+                        if (++consecutiveErrors >= 10) { reader?.Dispose(); return false; }
+                    }
                 }
 
                 reader.Dispose();
