@@ -56,7 +56,7 @@ namespace AirDirector.Controls
             {
                 Text = "🎬 CG Editor",
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Size = new Size(130, 35),
+                Size = new Size(200, 40),
                 BackColor = Color.FromArgb(100, 50, 150),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
