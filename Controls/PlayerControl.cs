@@ -181,8 +181,8 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Errore inizializzazione VLC:\n{ex.Message}\n\nAssicurati di aver installato libvlc.",
-                    "Errore VLC", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(string.Format(LanguageManager.GetString("Player.VLCInitError", "Errore inizializzazione VLC:\n{0}\n\nAssicurati di aver installato libvlc."), ex.Message),
+                    LanguageManager.GetString("Player.VLCErrorTitle", "Errore VLC"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -212,7 +212,7 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Errore init audio:\n{ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(string.Format(LanguageManager.GetString("Player.AudioInitError", "Errore init audio:\n{0}"), ex.Message), LanguageManager.GetString("Common.Error", "Errore"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -1000,7 +1000,7 @@ namespace AirDirector.Controls
                 {
                     Log($"[OnMixPointReached] ❌ ERRORE: {ex.Message}");
                     Log($"[OnMixPointReached] StackTrace: {ex.StackTrace}");
-                    MessageBox.Show($"Errore mix:  {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(string.Format(LanguageManager.GetString("Player.MixError", "Errore mix: {0}"), ex.Message), LanguageManager.GetString("Common.Error", "Errore"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
@@ -2041,13 +2041,13 @@ namespace AirDirector.Controls
                     }
                     else
                     {
-                        MessageBox.Show("La playlist queue è vuota!", "Attenzione",
+                        MessageBox.Show(LanguageManager.GetString("Player.PlaylistEmpty", "La playlist queue è vuota!"), LanguageManager.GetString("Common.Warning", "Attenzione"),
                             MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
                 else
                 {
-                    MessageBox.Show("Nessun file in playlist queue!", "Attenzione",
+                    MessageBox.Show(LanguageManager.GetString("Player.NoFileInQueue", "Nessun file in playlist queue!"), LanguageManager.GetString("Common.Warning", "Attenzione"),
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
@@ -2124,13 +2124,13 @@ namespace AirDirector.Controls
                     }
                     else
                     {
-                        MessageBox.Show("La playlist queue è vuota!", "Attenzione",
+                        MessageBox.Show(LanguageManager.GetString("Player.PlaylistEmpty", "La playlist queue è vuota!"), LanguageManager.GetString("Common.Warning", "Attenzione"),
                             MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
                 else
                 {
-                    MessageBox.Show("Nessun file in playlist queue!", "Attenzione",
+                    MessageBox.Show(LanguageManager.GetString("Player.NoFileInQueue", "Nessun file in playlist queue!"), LanguageManager.GetString("Common.Warning", "Attenzione"),
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
@@ -2495,7 +2495,7 @@ namespace AirDirector.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Errore caricamento file:\n{ex.Message}", "Errore",
+                MessageBox.Show(string.Format(LanguageManager.GetString("Player.FileLoadError", "Errore caricamento file:\n{0}"), ex.Message), LanguageManager.GetString("Common.Error", "Errore"),
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -2548,8 +2548,8 @@ namespace AirDirector.Controls
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Errore riproduzione stream:\n{ex.Message}",
-                        "Errore Stream", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(string.Format(LanguageManager.GetString("Player.StreamPlayError", "Errore riproduzione stream:\n{0}"), ex.Message),
+                        LanguageManager.GetString("Player.StreamErrorTitle", "Errore Stream"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                     Stop();
                 }
 
