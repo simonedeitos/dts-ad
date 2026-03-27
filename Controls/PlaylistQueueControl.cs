@@ -36,6 +36,8 @@ namespace AirDirector.Controls
 		private bool _isInitialStartup = true;
 		private string _currentClockName = "";
 		private bool _isGeneratingClock = false;
+		private List<PlaylistQueueItem> _generatingBatch = null;
+		private readonly object _generatingBatchLock = new object();
 
 		private PlaylistQueueItem _lastPlayedForReport = null;
 
@@ -1529,136 +1531,151 @@ namespace AirDirector.Controls
                     }
                 }
 
-                var clocks = DbcManager.LoadFromCsv<ClockEntry>("Clocks.dbc");
-                var clock = clocks.FirstOrDefault(c => c.ClockName == clockName);
+                string pendingVideoBuffer = _pendingScheduleVideoBufferPath;
 
-                if (clock == null)
+                _generatingBatch = new List<PlaylistQueueItem>();
+
+                var result = await Task.Run(() =>
                 {
-                    Log($"[GenerateClock] ❌ Clock '{clockName}' non trovato!");
-                    return;
-                }
+                    int addedCount = 0;
+                    int totalAttempts = 0;
 
-                if (string.IsNullOrEmpty(clock.Items))
-                {
-                    Log($"[GenerateClock] ⚠️ Clock '{clockName}' vuoto!");
-                    return;
-                }
+                    var clocks = DbcManager.LoadFromCsv<ClockEntry>("Clocks.dbc");
+                    var clock = clocks.FirstOrDefault(c => c.ClockName == clockName);
 
-                List<ClockItem> clockItems;
-                try
-                {
-                    clockItems = JsonConvert.DeserializeObject<List<ClockItem>>(clock.Items);
-                    Log($"[GenerateClock] 📋 Clock contiene {clockItems.Count} elementi");
-                }
-                catch (Exception jsonEx)
-                {
-                    Log($"[GenerateClock] ❌ Errore parsing JSON: {jsonEx.Message}");
-                    return;
-                }
-
-                int addedCount = 0;
-                int totalAttempts = 0;
-                int maxAttemptsPerItem = 10;
-                int batchCount = 0;
-                const int batchSize = 5;
-
-                for (int clockIndex = 0; clockIndex < clockItems.Count; clockIndex++)
-                {
-                    ClockItem currentItem = clockItems[clockIndex];
-
-                    Log($"");
-                    Log($"[GenerateClock] ━━━ Elemento #{clockIndex + 1}/{clockItems.Count} ━━━");
-                    Log($"[GenerateClock] Tipo:   {currentItem.Type}");
-                    Log($"[GenerateClock] Valore: {currentItem.Value ?? currentItem.CategoryName}");
-                    Log($"[GenerateClock] Count: {currentItem.Count}");
-
-                    int itemsToAdd = currentItem.Count;
-                    int addedForThisItem = 0;
-
-                    for (int i = 0; i < itemsToAdd && totalAttempts < maxItems * 3; i++)
+                    if (clock == null)
                     {
-                        PlaylistQueueItem queueItem = null;
-                        int attempts = 0;
+                        Log($"[GenerateClock] ❌ Clock '{clockName}' non trovato!");
+                        return (addedCount, totalAttempts);
+                    }
 
-                        while (queueItem == null && attempts < maxAttemptsPerItem)
+                    if (string.IsNullOrEmpty(clock.Items))
+                    {
+                        Log($"[GenerateClock] ⚠️ Clock '{clockName}' vuoto!");
+                        return (addedCount, totalAttempts);
+                    }
+
+                    List<ClockItem> clockItems;
+                    try
+                    {
+                        clockItems = JsonConvert.DeserializeObject<List<ClockItem>>(clock.Items);
+                        Log($"[GenerateClock] 📋 Clock contiene {clockItems.Count} elementi");
+                    }
+                    catch (Exception jsonEx)
+                    {
+                        Log($"[GenerateClock] ❌ Errore parsing JSON: {jsonEx.Message}");
+                        return (addedCount, totalAttempts);
+                    }
+
+                    int maxAttemptsPerItem = 10;
+
+                    for (int clockIndex = 0; clockIndex < clockItems.Count; clockIndex++)
+                    {
+                        ClockItem currentItem = clockItems[clockIndex];
+
+                        Log($"");
+                        Log($"[GenerateClock] ━━━ Elemento #{clockIndex + 1}/{clockItems.Count} ━━━");
+                        Log($"[GenerateClock] Tipo:   {currentItem.Type}");
+                        Log($"[GenerateClock] Valore: {currentItem.Value ?? currentItem.CategoryName}");
+                        Log($"[GenerateClock] Count: {currentItem.Count}");
+
+                        int itemsToAdd = currentItem.Count;
+                        int addedForThisItem = 0;
+
+                        for (int i = 0; i < itemsToAdd && totalAttempts < maxItems * 3; i++)
                         {
-                            // ✅ MUSIC CATEGORY
-                            if (currentItem.Type == "Music_Category")
-                            {
-                                Log($"[GenerateClock]   → Cerco Music_Category:   {currentItem.CategoryName}");
-                                queueItem = GetRandomItemByCategory(currentItem.CategoryName, "Music",
-                                    currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
-                            }
-                            // ✅ CLIPS CATEGORY
-                            else if (currentItem.Type == "Clips_Category")
-                            {
-                                Log($"[GenerateClock]   → Cerco Clips_Category:  {currentItem.CategoryName}");
-                                queueItem = GetRandomItemByCategory(currentItem.CategoryName, "Clip",
-                                    currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
-                            }
-                            // ✅ MUSIC GENRE
-                            else if (currentItem.Type == "Music_Genre")
-                            {
-                                Log($"[GenerateClock]   → Cerco Music_Genre: {currentItem.Value}");
-                                queueItem = GetRandomMusicByGenre(currentItem.Value,
-                                    currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
-                            }
-                            // ✅ CLIPS GENRE (ERA MANCANTE!)
-                            else if (currentItem.Type == "Clips_Genre")
-                            {
-                                Log($"[GenerateClock]   → Cerco Clips_Genre:  {currentItem.Value}");
-                                queueItem = GetRandomClipByGenre(currentItem.Value);
-                            }
-                            // ✅ MUSIC CATEGORY+GENRE
-                            else if (currentItem.Type == "Music_Category+Genre")
-                            {
-                                Log($"[GenerateClock]   → Cerco Music_Category+Genre: {currentItem.Value}");
-                                queueItem = GetRandomMusicByCategoryAndGenre(currentItem.Value,
-                                    currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
-                            }
-                            // ✅ CLIPS CATEGORY+GENRE
-                            else if (currentItem.Type == "Clips_Category+Genre")
-                            {
-                                Log($"[GenerateClock]   → Cerco Clips_Category+Genre: {currentItem.Value}");
-                                queueItem = GetRandomClipByCategoryAndGenre(currentItem.Value);
-                            }
-                            else
-                            {
-                                Log($"[GenerateClock]   ⚠️ Tipo sconosciuto: {currentItem.Type}");
-                            }
+                            PlaylistQueueItem queueItem = null;
+                            int attempts = 0;
 
-                            attempts++;
-                            totalAttempts++;
+                            while (queueItem == null && attempts < maxAttemptsPerItem)
+                            {
+                                // ✅ MUSIC CATEGORY
+                                if (currentItem.Type == "Music_Category")
+                                {
+                                    Log($"[GenerateClock]   → Cerco Music_Category:   {currentItem.CategoryName}");
+                                    queueItem = GetRandomItemByCategory(currentItem.CategoryName, "Music",
+                                        currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
+                                }
+                                // ✅ CLIPS CATEGORY
+                                else if (currentItem.Type == "Clips_Category")
+                                {
+                                    Log($"[GenerateClock]   → Cerco Clips_Category:  {currentItem.CategoryName}");
+                                    queueItem = GetRandomItemByCategory(currentItem.CategoryName, "Clip",
+                                        currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
+                                }
+                                // ✅ MUSIC GENRE
+                                else if (currentItem.Type == "Music_Genre")
+                                {
+                                    Log($"[GenerateClock]   → Cerco Music_Genre: {currentItem.Value}");
+                                    queueItem = GetRandomMusicByGenre(currentItem.Value,
+                                        currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
+                                }
+                                // ✅ CLIPS GENRE (ERA MANCANTE!)
+                                else if (currentItem.Type == "Clips_Genre")
+                                {
+                                    Log($"[GenerateClock]   → Cerco Clips_Genre:  {currentItem.Value}");
+                                    queueItem = GetRandomClipByGenre(currentItem.Value);
+                                }
+                                // ✅ MUSIC CATEGORY+GENRE
+                                else if (currentItem.Type == "Music_Category+Genre")
+                                {
+                                    Log($"[GenerateClock]   → Cerco Music_Category+Genre: {currentItem.Value}");
+                                    queueItem = GetRandomMusicByCategoryAndGenre(currentItem.Value,
+                                        currentItem.YearFilterEnabled, currentItem.YearFrom, currentItem.YearTo);
+                                }
+                                // ✅ CLIPS CATEGORY+GENRE
+                                else if (currentItem.Type == "Clips_Category+Genre")
+                                {
+                                    Log($"[GenerateClock]   → Cerco Clips_Category+Genre: {currentItem.Value}");
+                                    queueItem = GetRandomClipByCategoryAndGenre(currentItem.Value);
+                                }
+                                else
+                                {
+                                    Log($"[GenerateClock]   ⚠️ Tipo sconosciuto: {currentItem.Type}");
+                                }
+
+                                attempts++;
+                                totalAttempts++;
+
+                                if (queueItem != null)
+                                {
+                                    Log($"[GenerateClock]   ✅ Trovato dopo {attempts} tentativi");
+                                }
+                            }
 
                             if (queueItem != null)
                             {
-                                Log($"[GenerateClock]   ✅ Trovato dopo {attempts} tentativi");
+                                if (!string.IsNullOrEmpty(pendingVideoBuffer))
+                                    ApplyScheduleVideoBuffer(queueItem);
+                                lock (_generatingBatchLock) { _generatingBatch.Add(queueItem); }
+                                addedCount++;
+                                addedForThisItem++;
                             }
-                        }
-
-                        if (queueItem != null)
-                        {
-                            if (!string.IsNullOrEmpty(_pendingScheduleVideoBufferPath))
-                                ApplyScheduleVideoBuffer(queueItem);
-                            AddItemBatch(queueItem);
-                            addedCount++;
-                            addedForThisItem++;
-                            batchCount++;
-
-                            if (batchCount >= batchSize)
+                            else
                             {
-                                FinalizeBatchModification();
-                                batchCount = 0;
-                                await Task.Yield();
+                                Log($"[GenerateClock]   ❌ Nessun elemento trovato dopo {maxAttemptsPerItem} tentativi");
                             }
                         }
-                        else
-                        {
-                            Log($"[GenerateClock]   ❌ Nessun elemento trovato dopo {maxAttemptsPerItem} tentativi");
-                        }
+
+                        Log($"[GenerateClock] ✅ Aggiunti {addedForThisItem}/{itemsToAdd} per questo elemento");
                     }
 
-                    Log($"[GenerateClock] ✅ Aggiunti {addedForThisItem}/{itemsToAdd} per questo elemento");
+                    return (addedCount, totalAttempts);
+                });
+
+                int batchCount = 0;
+                const int batchSize = 5;
+                foreach (var queueItem in _generatingBatch)
+                {
+                    AddItemBatch(queueItem);
+                    batchCount++;
+
+                    if (batchCount >= batchSize)
+                    {
+                        FinalizeBatchModification();
+                        batchCount = 0;
+                        await Task.Yield();
+                    }
                 }
 
                 if (batchCount > 0)
@@ -1671,8 +1688,8 @@ namespace AirDirector.Controls
                 Log($"");
                 Log($"[GenerateClock] ═══════════════════════════════════════════");
                 Log($"[GenerateClock] ✅ GENERAZIONE COMPLETATA");
-                Log($"[GenerateClock] Totale aggiunti: {addedCount}");
-                Log($"[GenerateClock] Totale tentativi: {totalAttempts}");
+                Log($"[GenerateClock] Totale aggiunti: {result.addedCount}");
+                Log($"[GenerateClock] Totale tentativi: {result.totalAttempts}");
                 Log($"[GenerateClock] ═══════════════════════════════════════════");
                 Log($"");
 
@@ -1686,6 +1703,7 @@ namespace AirDirector.Controls
             }
             finally
             {
+                _generatingBatch = null;
                 _isGeneratingClock = false;
             }
         }
@@ -1978,6 +1996,24 @@ namespace AirDirector.Controls
 					}
 				}
 
+				var genBatch = _generatingBatch;
+				if (genBatch != null)
+				{
+					List<PlaylistQueueItem> snapshot;
+					lock (_generatingBatchLock) { snapshot = genBatch.ToList(); }
+					foreach (var item in snapshot)
+					{
+						if (item.Type == PlaylistItemType.Music)
+						{
+							if (item.Artist == entry.Artist && item.Title == entry.Title)
+								return false;
+
+							if (item.Artist == entry.Artist)
+								return false;
+						}
+					}
+				}
+
 				return true;
 			}
 			catch (Exception ex)
@@ -2123,6 +2159,18 @@ namespace AirDirector.Controls
 					StringComparer.OrdinalIgnoreCase
 				);
 
+				var genBatch = _generatingBatch;
+				List<PlaylistQueueItem> genBatchSnapshot = null;
+				if (genBatch != null)
+				{
+					lock (_generatingBatchLock) { genBatchSnapshot = genBatch.ToList(); }
+					foreach (var gi in genBatchSnapshot)
+					{
+						if (gi.Type == PlaylistItemType.Music && !string.IsNullOrEmpty(gi.Artist))
+							artistsInQueue.Add(gi.Artist);
+				 	}
+				}
+
 				var scoredTracks = new List<(MusicEntry track, int penaltyScore, DateTime? lastPlayed)>();
 
 				foreach (var track in validTracks)
@@ -2154,6 +2202,22 @@ namespace AirDirector.Controls
 								penalty += 100000;
 								alreadyInQueue = true;
 								break;
+							}
+						}
+					}
+
+					if (!alreadyInQueue && genBatchSnapshot != null)
+					{
+						foreach (var genItem in genBatchSnapshot)
+						{
+							if (genItem.Type == PlaylistItemType.Music)
+							{
+								if (genItem.Artist == track.Artist && genItem.Title == track.Title)
+								{
+									penalty += 100000;
+									alreadyInQueue = true;
+									break;
+								}
 							}
 						}
 					}
