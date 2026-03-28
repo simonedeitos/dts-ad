@@ -327,7 +327,10 @@ namespace AirDirector.Forms
                     int idx = clb.Items.Add(newCat);
                     clb.SetItemChecked(idx, true);
                     if (!_allCategories.Contains(newCat))
+                    {
                         _allCategories.Add(newCat);
+                        PersistNewCategory(newCat);
+                    }
                 }
                 txtNew.Text = "";
             };
@@ -354,6 +357,30 @@ namespace AirDirector.Forms
             };
 
             popup.Show(this);
+        }
+
+        private void PersistNewCategory(string categoryName)
+        {
+            try
+            {
+                var existing = DbcManager.LoadFromCsv<CategoryEntry>("Categories.dbc");
+                bool alreadyExists = existing.Any(c =>
+                    string.Equals(c.CategoryName?.Trim(), categoryName, StringComparison.OrdinalIgnoreCase));
+
+                if (!alreadyExists)
+                {
+                    DbcManager.Insert("Categories.dbc", new CategoryEntry
+                    {
+                        CategoryName = categoryName,
+                        Color = "#607D8B",
+                        IgnoreHourlySeparation = 0
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MusicEditor] ⚠️ Errore salvataggio nuova categoria: {ex.Message}");
+            }
         }
 
         /// <summary>

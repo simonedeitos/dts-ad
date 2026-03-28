@@ -12,6 +12,7 @@ using System.Windows.Forms;
 using Microsoft.Win32;
 using NAudio.Wave;
 using AirDirector.Services.Localization;
+using AirDirector.Services.Database;
 
 namespace AirDirector.Forms
 {
@@ -744,9 +745,20 @@ namespace AirDirector.Forms
         {
             BuildPreEditingPanel();
 
+            // ── Duplicate check: filter out files already present in Music.dbc ──
+            var filteredFiles = FilterDuplicateFiles(_inputFiles);
+            if (filteredFiles.Length == 0)
+            {
+                lblStatus.Text = LanguageManager.GetString("VideoConversion.AllDuplicates",
+                    "⚠️  Tutti i file selezionati sono già presenti nell'archivio.");
+                btnStart.Enabled = false;
+                btnSkipConvert.Enabled = false;
+                return;
+            }
+
             // detect if any audio files are present and update title/hint
-            bool hasAudio = _inputFiles.Any(f => IsAudioFile(f));
-            bool hasVideo = _inputFiles.Any(f => !IsAudioFile(f));
+            bool hasAudio = filteredFiles.Any(f => IsAudioFile(f));
+            bool hasVideo = filteredFiles.Any(f => !IsAudioFile(f));
 
             if (hasAudio && hasVideo)
             {
@@ -771,17 +783,17 @@ namespace AirDirector.Forms
             btnSkipConvert.Enabled = false;
 
             // probe all files in parallel
-            var probeTasks = _inputFiles.Select(f =>
+            var probeTasks = filteredFiles.Select(f =>
                 IsAudioFile(f) ? ProbeAudioFileAsync(f) : ProbeVideoFileAsync(f)).ToArray();
             var probeResults = await Task.WhenAll(probeTasks);
 
-            for (int i = 0; i < _inputFiles.Length; i++)
+            for (int i = 0; i < filteredFiles.Length; i++)
             {
-                bool isAudio = IsAudioFile(_inputFiles[i]);
+                bool isAudio = IsAudioFile(filteredFiles[i]);
                 if (isAudio)
-                    AddAudioFileRow(_inputFiles[i], (AudioSpec)probeResults[i]);
+                    AddAudioFileRow(filteredFiles[i], (AudioSpec)probeResults[i]);
                 else
-                    AddFileRow(_inputFiles[i], (VideoSpec)probeResults[i]);
+                    AddFileRow(filteredFiles[i], (VideoSpec)probeResults[i]);
             }
 
             pnlScroll.AutoScrollMinSize =
@@ -794,7 +806,7 @@ namespace AirDirector.Forms
 
             progressOverall.Maximum = PROGRESS_MAX; // use weighted progress
             progressOverall.Value = 0;
-            lblOverall.Text = $"0 / {_inputFiles.Length} files";
+            lblOverall.Text = $"0 / {filteredFiles.Length} files";
 
             btnStart.Enabled = true;
             btnSkipConvert.Enabled = true;
@@ -804,6 +816,71 @@ namespace AirDirector.Forms
         {
             string ext = Path.GetExtension(filePath);
             return AudioExtensions.Contains(ext);
+        }
+
+        /// <summary>
+        /// Filtra i file di input rimuovendo quelli già presenti in Music.dbc
+        /// (confronto per percorso esatto e per nome file senza estensione nella stessa cartella).
+        /// </summary>
+        private string[] FilterDuplicateFiles(string[] inputFiles)
+        {
+            try
+            {
+                var allMusic = DbcManager.LoadFromCsv<MusicEntry>("Music.dbc");
+                var existingPaths = new HashSet<string>(
+                    allMusic.Where(m => !string.IsNullOrWhiteSpace(m.FilePath))
+                            .Select(m => m.FilePath),
+                    StringComparer.OrdinalIgnoreCase);
+
+                // Also build a set of (directory, filenameWithoutExtension) for cross-extension matching
+                var existingStems = new HashSet<string>(
+                    allMusic.Where(m => !string.IsNullOrWhiteSpace(m.FilePath))
+                            .Select(m =>
+                            {
+                                string dir = Path.GetDirectoryName(m.FilePath) ?? "";
+                                string stem = Path.GetFileNameWithoutExtension(m.FilePath);
+                                return Path.Combine(dir, stem);
+                            }),
+                    StringComparer.OrdinalIgnoreCase);
+
+                var duplicates = new List<string>();
+                var filtered = new List<string>();
+
+                foreach (var f in inputFiles)
+                {
+                    string dir = Path.GetDirectoryName(f) ?? "";
+                    string stem = Path.GetFileNameWithoutExtension(f);
+                    string stemKey = Path.Combine(dir, stem);
+
+                    if (existingPaths.Contains(f) || existingStems.Contains(stemKey))
+                        duplicates.Add(Path.GetFileName(f));
+                    else
+                        filtered.Add(f);
+                }
+
+                if (duplicates.Count > 0)
+                {
+                    string dupList = string.Join("\n", duplicates.Take(20));
+                    if (duplicates.Count > 20)
+                        dupList += $"\n... (+{duplicates.Count - 20})";
+
+                    MessageBox.Show(
+                        string.Format(
+                            LanguageManager.GetString("VideoConversion.DuplicatesSkipped",
+                                "⚠️  {0} file già presenti nell'archivio (saltati):\n\n{1}"),
+                            duplicates.Count, dupList),
+                        LanguageManager.GetString("Common.Warning", "Attenzione"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+
+                return filtered.ToArray();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VideoConversion] ⚠️ Errore controllo duplicati: {ex.Message}");
+                return inputFiles; // in case of error, proceed with all files
+            }
         }
 
         // ═════════════════════════════════════════════════════════════════
