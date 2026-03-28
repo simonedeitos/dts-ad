@@ -12,6 +12,7 @@ using System.Windows.Forms;
 using Microsoft.Win32;
 using NAudio.Wave;
 using AirDirector.Services.Localization;
+using AirDirector.Services.Database;
 
 namespace AirDirector.Forms
 {
@@ -35,10 +36,12 @@ namespace AirDirector.Forms
 
         // ── state ─────────────────────────────────────────────────────────
         private readonly string[] _inputFiles;
+        private readonly string _archiveType;
         private readonly string _ffmpegPath;
         private readonly string _ffprobePath;
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private readonly List<FileRow> _fileRows = new List<FileRow>();
+        private HashSet<string> _duplicateFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private int _doneCount;
         private int _errorCount;
 
@@ -206,6 +209,7 @@ namespace AirDirector.Forms
             public bool Skip;
             public bool Succeeded;
             public bool IsCompleted;       // true when done, errored, or cancelled
+            public bool IsDuplicate;       // true when file is already in archive
             public int LastReportedPct;    // monotonic progress tracking
         }
 
@@ -213,10 +217,11 @@ namespace AirDirector.Forms
         // Constructor
         // ═════════════════════════════════════════════════════════════════
 
-        public VideoConversionForm(string[] inputFiles)
+        public VideoConversionForm(string[] inputFiles, string archiveType = "Music")
         {
             InitializeComponent();
             _inputFiles = inputFiles;
+            _archiveType = archiveType;
             _ffmpegPath = Path.Combine(
                 Path.GetDirectoryName(Application.ExecutablePath) ?? "", "ffmpeg.exe");
             _ffprobePath = Path.Combine(
@@ -744,6 +749,9 @@ namespace AirDirector.Forms
         {
             BuildPreEditingPanel();
 
+            // ── Duplicate check: identify files already present in Music.dbc / Clips.dbc ──
+            _duplicateFiles = FindDuplicateFiles(_inputFiles);
+
             // detect if any audio files are present and update title/hint
             bool hasAudio = _inputFiles.Any(f => IsAudioFile(f));
             bool hasVideo = _inputFiles.Any(f => !IsAudioFile(f));
@@ -770,31 +778,58 @@ namespace AirDirector.Forms
             btnStart.Enabled = false;
             btnSkipConvert.Enabled = false;
 
-            // probe all files in parallel
-            var probeTasks = _inputFiles.Select(f =>
+            // probe only non-duplicate files
+            var nonDupFiles = _inputFiles.Where(f => !_duplicateFiles.Contains(f)).ToArray();
+            var probeTasks = nonDupFiles.Select(f =>
                 IsAudioFile(f) ? ProbeAudioFileAsync(f) : ProbeVideoFileAsync(f)).ToArray();
             var probeResults = await Task.WhenAll(probeTasks);
 
-            for (int i = 0; i < _inputFiles.Length; i++)
+            // Add duplicate rows first (disabled)
+            foreach (var f in _inputFiles.Where(f => _duplicateFiles.Contains(f)))
             {
-                bool isAudio = IsAudioFile(_inputFiles[i]);
+                bool isAudio = IsAudioFile(f);
                 if (isAudio)
-                    AddAudioFileRow(_inputFiles[i], (AudioSpec)probeResults[i]);
+                    AddAudioFileRow(f, new AudioSpec(), isDuplicate: true);
                 else
-                    AddFileRow(_inputFiles[i], (VideoSpec)probeResults[i]);
+                    AddFileRow(f, new VideoSpec(), isDuplicate: true);
+            }
+
+            // Add valid (non-duplicate) rows
+            for (int i = 0; i < nonDupFiles.Length; i++)
+            {
+                bool isAudio = IsAudioFile(nonDupFiles[i]);
+                if (isAudio)
+                    AddAudioFileRow(nonDupFiles[i], (AudioSpec)probeResults[i]);
+                else
+                    AddFileRow(nonDupFiles[i], (VideoSpec)probeResults[i]);
             }
 
             pnlScroll.AutoScrollMinSize =
                 new Size(0, _fileRows.Count * (ROW_HEIGHT + ROW_MARGIN) + 10);
 
-            int compatible = _fileRows.Count(r => !r.ChkConvert.Checked);
-            lblStatus.Text = compatible > 0
+            int validCount = _fileRows.Count(r => !r.IsDuplicate);
+            int dupCount = _fileRows.Count(r => r.IsDuplicate);
+            int compatible = _fileRows.Count(r => !r.IsDuplicate && !r.ChkConvert.Checked);
+
+            if (validCount == 0)
+            {
+                lblStatus.Text = LanguageManager.GetString("VideoConversion.AllDuplicates",
+                    "⚠️  Tutti i file selezionati sono già presenti nell'archivio.");
+                btnStart.Enabled = false;
+                btnSkipConvert.Enabled = false;
+                return;
+            }
+
+            string statusMsg = compatible > 0
                 ? $"✅  {compatible} file(s) already compatible – toggle is OFF.  Press \"Start Conversion\"."
                 : "Ready.  Press \"Start Conversion\".";
+            if (dupCount > 0)
+                statusMsg += $"  ⚠️ {dupCount} duplicate(s) ignored.";
+            lblStatus.Text = statusMsg;
 
             progressOverall.Maximum = PROGRESS_MAX; // use weighted progress
             progressOverall.Value = 0;
-            lblOverall.Text = $"0 / {_inputFiles.Length} files";
+            lblOverall.Text = $"0 / {validCount} files";
 
             btnStart.Enabled = true;
             btnSkipConvert.Enabled = true;
@@ -804,6 +839,72 @@ namespace AirDirector.Forms
         {
             string ext = Path.GetExtension(filePath);
             return AudioExtensions.Contains(ext);
+        }
+
+        /// <summary>
+        /// Identifica i file di input già presenti in Music.dbc e/o Clips.dbc
+        /// (confronto per percorso esatto e per nome file senza estensione nella stessa cartella).
+        /// Restituisce il set dei percorsi duplicati.
+        /// </summary>
+        private HashSet<string> FindDuplicateFiles(string[] inputFiles)
+        {
+            var duplicates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                var existingPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var existingStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                // Always check Music.dbc
+                try
+                {
+                    var allMusic = DbcManager.LoadFromCsv<MusicEntry>("Music.dbc");
+                    foreach (var m in allMusic.Where(m => !string.IsNullOrWhiteSpace(m.FilePath)))
+                    {
+                        existingPaths.Add(m.FilePath);
+                        string dir = Path.GetDirectoryName(m.FilePath) ?? "";
+                        string stem = Path.GetFileNameWithoutExtension(m.FilePath);
+                        existingStems.Add(Path.Combine(dir, stem));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[VideoConversion] ⚠️ Errore lettura Music.dbc per duplicati: {ex.Message}");
+                }
+
+                // Always check Clips.dbc too
+                try
+                {
+                    var allClips = DbcManager.LoadFromCsv<ClipEntry>("Clips.dbc");
+                    foreach (var c in allClips.Where(c => !string.IsNullOrWhiteSpace(c.FilePath)))
+                    {
+                        existingPaths.Add(c.FilePath);
+                        string dir = Path.GetDirectoryName(c.FilePath) ?? "";
+                        string stem = Path.GetFileNameWithoutExtension(c.FilePath);
+                        existingStems.Add(Path.Combine(dir, stem));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[VideoConversion] ⚠️ Errore lettura Clips.dbc per duplicati: {ex.Message}");
+                }
+
+                foreach (var f in inputFiles)
+                {
+                    string dir = Path.GetDirectoryName(f) ?? "";
+                    string stem = Path.GetFileNameWithoutExtension(f);
+                    string stemKey = Path.Combine(dir, stem);
+
+                    if (existingPaths.Contains(f) || existingStems.Contains(stemKey))
+                        duplicates.Add(f);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VideoConversion] ⚠️ Errore controllo duplicati: {ex.Message}");
+            }
+
+            return duplicates;
         }
 
         // ═════════════════════════════════════════════════════════════════
@@ -1360,20 +1461,22 @@ namespace AirDirector.Forms
         // Build one visual row – VIDEO
         // ═════════════════════════════════════════════════════════════════
 
-        private void AddFileRow(string filePath, VideoSpec spec)
+        private void AddFileRow(string filePath, VideoSpec spec, bool isDuplicate = false)
         {
             int idx = _fileRows.Count;
             int top = idx * (ROW_HEIGHT + ROW_MARGIN) + 4;
             int panW = Math.Max(pnlScroll.ClientSize.Width - 8, 400);
 
             bool compatible = spec.AlreadyCompatible;
-            bool needsConvert = !compatible;
+            bool needsConvert = !compatible && !isDuplicate;
 
             Panel container = new Panel
             {
                 Location = new Point(4, top),
                 Size = new Size(panW, ROW_HEIGHT),
-                BackColor = compatible
+                BackColor = isDuplicate
+                              ? Color.FromArgb(60, 40, 40)
+                              : compatible
                               ? Color.FromArgb(18, 55, 18)
                               : Color.FromArgb(42, 42, 52),
                 BorderStyle = BorderStyle.FixedSingle
@@ -1386,14 +1489,18 @@ namespace AirDirector.Forms
                 Location = new Point(7, 5),
                 Size = new Size(18, 18),
                 Checked = needsConvert,
+                Enabled = !isDuplicate,
                 FlatStyle = FlatStyle.Flat
             };
-            chkConvert.CheckedChanged += (s, ev) =>
+            if (!isDuplicate)
             {
-                container.BackColor = chkConvert.Checked
-                    ? Color.FromArgb(42, 42, 52)
-                    : Color.FromArgb(18, 55, 18);
-            };
+                chkConvert.CheckedChanged += (s, ev) =>
+                {
+                    container.BackColor = chkConvert.Checked
+                        ? Color.FromArgb(42, 42, 52)
+                        : Color.FromArgb(18, 55, 18);
+                };
+            }
             container.Controls.Add(chkConvert);
 
             // file name (shifted right for checkbox)
@@ -1403,17 +1510,34 @@ namespace AirDirector.Forms
                 Location = new Point(30, 5),
                 Size = new Size(panW - 250, 18),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                ForeColor = Color.White,
+                ForeColor = isDuplicate ? Color.Gray : Color.White,
                 AutoEllipsis = true
             };
             container.Controls.Add(lblName);
 
-            // badge – shifted left and brought to front
-            string badgeText = !spec.ProbeSuccess
-                ? "❓ Specs unavailable"
-                : compatible ? "⚡ Already compatible" : "🔄 Needs conversion";
-            Color badgeColor = !spec.ProbeSuccess ? Color.Orange
-                : compatible ? Color.LightGreen : Color.LightSkyBlue;
+            // badge
+            string badgeText;
+            Color badgeColor;
+            if (isDuplicate)
+            {
+                badgeText = "⛔ Già in archivio (duplicato)";
+                badgeColor = Color.Salmon;
+            }
+            else if (!spec.ProbeSuccess)
+            {
+                badgeText = "❓ Specs unavailable";
+                badgeColor = Color.Orange;
+            }
+            else if (compatible)
+            {
+                badgeText = "⚡ Already compatible";
+                badgeColor = Color.LightGreen;
+            }
+            else
+            {
+                badgeText = "🔄 Needs conversion";
+                badgeColor = Color.LightSkyBlue;
+            }
 
             Label lblBadge = new Label
             {
@@ -1490,11 +1614,11 @@ namespace AirDirector.Forms
             // progress label
             Label lblProg = new Label
             {
-                Text = needsConvert ? "Waiting…" : "Skip (toggle ON to convert)",
+                Text = isDuplicate ? "⛔ Duplicato – ignorato" : (needsConvert ? "Waiting…" : "Skip (toggle ON to convert)"),
                 Location = new Point(pb.Right + 10, 84),
                 Size = new Size(panW - pb.Right - 20, 18),
                 Font = new Font("Segoe UI", 8),
-                ForeColor = Color.LightGray
+                ForeColor = isDuplicate ? Color.Salmon : Color.LightGray
             };
             container.Controls.Add(lblProg);
 
@@ -1520,8 +1644,9 @@ namespace AirDirector.Forms
                 Spec = spec,
                 AudioSpec = null,
                 IsAudio = false,
-                Skip = compatible,
+                Skip = compatible || isDuplicate,
                 Succeeded = false,
+                IsDuplicate = isDuplicate,
                 LastReportedPct = 0
             });
         }
@@ -1530,7 +1655,7 @@ namespace AirDirector.Forms
         // Build one visual row – AUDIO
         // ═════════════════════════════════════════════════════════════════
 
-        private void AddAudioFileRow(string filePath, AudioSpec spec)
+        private void AddAudioFileRow(string filePath, AudioSpec spec, bool isDuplicate = false)
         {
             int idx = _fileRows.Count;
             int top = idx * (ROW_HEIGHT + ROW_MARGIN) + 4;
@@ -1538,13 +1663,15 @@ namespace AirDirector.Forms
 
             bool compatible = spec.AlreadyCompatible;
             // VBR files should have conversion pre-enabled even if format is compatible
-            bool defaultChecked = !compatible || spec.IsVariableBitrate;
+            bool defaultChecked = isDuplicate ? false : (!compatible || spec.IsVariableBitrate);
 
             Panel container = new Panel
             {
                 Location = new Point(4, top),
                 Size = new Size(panW, ROW_HEIGHT),
-                BackColor = (compatible && !spec.IsVariableBitrate)
+                BackColor = isDuplicate
+                              ? Color.FromArgb(60, 40, 40)
+                              : (compatible && !spec.IsVariableBitrate)
                               ? Color.FromArgb(18, 55, 18)
                               : Color.FromArgb(42, 42, 52),
                 BorderStyle = BorderStyle.FixedSingle
@@ -1557,14 +1684,18 @@ namespace AirDirector.Forms
                 Location = new Point(7, 5),
                 Size = new Size(18, 18),
                 Checked = defaultChecked,
+                Enabled = !isDuplicate,
                 FlatStyle = FlatStyle.Flat
             };
-            chkConvert.CheckedChanged += (s, ev) =>
+            if (!isDuplicate)
             {
-                container.BackColor = chkConvert.Checked
-                    ? Color.FromArgb(42, 42, 52)
-                    : Color.FromArgb(18, 55, 18);
-            };
+                chkConvert.CheckedChanged += (s, ev) =>
+                {
+                    container.BackColor = chkConvert.Checked
+                        ? Color.FromArgb(42, 42, 52)
+                        : Color.FromArgb(18, 55, 18);
+                };
+            }
             container.Controls.Add(chkConvert);
 
             // file name
@@ -1574,15 +1705,20 @@ namespace AirDirector.Forms
                 Location = new Point(30, 5),
                 Size = new Size(panW - 250, 18),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                ForeColor = Color.White,
+                ForeColor = isDuplicate ? Color.Gray : Color.White,
                 AutoEllipsis = true
             };
             container.Controls.Add(lblName);
 
-            // badge – shifted left and brought to front
+            // badge
             string badgeText;
             Color badgeColor;
-            if (!spec.ProbeSuccess)
+            if (isDuplicate)
+            {
+                badgeText = "⛔ Già in archivio (duplicato)";
+                badgeColor = Color.Salmon;
+            }
+            else if (!spec.ProbeSuccess)
             {
                 badgeText = "❓ Specs unavailable";
                 badgeColor = Color.Orange;
@@ -1678,11 +1814,11 @@ namespace AirDirector.Forms
             // progress label
             Label lblProg = new Label
             {
-                Text = defaultChecked ? "Waiting…" : "Skip (toggle ON to convert)",
+                Text = isDuplicate ? "⛔ Duplicato – ignorato" : (defaultChecked ? "Waiting…" : "Skip (toggle ON to convert)"),
                 Location = new Point(pb.Right + 8, 84),
                 Size = new Size(panW - pb.Right - 20, 18),
                 Font = new Font("Segoe UI", 8),
-                ForeColor = Color.LightGray
+                ForeColor = isDuplicate ? Color.Salmon : Color.LightGray
             };
             container.Controls.Add(lblProg);
 
@@ -1711,8 +1847,9 @@ namespace AirDirector.Forms
                 Spec = null,
                 AudioSpec = spec,
                 IsAudio = true,
-                Skip = !defaultChecked,
+                Skip = !defaultChecked || isDuplicate,
                 Succeeded = false,
+                IsDuplicate = isDuplicate,
                 LastReportedPct = 0
             });
         }
@@ -1849,9 +1986,9 @@ namespace AirDirector.Forms
             // ── 1. CONVERSIONE ────────────────────────────────────────────────────
             lblStatus.Text = LanguageManager.GetString("VideoConversion.StartingConversion", "⏳  Starting conversion…");
 
-            // split files by toggle state
-            var toConvert = _fileRows.Where(r => r.ChkConvert.Checked).ToList();
-            var skipRows = _fileRows.Where(r => !r.ChkConvert.Checked).ToList();
+            // split files by toggle state (exclude duplicates)
+            var toConvert = _fileRows.Where(r => r.ChkConvert.Checked && !r.IsDuplicate).ToList();
+            var skipRows = _fileRows.Where(r => !r.ChkConvert.Checked && !r.IsDuplicate).ToList();
 
             // Mark skipped rows as succeeded immediately
             foreach (var row in skipRows)
@@ -1942,7 +2079,7 @@ namespace AirDirector.Forms
             {
                 ConversionCompleted?.Invoke(
                     _fileRows
-                        .Where(r => r.Succeeded && !string.IsNullOrEmpty(r.OutputPath))
+                        .Where(r => r.Succeeded && !r.IsDuplicate && !string.IsNullOrEmpty(r.OutputPath))
                         .Select(r => r.OutputPath)
                         .ToList());
             }
@@ -1979,7 +2116,7 @@ namespace AirDirector.Forms
                 double thresholdIn = (double)_nudMarkerInDb.Value;
                 double thresholdOut = (double)_nudMarkerOutDb.Value;
 
-                foreach (var row in _fileRows)
+                foreach (var row in _fileRows.Where(r => !r.IsDuplicate))
                 {
                     try
                     {
@@ -2001,8 +2138,8 @@ namespace AirDirector.Forms
                 lblStatus.Text = $"✅  Pre-editing markers computed for {_preEditResults.Count} file(s). Importing originals…";
             }
 
-            // ── IMPORTAZIONE DEI FILE ORIGINALI ──────────────────────────────────
-            ConversionCompleted?.Invoke(_fileRows.Select(r => r.InputPath).ToList());
+            // ── IMPORTAZIONE DEI FILE ORIGINALI (esclusi duplicati) ──────────────────────────────────
+            ConversionCompleted?.Invoke(_fileRows.Where(r => !r.IsDuplicate).Select(r => r.InputPath).ToList());
             Close();
         }
 
@@ -2349,11 +2486,12 @@ namespace AirDirector.Forms
         {
             if (InvokeRequired) { BeginInvoke(new Action(UpdateOverallProgress)); return; }
 
-            if (_fileRows.Count == 0) return;
+            var activeRows = _fileRows.Where(r => !r.IsDuplicate).ToList();
+            if (activeRows.Count == 0) return;
 
             int totalWeight = 0;
             int doneFiles = 0;
-            foreach (var row in _fileRows)
+            foreach (var row in activeRows)
             {
                 if (row.IsCompleted)
                 {
@@ -2371,12 +2509,12 @@ namespace AirDirector.Forms
                 }
             }
 
-            int overallPct = totalWeight * PROGRESS_MAX / (_fileRows.Count * 100);
+            int overallPct = totalWeight * PROGRESS_MAX / (activeRows.Count * 100);
             // enforce monotonic overall progress
             if (overallPct > progressOverall.Value)
                 progressOverall.Value = Math.Min(overallPct, PROGRESS_MAX);
 
-            lblOverall.Text = $"{doneFiles} / {_inputFiles.Length} files completed";
+            lblOverall.Text = $"{doneFiles} / {activeRows.Count} files completed";
         }
 
         // ═════════════════════════════════════════════════════════════════

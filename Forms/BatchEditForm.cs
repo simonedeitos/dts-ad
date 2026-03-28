@@ -24,7 +24,7 @@ namespace AirDirector.Forms
         private TextBox txtCategoriesDisplay;
         private Button btnCategoriesDropdown;
         private CheckBox chkModifyYear;
-        private TextBox txtYear;
+        private NumericUpDown numYear;
         private Label lblTitle;
         private Button btnOK;
         private Button btnCancel;
@@ -74,134 +74,172 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
-            this.Size = new Size(450, 280);
+            this.Size = new Size(500, 310);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.BackColor = AppTheme.BgLight;
+            this.Padding = new Padding(20, 15, 20, 15);
 
             lblTitle = new Label
             {
                 Text = "Seleziona cosa modificare:",
-                Location = new Point(20, 20),
-                Size = new Size(400, 20),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+                Dock = DockStyle.Top,
+                Height = 28,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Padding = new Padding(0, 0, 0, 6)
             };
-            this.Controls.Add(lblTitle);
 
-            // --- Genere ---
+            // --- Content panel con TableLayout ---
+            var tbl = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                ColumnCount = 3,
+                Padding = new Padding(0),
+                Margin = new Padding(0)
+            };
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 34));
+
+            // --- Genere (riga 0) ---
             chkModifyGenre = new CheckBox
             {
                 Text = "Modifica Genere:",
-                Location = new Point(20, 55),
-                Size = new Size(150, 25),
-                Font = new Font("Segoe UI", 9)
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9),
+                Margin = new Padding(0, 6, 8, 6),
+                Anchor = AnchorStyles.Left
             };
             chkModifyGenre.CheckedChanged += (s, e) => cmbGenre.Enabled = chkModifyGenre.Checked;
-            this.Controls.Add(chkModifyGenre);
 
             cmbGenre = new ComboBox
             {
-                Location = new Point(180, 53),
-                Size = new Size(230, 25),
+                Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 9),
                 Enabled = false,
                 DropDownStyle = ComboBoxStyle.DropDown,
                 AutoCompleteMode = AutoCompleteMode.SuggestAppend,
-                AutoCompleteSource = AutoCompleteSource.ListItems
+                AutoCompleteSource = AutoCompleteSource.ListItems,
+                Margin = new Padding(0, 6, 0, 6)
             };
-            this.Controls.Add(cmbGenre);
 
-            // --- Categorie (popup dropdown) ---
+            tbl.Controls.Add(chkModifyGenre, 0, 0);
+            tbl.Controls.Add(cmbGenre, 1, 0);
+            tbl.SetColumnSpan(cmbGenre, 2);
+
+            // --- Categorie (riga 1) ---
             chkModifyCategory = new CheckBox
             {
                 Text = "Modifica Categoria:",
-                Location = new Point(20, 90),
-                Size = new Size(150, 25),
-                Font = new Font("Segoe UI", 9)
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9),
+                Margin = new Padding(0, 6, 8, 6),
+                Anchor = AnchorStyles.Left
             };
             chkModifyCategory.CheckedChanged += (s, e) =>
             {
                 txtCategoriesDisplay.Enabled = chkModifyCategory.Checked;
                 btnCategoriesDropdown.Enabled = chkModifyCategory.Checked;
             };
-            this.Controls.Add(chkModifyCategory);
 
             txtCategoriesDisplay = new TextBox
             {
-                Location = new Point(180, 88),
-                Size = new Size(200, 25),
+                Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 9),
                 Enabled = false,
                 ReadOnly = true,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 6, 0, 6)
             };
             txtCategoriesDisplay.Click += (s, e) => { if (txtCategoriesDisplay.Enabled) ShowCategoryPopup(); };
-            this.Controls.Add(txtCategoriesDisplay);
 
             btnCategoriesDropdown = new Button
             {
-                Location = new Point(380, 88),
+                Text = "▼",
                 Size = new Size(30, 25),
                 Font = new Font("Segoe UI", 9),
-                Text = "▼",
                 FlatStyle = FlatStyle.Flat,
-                Enabled = false
+                Enabled = false,
+                Margin = new Padding(4, 6, 0, 6)
             };
             btnCategoriesDropdown.Click += (s, e) => ShowCategoryPopup();
-            this.Controls.Add(btnCategoriesDropdown);
 
-            // --- Anno ---
+            tbl.Controls.Add(chkModifyCategory, 0, 1);
+            tbl.Controls.Add(txtCategoriesDisplay, 1, 1);
+            tbl.Controls.Add(btnCategoriesDropdown, 2, 1);
+
+            // --- Anno (riga 2) ---
             chkModifyYear = new CheckBox
             {
                 Text = "Anno:",
-                Location = new Point(20, 125),
-                Size = new Size(150, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            chkModifyYear.CheckedChanged += (s, e) => txtYear.Enabled = chkModifyYear.Checked;
-            this.Controls.Add(chkModifyYear);
-
-            txtYear = new TextBox
-            {
-                Location = new Point(180, 123),
-                Size = new Size(100, 25),
+                AutoSize = true,
                 Font = new Font("Segoe UI", 9),
-                Enabled = false
+                Margin = new Padding(0, 6, 8, 6),
+                Anchor = AnchorStyles.Left
             };
-            this.Controls.Add(txtYear);
+            chkModifyYear.CheckedChanged += (s, e) => numYear.Enabled = chkModifyYear.Checked;
+
+            numYear = new NumericUpDown
+            {
+                Font = new Font("Segoe UI", 9),
+                Enabled = false,
+                Minimum = 1900,
+                Maximum = 2100,
+                Value = DateTime.Now.Year,
+                Size = new Size(100, 25),
+                Margin = new Padding(0, 6, 0, 6),
+                Anchor = AnchorStyles.Left
+            };
+
+            tbl.Controls.Add(chkModifyYear, 0, 2);
+            tbl.Controls.Add(numYear, 1, 2);
 
             // --- Bottoni ---
-            btnOK = new Button
+            var pnlButtons = new FlowLayoutPanel
             {
-                Text = "✓ Applica",
-                Location = new Point(180, 170),
-                Size = new Size(110, 35),
-                BackColor = AppTheme.Success,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                Cursor = Cursors.Hand
+                Dock = DockStyle.Bottom,
+                FlowDirection = FlowDirection.RightToLeft,
+                AutoSize = true,
+                Padding = new Padding(0, 10, 0, 0)
             };
-            btnOK.FlatAppearance.BorderSize = 0;
-            btnOK.Click += BtnOK_Click;
-            this.Controls.Add(btnOK);
 
             btnCancel = new Button
             {
                 Text = "✖ Annulla",
-                Location = new Point(300, 170),
-                Size = new Size(110, 35),
+                Size = new Size(120, 38),
                 BackColor = AppTheme.Danger,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 0, 0)
             };
             btnCancel.FlatAppearance.BorderSize = 0;
             btnCancel.Click += (s, e) => this.DialogResult = DialogResult.Cancel;
-            this.Controls.Add(btnCancel);
+
+            btnOK = new Button
+            {
+                Text = "✓ Applica",
+                Size = new Size(120, 38),
+                BackColor = AppTheme.Success,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 8, 0)
+            };
+            btnOK.FlatAppearance.BorderSize = 0;
+            btnOK.Click += BtnOK_Click;
+
+            pnlButtons.Controls.Add(btnCancel);
+            pnlButtons.Controls.Add(btnOK);
+
+            this.Controls.Add(tbl);
+            this.Controls.Add(pnlButtons);
+            this.Controls.Add(lblTitle);
         }
 
         private void UpdateCategoryDisplay()
@@ -219,7 +257,7 @@ namespace AirDirector.Forms
                 StartPosition = FormStartPosition.Manual,
                 ShowInTaskbar = false,
                 Text = LanguageManager.GetString("BatchEdit.ModifyCategory", "Modifica Categoria:"),
-                Size = new Size(250, 220),
+                Size = new Size(280, 260),
                 BackColor = this.BackColor
             };
 
@@ -242,7 +280,67 @@ namespace AirDirector.Forms
                     clb.SetItemChecked(idx, true);
             }
 
+            // Pannello in basso per aggiungere nuova categoria
+            var addPanel = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 36,
+                BackColor = AppTheme.BgLight,
+                Padding = new Padding(4, 4, 4, 4)
+            };
+            var txtNew = new TextBox
+            {
+                Location = new Point(4, 6),
+                Size = new Size(168, 24),
+                Font = new Font("Segoe UI", 9F),
+                BackColor = AppTheme.Surface,
+                ForeColor = AppTheme.TextPrimary
+            };
+            var btnAdd = new Button
+            {
+                Text = "+ Aggiungi",
+                Location = new Point(176, 4),
+                Size = new Size(90, 26),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                BackColor = AppTheme.Primary,
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand
+            };
+            btnAdd.FlatAppearance.BorderSize = 0;
+            txtNew.KeyDown += (sk, ek) => { if (ek.KeyCode == Keys.Enter) { ek.SuppressKeyPress = true; btnAdd.PerformClick(); } };
+            btnAdd.Click += (s2, e2) =>
+            {
+                string newCat = txtNew.Text.Trim();
+                if (string.IsNullOrWhiteSpace(newCat)) return;
+
+                bool exists = false;
+                for (int i = 0; i < clb.Items.Count; i++)
+                {
+                    if (string.Equals(clb.Items[i].ToString(), newCat, StringComparison.OrdinalIgnoreCase))
+                    {
+                        clb.SetItemChecked(i, true);
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists)
+                {
+                    int idx = clb.Items.Add(newCat);
+                    clb.SetItemChecked(idx, true);
+                    if (!_allCategories.Contains(newCat))
+                    {
+                        _allCategories.Add(newCat);
+                        PersistNewCategory(newCat);
+                    }
+                }
+                txtNew.Text = "";
+            };
+            addPanel.Controls.Add(txtNew);
+            addPanel.Controls.Add(btnAdd);
+
             popup.Controls.Add(clb);
+            popup.Controls.Add(addPanel);
 
             var screenPos = txtCategoriesDisplay.PointToScreen(new Point(0, txtCategoriesDisplay.Height));
             popup.Location = screenPos;
@@ -259,6 +357,30 @@ namespace AirDirector.Forms
             };
 
             popup.Show(this);
+        }
+
+        private void PersistNewCategory(string categoryName)
+        {
+            try
+            {
+                var existing = DbcManager.LoadFromCsv<CategoryEntry>("Categories.dbc");
+                bool alreadyExists = existing.Any(c =>
+                    string.Equals(c.CategoryName?.Trim(), categoryName, StringComparison.OrdinalIgnoreCase));
+
+                if (!alreadyExists)
+                {
+                    DbcManager.Insert("Categories.dbc", new CategoryEntry
+                    {
+                        CategoryName = categoryName,
+                        Color = "#607D8B",
+                        IgnoreHourlySeparation = 0
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[BatchEdit] ⚠️ Errore salvataggio nuova categoria: {ex.Message}");
+            }
         }
 
         private void LoadExistingData()
@@ -360,27 +482,10 @@ namespace AirDirector.Forms
                 ? string.Join(";", _checkedCategories.OrderBy(c => c))
                 : "";
 
-            // Anno: parse del valore, vuoto = null
+            // Anno: valore dal NumericUpDown
             if (ModifyYear)
             {
-                string yearText = txtYear.Text.Trim();
-                if (string.IsNullOrEmpty(yearText))
-                {
-                    NewYear = 0; // vuoto = azzera anno
-                }
-                else if (int.TryParse(yearText, out int yearVal) && yearVal >= 0 && yearVal <= 2100)
-                {
-                    NewYear = yearVal;
-                }
-                else
-                {
-                    MessageBox.Show(
-                        LanguageManager.GetString("Archive.InvalidYearRange", "❌ Anno non valido!"),
-                        LanguageManager.GetString("Common.Warning", "Attenzione"),
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
-                    return;
-                }
+                NewYear = (int)numYear.Value;
             }
 
             if (!ModifyGenre && !ModifyCategory && !ModifyYear)
