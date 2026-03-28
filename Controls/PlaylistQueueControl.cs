@@ -1535,7 +1535,10 @@ namespace AirDirector.Controls
 
                 _generatingBatch = new List<PlaylistQueueItem>();
 
-                var result = await Task.Run(() =>
+                const int earlyBatchSize = 5;
+                var earlyBatchReady = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                var generationTask = Task.Run(() =>
                 {
                     int addedCount = 0;
                     int totalAttempts = 0;
@@ -1546,12 +1549,14 @@ namespace AirDirector.Controls
                     if (clock == null)
                     {
                         Log($"[GenerateClock] ❌ Clock '{clockName}' non trovato!");
+                        earlyBatchReady.TrySetResult(true);
                         return (addedCount, totalAttempts);
                     }
 
                     if (string.IsNullOrEmpty(clock.Items))
                     {
                         Log($"[GenerateClock] ⚠️ Clock '{clockName}' vuoto!");
+                        earlyBatchReady.TrySetResult(true);
                         return (addedCount, totalAttempts);
                     }
 
@@ -1564,6 +1569,7 @@ namespace AirDirector.Controls
                     catch (Exception jsonEx)
                     {
                         Log($"[GenerateClock] ❌ Errore parsing JSON: {jsonEx.Message}");
+                        earlyBatchReady.TrySetResult(true);
                         return (addedCount, totalAttempts);
                     }
 
@@ -1650,6 +1656,9 @@ namespace AirDirector.Controls
                                 lock (_generatingBatchLock) { _generatingBatch.Add(queueItem); }
                                 addedCount++;
                                 addedForThisItem++;
+
+                                if (addedCount == earlyBatchSize)
+                                    earlyBatchReady.TrySetResult(true);
                             }
                             else
                             {
@@ -1660,26 +1669,67 @@ namespace AirDirector.Controls
                         Log($"[GenerateClock] ✅ Aggiunti {addedForThisItem}/{itemsToAdd} per questo elemento");
                     }
 
+                    earlyBatchReady.TrySetResult(true);
                     return (addedCount, totalAttempts);
                 });
 
-                int batchCount = 0;
-                const int batchSize = 5;
-                foreach (var queueItem in _generatingBatch)
-                {
-                    AddItemBatch(queueItem);
-                    batchCount++;
+                // Wait for the first batch to be ready so playback can start immediately
+                await earlyBatchReady.Task;
 
-                    if (batchCount >= batchSize)
-                    {
-                        FinalizeBatchModification();
-                        batchCount = 0;
-                        await Task.Yield();
-                    }
+                List<PlaylistQueueItem> earlyItems;
+                lock (_generatingBatchLock) { earlyItems = new List<PlaylistQueueItem>(_generatingBatch); }
+                int earlyCount = earlyItems.Count;
+
+                if (earlyCount > 0)
+                {
+                    Log($"[GenerateClock] ⚡ Primi {earlyCount} elementi pronti, aggiungo subito alla coda");
+                    foreach (var item in earlyItems)
+                        AddItemBatch(item);
+                    FinalizeBatchModification();
                 }
 
-                if (batchCount > 0)
-                    FinalizeBatchModification();
+                // Fire QueueReady early so playback can start while generation continues
+                bool earlyQueueReadyFired = false;
+                if (_isInitialStartup && _items.Count >= 2)
+                {
+                    Log($"[GenerateClock] ▶️ QueueReady anticipato con {_items.Count} elementi");
+                    QueueReady?.Invoke(this, _items.Count);
+                    earlyQueueReadyFired = true;
+                }
+
+                // Wait for the full generation to complete
+                var result = await generationTask;
+
+                // Add remaining items that were generated after the early batch
+                List<PlaylistQueueItem> remainingItems;
+                lock (_generatingBatchLock)
+                {
+                    remainingItems = _generatingBatch.Count > earlyCount
+                        ? _generatingBatch.GetRange(earlyCount, _generatingBatch.Count - earlyCount)
+                        : new List<PlaylistQueueItem>();
+                }
+
+                if (remainingItems.Count > 0)
+                {
+                    Log($"[GenerateClock] 📦 Aggiungo i restanti {remainingItems.Count} elementi alla coda");
+                    int batchCount = 0;
+                    const int batchSize = 5;
+                    foreach (var item in remainingItems)
+                    {
+                        AddItemBatch(item);
+                        batchCount++;
+
+                        if (batchCount >= batchSize)
+                        {
+                            FinalizeBatchModification();
+                            batchCount = 0;
+                            await Task.Yield();
+                        }
+                    }
+
+                    if (batchCount > 0)
+                        FinalizeBatchModification();
+                }
 
                 _currentClockName = clockName;
                 DbcManager.SetConfigValue("LastUsedClock", clockName);
@@ -1693,7 +1743,7 @@ namespace AirDirector.Controls
                 Log($"[GenerateClock] ═══════════════════════════════════════════");
                 Log($"");
 
-                if (_isInitialStartup && _items.Count >= 2)
+                if (!earlyQueueReadyFired && _isInitialStartup && _items.Count >= 2)
                     QueueReady?.Invoke(this, _items.Count);
             }
             catch (Exception ex)
