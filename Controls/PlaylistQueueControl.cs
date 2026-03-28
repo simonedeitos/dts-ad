@@ -89,7 +89,7 @@ namespace AirDirector.Controls
 			this.MouseWheel += PlaylistQueueControl_MouseWheel;
 			this.Resize += (s, e) => UpdateScrollBar();
 
-			_queueMonitorTimer = new System.Windows.Forms.Timer { Interval = 5000 };
+			_queueMonitorTimer = new System.Windows.Forms.Timer { Interval = 15000 };
 			_queueMonitorTimer.Tick += QueueMonitorTimer_Tick;
 			_queueMonitorTimer.Start();
 
