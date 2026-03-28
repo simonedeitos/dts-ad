@@ -15,15 +15,23 @@ namespace AirDirector.Forms
         public string NewGenre { get; private set; }
         public bool ModifyCategory { get; private set; }
         public string NewCategory { get; private set; }
+        public bool ModifyYear { get; private set; }
+        public int? NewYear { get; private set; }
 
         private CheckBox chkModifyGenre;
         private ComboBox cmbGenre;
         private CheckBox chkModifyCategory;
-        private ComboBox cmbCategory;
+        private TextBox txtCategoriesDisplay;
+        private Button btnCategoriesDropdown;
+        private CheckBox chkModifyYear;
+        private TextBox txtYear;
         private Label lblTitle;
         private Button btnOK;
         private Button btnCancel;
         private string _archiveType;
+
+        private List<string> _allCategories = new List<string>();
+        private HashSet<string> _checkedCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public BatchEditForm(string archiveType)
         {
@@ -54,6 +62,9 @@ namespace AirDirector.Forms
             if (chkModifyCategory != null)
                 chkModifyCategory.Text = LanguageManager.GetString("BatchEdit.ModifyCategory", "Modifica Categoria:");
 
+            if (chkModifyYear != null)
+                chkModifyYear.Text = LanguageManager.GetString("Archive.ColumnYear", "Anno") + ":";
+
             if (btnOK != null)
                 btnOK.Text = "✓ " + LanguageManager.GetString("BatchEdit.Apply", "Applica");
 
@@ -63,7 +74,7 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
-            this.Size = new Size(450, 250);
+            this.Size = new Size(450, 280);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -79,10 +90,11 @@ namespace AirDirector.Forms
             };
             this.Controls.Add(lblTitle);
 
+            // --- Genere ---
             chkModifyGenre = new CheckBox
             {
                 Text = "Modifica Genere:",
-                Location = new Point(20, 60),
+                Location = new Point(20, 55),
                 Size = new Size(150, 25),
                 Font = new Font("Segoe UI", 9)
             };
@@ -91,7 +103,7 @@ namespace AirDirector.Forms
 
             cmbGenre = new ComboBox
             {
-                Location = new Point(180, 58),
+                Location = new Point(180, 53),
                 Size = new Size(230, 25),
                 Font = new Font("Segoe UI", 9),
                 Enabled = false,
@@ -101,32 +113,70 @@ namespace AirDirector.Forms
             };
             this.Controls.Add(cmbGenre);
 
+            // --- Categorie (popup dropdown) ---
             chkModifyCategory = new CheckBox
             {
                 Text = "Modifica Categoria:",
-                Location = new Point(20, 100),
+                Location = new Point(20, 90),
                 Size = new Size(150, 25),
                 Font = new Font("Segoe UI", 9)
             };
-            chkModifyCategory.CheckedChanged += (s, e) => cmbCategory.Enabled = chkModifyCategory.Checked;
+            chkModifyCategory.CheckedChanged += (s, e) =>
+            {
+                txtCategoriesDisplay.Enabled = chkModifyCategory.Checked;
+                btnCategoriesDropdown.Enabled = chkModifyCategory.Checked;
+            };
             this.Controls.Add(chkModifyCategory);
 
-            cmbCategory = new ComboBox
+            txtCategoriesDisplay = new TextBox
             {
-                Location = new Point(180, 98),
-                Size = new Size(230, 25),
+                Location = new Point(180, 88),
+                Size = new Size(200, 25),
                 Font = new Font("Segoe UI", 9),
                 Enabled = false,
-                DropDownStyle = ComboBoxStyle.DropDown,
-                AutoCompleteMode = AutoCompleteMode.SuggestAppend,
-                AutoCompleteSource = AutoCompleteSource.ListItems
+                ReadOnly = true,
+                Cursor = Cursors.Hand
             };
-            this.Controls.Add(cmbCategory);
+            txtCategoriesDisplay.Click += (s, e) => { if (txtCategoriesDisplay.Enabled) ShowCategoryPopup(); };
+            this.Controls.Add(txtCategoriesDisplay);
 
+            btnCategoriesDropdown = new Button
+            {
+                Location = new Point(380, 88),
+                Size = new Size(30, 25),
+                Font = new Font("Segoe UI", 9),
+                Text = "▼",
+                FlatStyle = FlatStyle.Flat,
+                Enabled = false
+            };
+            btnCategoriesDropdown.Click += (s, e) => ShowCategoryPopup();
+            this.Controls.Add(btnCategoriesDropdown);
+
+            // --- Anno ---
+            chkModifyYear = new CheckBox
+            {
+                Text = "Anno:",
+                Location = new Point(20, 125),
+                Size = new Size(150, 25),
+                Font = new Font("Segoe UI", 9)
+            };
+            chkModifyYear.CheckedChanged += (s, e) => txtYear.Enabled = chkModifyYear.Checked;
+            this.Controls.Add(chkModifyYear);
+
+            txtYear = new TextBox
+            {
+                Location = new Point(180, 123),
+                Size = new Size(100, 25),
+                Font = new Font("Segoe UI", 9),
+                Enabled = false
+            };
+            this.Controls.Add(txtYear);
+
+            // --- Bottoni ---
             btnOK = new Button
             {
                 Text = "✓ Applica",
-                Location = new Point(180, 160),
+                Location = new Point(180, 170),
                 Size = new Size(110, 35),
                 BackColor = AppTheme.Success,
                 ForeColor = Color.White,
@@ -141,7 +191,7 @@ namespace AirDirector.Forms
             btnCancel = new Button
             {
                 Text = "✖ Annulla",
-                Location = new Point(300, 160),
+                Location = new Point(300, 170),
                 Size = new Size(110, 35),
                 BackColor = AppTheme.Danger,
                 ForeColor = Color.White,
@@ -154,10 +204,69 @@ namespace AirDirector.Forms
             this.Controls.Add(btnCancel);
         }
 
+        private void UpdateCategoryDisplay()
+        {
+            txtCategoriesDisplay.Text = _checkedCategories.Count > 0
+                ? string.Join("; ", _checkedCategories.OrderBy(c => c))
+                : "";
+        }
+
+        private void ShowCategoryPopup()
+        {
+            var popup = new Form
+            {
+                FormBorderStyle = FormBorderStyle.FixedToolWindow,
+                StartPosition = FormStartPosition.Manual,
+                ShowInTaskbar = false,
+                Text = LanguageManager.GetString("BatchEdit.ModifyCategory", "Modifica Categoria:"),
+                Size = new Size(250, 220),
+                BackColor = this.BackColor
+            };
+
+            var clb = new CheckedListBox
+            {
+                Dock = DockStyle.Fill,
+                CheckOnClick = true,
+                Font = new Font("Segoe UI", 9F),
+                BorderStyle = BorderStyle.None
+            };
+
+            var allItems = new HashSet<string>(_allCategories, StringComparer.OrdinalIgnoreCase);
+            foreach (var c in _checkedCategories)
+                allItems.Add(c);
+
+            foreach (var cat in allItems.OrderBy(c => c))
+            {
+                int idx = clb.Items.Add(cat);
+                if (_checkedCategories.Contains(cat))
+                    clb.SetItemChecked(idx, true);
+            }
+
+            popup.Controls.Add(clb);
+
+            var screenPos = txtCategoriesDisplay.PointToScreen(new Point(0, txtCategoriesDisplay.Height));
+            popup.Location = screenPos;
+
+            popup.FormClosed += (s2, e2) =>
+            {
+                _checkedCategories.Clear();
+                for (int i = 0; i < clb.Items.Count; i++)
+                {
+                    if (clb.GetItemChecked(i))
+                        _checkedCategories.Add(clb.Items[i].ToString());
+                }
+                UpdateCategoryDisplay();
+            };
+
+            popup.Show(this);
+        }
+
         private void LoadExistingData()
         {
             try
             {
+                var allCats = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
                 if (_archiveType == "Music")
                 {
                     var allMusic = DbcManager.LoadFromCsv<MusicEntry>("Music.dbc");
@@ -175,17 +284,15 @@ namespace AirDirector.Forms
                         cmbGenre.Items.Add(genre);
                     }
 
-                    var categories = allMusic
-                        .Select(m => m.Categories)
-                        .Where(c => !string.IsNullOrWhiteSpace(c))
-                        .Distinct()
-                        .OrderBy(c => c)
-                        .ToList();
-
-                    cmbCategory.Items.Clear();
-                    foreach (var category in categories)
+                    foreach (var m in allMusic)
                     {
-                        cmbCategory.Items.Add(category);
+                        if (string.IsNullOrWhiteSpace(m.Categories)) continue;
+                        foreach (var part in m.Categories.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            string trimmed = part.Trim();
+                            if (!string.IsNullOrWhiteSpace(trimmed))
+                                allCats.Add(trimmed);
+                        }
                     }
                 }
                 else
@@ -205,19 +312,31 @@ namespace AirDirector.Forms
                         cmbGenre.Items.Add(genre);
                     }
 
-                    var categories = allClips
-                        .Select(c => c.Categories)
-                        .Where(c => !string.IsNullOrWhiteSpace(c))
-                        .Distinct()
-                        .OrderBy(c => c)
-                        .ToList();
-
-                    cmbCategory.Items.Clear();
-                    foreach (var category in categories)
+                    foreach (var c in allClips)
                     {
-                        cmbCategory.Items.Add(category);
+                        if (string.IsNullOrWhiteSpace(c.Categories)) continue;
+                        foreach (var part in c.Categories.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            string trimmed = part.Trim();
+                            if (!string.IsNullOrWhiteSpace(trimmed))
+                                allCats.Add(trimmed);
+                        }
                     }
                 }
+
+                // Aggiungi categorie da Categories.dbc
+                try
+                {
+                    var categoryEntries = DbcManager.LoadFromCsv<CategoryEntry>("Categories.dbc");
+                    foreach (var ce in categoryEntries)
+                    {
+                        if (!string.IsNullOrWhiteSpace(ce.CategoryName))
+                            allCats.Add(ce.CategoryName.Trim());
+                    }
+                }
+                catch { }
+
+                _allCategories = allCats.OrderBy(c => c).ToList();
             }
             catch (Exception ex)
             {
@@ -234,9 +353,37 @@ namespace AirDirector.Forms
             ModifyGenre = chkModifyGenre.Checked;
             NewGenre = cmbGenre.Text.Trim();
             ModifyCategory = chkModifyCategory.Checked;
-            NewCategory = cmbCategory.Text.Trim();
+            ModifyYear = chkModifyYear.Checked;
 
-            if (!ModifyGenre && !ModifyCategory)
+            // Categorie: join degli elementi selezionati con punto e virgola
+            NewCategory = _checkedCategories.Count > 0
+                ? string.Join(";", _checkedCategories.OrderBy(c => c))
+                : "";
+
+            // Anno: parse del valore, vuoto = null
+            if (ModifyYear)
+            {
+                string yearText = txtYear.Text.Trim();
+                if (string.IsNullOrEmpty(yearText))
+                {
+                    NewYear = 0; // vuoto = azzera anno
+                }
+                else if (int.TryParse(yearText, out int yearVal) && yearVal >= 0 && yearVal <= 2100)
+                {
+                    NewYear = yearVal;
+                }
+                else
+                {
+                    MessageBox.Show(
+                        LanguageManager.GetString("Archive.InvalidYearRange", "❌ Anno non valido!"),
+                        LanguageManager.GetString("Common.Warning", "Attenzione"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+
+            if (!ModifyGenre && !ModifyCategory && !ModifyYear)
             {
                 MessageBox.Show(
                     LanguageManager.GetString("BatchEdit.SelectAtLeastOne", "Seleziona almeno una modifica!"),
@@ -256,7 +403,7 @@ namespace AirDirector.Forms
                 return;
             }
 
-            if (ModifyCategory && string.IsNullOrWhiteSpace(NewCategory))
+            if (ModifyCategory && _checkedCategories.Count == 0)
             {
                 MessageBox.Show(
                     LanguageManager.GetString("BatchEdit.EnterCategory", "Inserisci la nuova categoria!"),
