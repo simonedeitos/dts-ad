@@ -346,7 +346,8 @@ namespace AirDirector.Controls
 
 				if (totalCount <= 3)
 				{
-					_isInitialStartup = false;
+					if (!_isGeneratingClock)
+						_isInitialStartup = false;
 					FillQueueFromLastClock();
 				}
 			}
@@ -1512,6 +1513,9 @@ namespace AirDirector.Controls
 
             _isGeneratingClock = true;
 
+            // Cattura il flag prima che possa essere modificato da timer esterni
+            bool wasInitialStartup = _isInitialStartup;
+
             try
             {
                 Log($"");
@@ -1690,7 +1694,7 @@ namespace AirDirector.Controls
 
                 // Fire QueueReady early so playback can start while generation continues
                 bool earlyQueueReadyFired = false;
-                if (_isInitialStartup && _items.Count >= 2)
+                if (wasInitialStartup && _items.Count >= 2)
                 {
                     Log($"[GenerateClock] ▶️ QueueReady anticipato con {_items.Count} elementi");
                     QueueReady?.Invoke(this, _items.Count);
@@ -1743,7 +1747,7 @@ namespace AirDirector.Controls
                 Log($"[GenerateClock] ═══════════════════════════════════════════");
                 Log($"");
 
-                if (!earlyQueueReadyFired && _isInitialStartup && _items.Count >= 2)
+                if (!earlyQueueReadyFired && wasInitialStartup && _items.Count >= 2)
                     QueueReady?.Invoke(this, _items.Count);
             }
             catch (Exception ex)
