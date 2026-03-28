@@ -309,7 +309,7 @@ namespace AirDirector.Forms
             };
             var btnAdd = new Button
             {
-                Text = "+ Aggiungi",
+                Text = "+ " + LanguageManager.GetString("Download.Add", "Aggiungi"),
                 Location = new Point(176, 4),
                 Size = new Size(90, 26),
                 FlatStyle = FlatStyle.Flat,
