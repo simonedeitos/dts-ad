@@ -7,6 +7,7 @@ using System.Net;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using AirDirector.Models;
+using AirDirector.Services.Core;
 using AirDirector.Services.Database;
 using AirDirector.Services.Localization;
 using AirDirector.Themes;
@@ -22,7 +23,8 @@ namespace AirDirector.Controls
         private List<DownloadTask> _downloadTasks = new List<DownloadTask>();
         private System.Windows.Forms.Timer _schedulerTimer;
         private System.Windows.Forms.Timer _countdownTimer;
-        private string _logFilePath;
+        private DailyLogger _dailyLogger;
+        private readonly Dictionary<string, DateTime> _lastExecuted = new Dictionary<string, DateTime>();
         private bool _isProcessing = false;
         private bool _logVisible = true;
 
@@ -48,13 +50,7 @@ namespace AirDirector.Controls
         {
             InitializeComponent();
 
-            _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", "FileDownloader_Log.txt");
-
-            string logDir = Path.GetDirectoryName(_logFilePath);
-            if (!Directory.Exists(logDir))
-            {
-                Directory.CreateDirectory(logDir);
-            }
+            try { _dailyLogger = new DailyLogger("Download"); } catch { }
 
             _schedulerTimer = new System.Windows.Forms.Timer();
             _schedulerTimer.Interval = 1000;
@@ -718,7 +714,7 @@ namespace AirDirector.Controls
             }
             else
             {
-                lblCountdown.Text = "--: --:--";
+                lblCountdown.Text = "--:--:--";
                 lblCountdown.ForeColor = Color.Gray;
             }
         }
@@ -726,7 +722,7 @@ namespace AirDirector.Controls
         private void SchedulerTimer_Tick(object sender, EventArgs e)
         {
             DateTime now = DateTime.Now;
-            string currentTimeStr = now.ToString("HH: mm:ss");
+            string currentTimeStr = now.ToString("HH:mm:ss");
             DayOfWeek currentDay = now.DayOfWeek;
 
             foreach (var task in _downloadTasks)
@@ -748,6 +744,11 @@ namespace AirDirector.Controls
 
                 if (dayMatch && task.ScheduleTimes.Contains(currentTimeStr))
                 {
+                    string taskKey = task.Name + "|" + currentTimeStr;
+                    if (_lastExecuted.TryGetValue(taskKey, out DateTime lastRun) && (now - lastRun).TotalSeconds < 60)
+                        continue;
+
+                    _lastExecuted[taskKey] = now;
                     ExecuteDownloadTask(task);
                 }
             }
@@ -1489,14 +1490,11 @@ namespace AirDirector.Controls
 
         private void LogMessage(string message)
         {
-            string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {message}";
+            _dailyLogger?.Log($"[Download] {message}");
 
             try
             {
-                using (StreamWriter writer = File.AppendText(_logFilePath))
-                {
-                    writer.WriteLine(logEntry);
-                }
+                string logEntry = $"[{DateTime.Now:HH:mm:ss.fff}] {message}";
 
                 if (txtLog.InvokeRequired)
                 {
@@ -1528,6 +1526,7 @@ namespace AirDirector.Controls
                 _schedulerTimer?.Dispose();
                 _countdownTimer?.Stop();
                 _countdownTimer?.Dispose();
+                try { _dailyLogger?.Dispose(); } catch { }
             }
             base.Dispose(disposing);
         }
