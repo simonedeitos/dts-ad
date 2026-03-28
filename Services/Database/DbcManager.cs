@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -93,9 +93,6 @@ namespace AirDirector.Services.Database
             {
                 var defaultCategories = new List<CategoryEntry>
                 {
-                    new CategoryEntry { ID = 1, CategoryName = "Rotation", Color = "#2196F3", IgnoreHourlySeparation = 0 },
-                    new CategoryEntry { ID = 2, CategoryName = "Jingle", Color = "#FF9800", IgnoreHourlySeparation = 1 },
-                    new CategoryEntry { ID = 3, CategoryName = "Promo", Color = "#9C27B0", IgnoreHourlySeparation = 1 }
                 };
                 SaveToCsvInternal(categoriesPath, defaultCategories);
                 Console.WriteLine("[DbcManager] Categories.dbc creato");
