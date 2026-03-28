@@ -21,13 +21,17 @@ namespace AirDirector.Forms
         private CheckBox chkModifyGenre;
         private ComboBox cmbGenre;
         private CheckBox chkModifyCategory;
-        private CheckedListBox chkCategoryList;
+        private TextBox txtCategoriesDisplay;
+        private Button btnCategoriesDropdown;
         private CheckBox chkModifyYear;
         private TextBox txtYear;
         private Label lblTitle;
         private Button btnOK;
         private Button btnCancel;
         private string _archiveType;
+
+        private List<string> _allCategories = new List<string>();
+        private HashSet<string> _checkedCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public BatchEditForm(string archiveType)
         {
@@ -70,7 +74,7 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
-            this.Size = new Size(450, 340);
+            this.Size = new Size(450, 280);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -109,7 +113,7 @@ namespace AirDirector.Forms
             };
             this.Controls.Add(cmbGenre);
 
-            // --- Categorie (CheckedListBox multi-selezione) ---
+            // --- Categorie (popup dropdown) ---
             chkModifyCategory = new CheckBox
             {
                 Text = "Modifica Categoria:",
@@ -117,25 +121,42 @@ namespace AirDirector.Forms
                 Size = new Size(150, 25),
                 Font = new Font("Segoe UI", 9)
             };
-            chkModifyCategory.CheckedChanged += (s, e) => chkCategoryList.Enabled = chkModifyCategory.Checked;
+            chkModifyCategory.CheckedChanged += (s, e) =>
+            {
+                txtCategoriesDisplay.Enabled = chkModifyCategory.Checked;
+                btnCategoriesDropdown.Enabled = chkModifyCategory.Checked;
+            };
             this.Controls.Add(chkModifyCategory);
 
-            chkCategoryList = new CheckedListBox
+            txtCategoriesDisplay = new TextBox
             {
                 Location = new Point(180, 88),
-                Size = new Size(230, 55),
+                Size = new Size(200, 25),
                 Font = new Font("Segoe UI", 9),
                 Enabled = false,
-                CheckOnClick = true,
-                BorderStyle = BorderStyle.FixedSingle
+                ReadOnly = true,
+                Cursor = Cursors.Hand
             };
-            this.Controls.Add(chkCategoryList);
+            txtCategoriesDisplay.Click += (s, e) => { if (txtCategoriesDisplay.Enabled) ShowCategoryPopup(); };
+            this.Controls.Add(txtCategoriesDisplay);
+
+            btnCategoriesDropdown = new Button
+            {
+                Location = new Point(380, 88),
+                Size = new Size(30, 25),
+                Font = new Font("Segoe UI", 9),
+                Text = "▼",
+                FlatStyle = FlatStyle.Flat,
+                Enabled = false
+            };
+            btnCategoriesDropdown.Click += (s, e) => ShowCategoryPopup();
+            this.Controls.Add(btnCategoriesDropdown);
 
             // --- Anno ---
             chkModifyYear = new CheckBox
             {
                 Text = "Anno:",
-                Location = new Point(20, 155),
+                Location = new Point(20, 125),
                 Size = new Size(150, 25),
                 Font = new Font("Segoe UI", 9)
             };
@@ -144,7 +165,7 @@ namespace AirDirector.Forms
 
             txtYear = new TextBox
             {
-                Location = new Point(180, 153),
+                Location = new Point(180, 123),
                 Size = new Size(100, 25),
                 Font = new Font("Segoe UI", 9),
                 Enabled = false
@@ -155,7 +176,7 @@ namespace AirDirector.Forms
             btnOK = new Button
             {
                 Text = "✓ Applica",
-                Location = new Point(180, 200),
+                Location = new Point(180, 170),
                 Size = new Size(110, 35),
                 BackColor = AppTheme.Success,
                 ForeColor = Color.White,
@@ -170,7 +191,7 @@ namespace AirDirector.Forms
             btnCancel = new Button
             {
                 Text = "✖ Annulla",
-                Location = new Point(300, 200),
+                Location = new Point(300, 170),
                 Size = new Size(110, 35),
                 BackColor = AppTheme.Danger,
                 ForeColor = Color.White,
@@ -181,6 +202,63 @@ namespace AirDirector.Forms
             btnCancel.FlatAppearance.BorderSize = 0;
             btnCancel.Click += (s, e) => this.DialogResult = DialogResult.Cancel;
             this.Controls.Add(btnCancel);
+        }
+
+        private void UpdateCategoryDisplay()
+        {
+            txtCategoriesDisplay.Text = _checkedCategories.Count > 0
+                ? string.Join("; ", _checkedCategories.OrderBy(c => c))
+                : "";
+        }
+
+        private void ShowCategoryPopup()
+        {
+            var popup = new Form
+            {
+                FormBorderStyle = FormBorderStyle.FixedToolWindow,
+                StartPosition = FormStartPosition.Manual,
+                ShowInTaskbar = false,
+                Text = LanguageManager.GetString("BatchEdit.ModifyCategory", "Modifica Categoria:"),
+                Size = new Size(250, 220),
+                BackColor = this.BackColor
+            };
+
+            var clb = new CheckedListBox
+            {
+                Dock = DockStyle.Fill,
+                CheckOnClick = true,
+                Font = new Font("Segoe UI", 9F),
+                BorderStyle = BorderStyle.None
+            };
+
+            var allItems = new HashSet<string>(_allCategories, StringComparer.OrdinalIgnoreCase);
+            foreach (var c in _checkedCategories)
+                allItems.Add(c);
+
+            foreach (var cat in allItems.OrderBy(c => c))
+            {
+                int idx = clb.Items.Add(cat);
+                if (_checkedCategories.Contains(cat))
+                    clb.SetItemChecked(idx, true);
+            }
+
+            popup.Controls.Add(clb);
+
+            var screenPos = txtCategoriesDisplay.PointToScreen(new Point(0, txtCategoriesDisplay.Height));
+            popup.Location = screenPos;
+
+            popup.FormClosed += (s2, e2) =>
+            {
+                _checkedCategories.Clear();
+                for (int i = 0; i < clb.Items.Count; i++)
+                {
+                    if (clb.GetItemChecked(i))
+                        _checkedCategories.Add(clb.Items[i].ToString());
+                }
+                UpdateCategoryDisplay();
+            };
+
+            popup.Show(this);
         }
 
         private void LoadExistingData()
@@ -258,11 +336,7 @@ namespace AirDirector.Forms
                 }
                 catch { }
 
-                chkCategoryList.Items.Clear();
-                foreach (var cat in allCats.OrderBy(c => c))
-                {
-                    chkCategoryList.Items.Add(cat);
-                }
+                _allCategories = allCats.OrderBy(c => c).ToList();
             }
             catch (Exception ex)
             {
@@ -282,13 +356,9 @@ namespace AirDirector.Forms
             ModifyYear = chkModifyYear.Checked;
 
             // Categorie: join degli elementi selezionati con punto e virgola
-            var checkedCats = new List<string>();
-            for (int i = 0; i < chkCategoryList.Items.Count; i++)
-            {
-                if (chkCategoryList.GetItemChecked(i))
-                    checkedCats.Add(chkCategoryList.Items[i].ToString());
-            }
-            NewCategory = string.Join(";", checkedCats);
+            NewCategory = _checkedCategories.Count > 0
+                ? string.Join(";", _checkedCategories.OrderBy(c => c))
+                : "";
 
             // Anno: parse del valore, vuoto = null
             if (ModifyYear)
@@ -333,7 +403,7 @@ namespace AirDirector.Forms
                 return;
             }
 
-            if (ModifyCategory && checkedCats.Count == 0)
+            if (ModifyCategory && _checkedCategories.Count == 0)
             {
                 MessageBox.Show(
                     LanguageManager.GetString("BatchEdit.EnterCategory", "Inserisci la nuova categoria!"),

@@ -78,6 +78,10 @@ namespace AirDirector.Forms
         // ✅ AUTOCOMPLETE suggerimenti
         private AutoCompleteStringCollection _genreSuggestions;
 
+        // ✅ CATEGORIE – dati interni per popup
+        private List<string> _allCategories = new List<string>();
+        private HashSet<string> _checkedCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         // ✅ VIDEO PREVIEW (RadioTV mode) – separate preview window
         private string _videoPath;  // resolved video file path (null if no video)
         private int _videoSyncTickCounter;  // rate-limiter for drift correction
@@ -238,15 +242,7 @@ namespace AirDirector.Forms
                 }
                 catch { }
 
-                // Popola CheckedListBox
-                chkCategories.Items.Clear();
-                foreach (var cat in allCats.OrderBy(c => c))
-                {
-                    chkCategories.Items.Add(cat);
-                }
-
-                // Setup btnAddCategory
-                btnAddCategory.Click += BtnAddCategory_Click;
+                _allCategories = allCats.OrderBy(c => c).ToList();
 
                 Console.WriteLine($"[MusicEditor] ✅ Caricate {allCats.Count} categorie da {dbcFile}");
             }
@@ -256,30 +252,108 @@ namespace AirDirector.Forms
             }
         }
 
-        private void BtnAddCategory_Click(object sender, EventArgs e)
+        private void UpdateCategoryDisplay()
         {
-            string newCat = txtNewCategory.Text.Trim();
-            if (string.IsNullOrWhiteSpace(newCat)) return;
+            txtCategoriesDisplay.Text = _checkedCategories.Count > 0
+                ? string.Join("; ", _checkedCategories.OrderBy(c => c))
+                : "";
+        }
 
-            // Controlla se esiste già nella lista
-            bool exists = false;
-            for (int i = 0; i < chkCategories.Items.Count; i++)
+        private void ShowCategoryPopup()
+        {
+            var popup = new Form
             {
-                if (string.Equals(chkCategories.Items[i].ToString(), newCat, StringComparison.OrdinalIgnoreCase))
+                FormBorderStyle = FormBorderStyle.FixedToolWindow,
+                StartPosition = FormStartPosition.Manual,
+                ShowInTaskbar = false,
+                Text = LanguageManager.GetString("MusicEditor.Categories", "Categorie:"),
+                Size = new Size(280, 260),
+                BackColor = this.BackColor
+            };
+
+            var clb = new CheckedListBox
+            {
+                Dock = DockStyle.Fill,
+                CheckOnClick = true,
+                Font = new Font("Segoe UI", 9F),
+                BorderStyle = BorderStyle.None
+            };
+
+            // Popola con tutte le categorie (incluse quelle checked non presenti in _allCategories)
+            var allItems = new HashSet<string>(_allCategories, StringComparer.OrdinalIgnoreCase);
+            foreach (var c in _checkedCategories)
+                allItems.Add(c);
+
+            foreach (var cat in allItems.OrderBy(c => c))
+            {
+                int idx = clb.Items.Add(cat);
+                if (_checkedCategories.Contains(cat))
+                    clb.SetItemChecked(idx, true);
+            }
+
+            // Pannello in basso per aggiungere nuova categoria
+            var addPanel = new Panel { Dock = DockStyle.Bottom, Height = 30 };
+            var txtNew = new TextBox
+            {
+                Location = new Point(2, 4),
+                Size = new Size(170, 22),
+                Font = new Font("Segoe UI", 9F)
+            };
+            var btnAdd = new Button
+            {
+                Text = "+",
+                Location = new Point(176, 3),
+                Size = new Size(90, 24),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+            btnAdd.Click += (s2, e2) =>
+            {
+                string newCat = txtNew.Text.Trim();
+                if (string.IsNullOrWhiteSpace(newCat)) return;
+
+                bool exists = false;
+                for (int i = 0; i < clb.Items.Count; i++)
                 {
-                    exists = true;
-                    chkCategories.SetItemChecked(i, true);
-                    break;
+                    if (string.Equals(clb.Items[i].ToString(), newCat, StringComparison.OrdinalIgnoreCase))
+                    {
+                        clb.SetItemChecked(i, true);
+                        exists = true;
+                        break;
+                    }
                 }
-            }
+                if (!exists)
+                {
+                    int idx = clb.Items.Add(newCat);
+                    clb.SetItemChecked(idx, true);
+                    if (!_allCategories.Contains(newCat))
+                        _allCategories.Add(newCat);
+                }
+                txtNew.Text = "";
+            };
+            addPanel.Controls.Add(txtNew);
+            addPanel.Controls.Add(btnAdd);
 
-            if (!exists)
+            popup.Controls.Add(clb);
+            popup.Controls.Add(addPanel);
+
+            // Posiziona sotto il TextBox
+            var screenPos = txtCategoriesDisplay.PointToScreen(new Point(0, txtCategoriesDisplay.Height));
+            popup.Location = screenPos;
+
+            // Quando il popup si chiude, aggiorna i dati
+            popup.FormClosed += (s2, e2) =>
             {
-                int idx = chkCategories.Items.Add(newCat);
-                chkCategories.SetItemChecked(idx, true);
-            }
+                _checkedCategories.Clear();
+                for (int i = 0; i < clb.Items.Count; i++)
+                {
+                    if (clb.GetItemChecked(i))
+                        _checkedCategories.Add(clb.Items[i].ToString());
+                }
+                UpdateCategoryDisplay();
+            };
 
-            txtNewCategory.Text = "";
+            popup.Show(this);
         }
 
         /// <summary>
@@ -1401,34 +1475,16 @@ namespace AirDirector.Forms
             numYear.Value = _musicEntry.Year > 0 ? _musicEntry.Year : DateTime.Now.Year;
             cmbGenre.Text = _musicEntry.Genre ?? "";
 
-            // Seleziona le categorie correnti nella CheckedListBox
+            // Popola le categorie selezionate dai dati del brano
+            _checkedCategories.Clear();
             string currentCats = _musicEntry.Categories ?? "";
-            var selectedCats = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var part in currentCats.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 string trimmed = part.Trim();
                 if (!string.IsNullOrWhiteSpace(trimmed))
-                    selectedCats.Add(trimmed);
+                    _checkedCategories.Add(trimmed);
             }
-            for (int i = 0; i < chkCategories.Items.Count; i++)
-            {
-                chkCategories.SetItemChecked(i, selectedCats.Contains(chkCategories.Items[i].ToString()));
-            }
-            // Aggiungi categorie non ancora nella lista
-            foreach (var cat in selectedCats)
-            {
-                bool found = false;
-                for (int i = 0; i < chkCategories.Items.Count; i++)
-                {
-                    if (string.Equals(chkCategories.Items[i].ToString(), cat, StringComparison.OrdinalIgnoreCase))
-                    { found = true; break; }
-                }
-                if (!found)
-                {
-                    int idx = chkCategories.Items.Add(cat);
-                    chkCategories.SetItemChecked(idx, true);
-                }
-            }
+            UpdateCategoryDisplay();
 
             LoadValidityData();
         }
@@ -2267,13 +2323,9 @@ namespace AirDirector.Forms
                 _musicEntry.Genre = cmbGenre.Text ?? "";
 
                 // Categorie: join degli elementi selezionati con punto e virgola
-                var checkedCats = new List<string>();
-                for (int i = 0; i < chkCategories.Items.Count; i++)
-                {
-                    if (chkCategories.GetItemChecked(i))
-                        checkedCats.Add(chkCategories.Items[i].ToString());
-                }
-                _musicEntry.Categories = string.Join(";", checkedCats);
+                _musicEntry.Categories = _checkedCategories.Count > 0
+                    ? string.Join(";", _checkedCategories.OrderBy(c => c))
+                    : "";
 
                 _musicEntry.MarkerIN = ParseTime(txtMarkerIn.Text);
                 _musicEntry.MarkerINTRO = ParseTime(txtMarkerIntro.Text);
