@@ -1814,7 +1814,8 @@ namespace AirDirector.Controls
                 var allMusic = DbcManager.LoadFromCsv<MusicEntry>("Music.dbc");
 
                 var filtered = allMusic.Where(m =>
-                    m.Categories == category &&
+                    (m.Categories ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Any(c => c.Trim().Equals(category, StringComparison.OrdinalIgnoreCase)) &&
                     m.Genre == genre).ToList();
 
                 Log($"[GetRandomMusicByCategoryAndGenre] Trovati {filtered.Count} brani con categoria+genere");
@@ -1875,7 +1876,8 @@ namespace AirDirector.Controls
                 var allClips = DbcManager.LoadFromCsv<ClipEntry>("Clips.dbc");
 
                 var filtered = allClips.Where(c =>
-                    c.Categories == category &&
+                    (c.Categories ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Any(cat => cat.Trim().Equals(category, StringComparison.OrdinalIgnoreCase)) &&
                     c.Genre == genre).ToList();
 
                 Log($"[GetRandomClipByCategoryAndGenre] Trovati {filtered.Count} clips con categoria+genere");
@@ -2141,7 +2143,9 @@ namespace AirDirector.Controls
 				if (type == "Music")
 				{
 					var allMusic = DbcManager.LoadFromCsv<MusicEntry>("Music.dbc");
-					var filtered = allMusic.Where(m => m.Categories == category).ToList();
+					var filtered = allMusic.Where(m =>
+						(m.Categories ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+						.Any(c => c.Trim().Equals(category, StringComparison.OrdinalIgnoreCase))).ToList();
 
 					if (yearFilter)
 						filtered = filtered.Where(m => m.Year >= yearFrom && m.Year <= yearTo).ToList();
@@ -2168,7 +2172,9 @@ namespace AirDirector.Controls
 				else if (type == "Clip")
 				{
 					var allClips = DbcManager.LoadFromCsv<ClipEntry>("Clips.dbc");
-					var filtered = allClips.Where(c => c.Categories == category).ToList();
+					var filtered = allClips.Where(c =>
+						(c.Categories ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+						.Any(cat => cat.Trim().Equals(category, StringComparison.OrdinalIgnoreCase))).ToList();
 
 					var valid = filtered.Where(c => IsItemValid(c)).ToList();
 

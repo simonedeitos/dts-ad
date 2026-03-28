@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Microsoft.Win32;
 using NAudio.Wave;
 using AirDirector.Services.Database;
 using AirDirector.Services.Localization;
@@ -53,6 +54,13 @@ namespace AirDirector.Forms
         // ✅ ZOOM
         private float _zoomLevel = 1.0f;
         private int _scrollOffset = 0; // offset in waveformData samples
+        private bool _userScrolled = false; // flag: l'utente ha scrollato manualmente
+
+        // ✅ Backup marker originali (per ripristino su Annulla)
+        private int _originalMarkerIN;
+        private int _originalMarkerINTRO;
+        private int _originalMarkerMIX;
+        private int _originalMarkerOUT;
 
         // ✅ VOLUME BOOST
         private float _volumeBoostDb = 0f;
@@ -69,7 +77,6 @@ namespace AirDirector.Forms
 
         // ✅ AUTOCOMPLETE suggerimenti
         private AutoCompleteStringCollection _genreSuggestions;
-        private AutoCompleteStringCollection _categorySuggestions;
 
         // ✅ VIDEO PREVIEW (RadioTV mode) – separate preview window
         private string _videoPath;  // resolved video file path (null if no video)
@@ -83,6 +90,12 @@ namespace AirDirector.Forms
 
             _musicEntry = musicEntry;
             _isClip = isClip;
+
+            // Backup marker originali per ripristino su Annulla
+            _originalMarkerIN = musicEntry.MarkerIN;
+            _originalMarkerINTRO = musicEntry.MarkerINTRO;
+            _originalMarkerMIX = musicEntry.MarkerMIX;
+            _originalMarkerOUT = musicEntry.MarkerOUT;
 
             if (_isClip)
             {
@@ -134,6 +147,18 @@ namespace AirDirector.Forms
 
             // ✅ ASCOLTA CAMBIO LINGUA
             LanguageManager.LanguageChanged += (s, e) => ApplyLanguage();
+
+            // ✅ Ripristina marker originali se l'utente annulla
+            this.FormClosing += (s, e) =>
+            {
+                if (this.DialogResult != DialogResult.OK)
+                {
+                    _musicEntry.MarkerIN = _originalMarkerIN;
+                    _musicEntry.MarkerINTRO = _originalMarkerINTRO;
+                    _musicEntry.MarkerMIX = _originalMarkerMIX;
+                    _musicEntry.MarkerOUT = _originalMarkerOUT;
+                }
+            };
         }
 
         #region ============ GENRE / CATEGORY SUGGESTIONS ============
@@ -184,8 +209,6 @@ namespace AirDirector.Forms
         {
             try
             {
-                _categorySuggestions = new AutoCompleteStringCollection();
-
                 string dbcFile = _isClip ? "Clips.dbc" : "Music.dbc";
                 var existingCategories = GetDistinctFieldValues(dbcFile, "Categories");
 
@@ -203,14 +226,27 @@ namespace AirDirector.Forms
                     }
                 }
 
-                foreach (var cat in allCats)
+                // Aggiungi anche categorie da Categories.dbc
+                try
                 {
-                    _categorySuggestions.Add(cat);
+                    var categoryEntries = DbcManager.LoadFromCsv<CategoryEntry>("Categories.dbc");
+                    foreach (var ce in categoryEntries)
+                    {
+                        if (!string.IsNullOrWhiteSpace(ce.CategoryName))
+                            allCats.Add(ce.CategoryName.Trim());
+                    }
+                }
+                catch { }
+
+                // Popola CheckedListBox
+                chkCategories.Items.Clear();
+                foreach (var cat in allCats.OrderBy(c => c))
+                {
+                    chkCategories.Items.Add(cat);
                 }
 
-                txtCategories.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
-                txtCategories.AutoCompleteSource = AutoCompleteSource.CustomSource;
-                txtCategories.AutoCompleteCustomSource = _categorySuggestions;
+                // Setup btnAddCategory
+                btnAddCategory.Click += BtnAddCategory_Click;
 
                 Console.WriteLine($"[MusicEditor] ✅ Caricate {allCats.Count} categorie da {dbcFile}");
             }
@@ -218,6 +254,32 @@ namespace AirDirector.Forms
             {
                 Console.WriteLine($"[MusicEditor] ⚠️ Errore LoadCategorySuggestions: {ex.Message}");
             }
+        }
+
+        private void BtnAddCategory_Click(object sender, EventArgs e)
+        {
+            string newCat = txtNewCategory.Text.Trim();
+            if (string.IsNullOrWhiteSpace(newCat)) return;
+
+            // Controlla se esiste già nella lista
+            bool exists = false;
+            for (int i = 0; i < chkCategories.Items.Count; i++)
+            {
+                if (string.Equals(chkCategories.Items[i].ToString(), newCat, StringComparison.OrdinalIgnoreCase))
+                {
+                    exists = true;
+                    chkCategories.SetItemChecked(i, true);
+                    break;
+                }
+            }
+
+            if (!exists)
+            {
+                int idx = chkCategories.Items.Add(newCat);
+                chkCategories.SetItemChecked(idx, true);
+            }
+
+            txtNewCategory.Text = "";
         }
 
         /// <summary>
@@ -294,6 +356,8 @@ namespace AirDirector.Forms
                 return;
             }
 
+            _userScrolled = true;
+
             float oldZoom = _zoomLevel;
             int delta = e.Delta > 0 ? 50 : -50;
             int newVal = Math.Max(trkZoom.Minimum, Math.Min(trkZoom.Maximum, trkZoom.Value + delta));
@@ -327,6 +391,8 @@ namespace AirDirector.Forms
         private void HScrollWaveform_Scroll(object sender, ScrollEventArgs e)
         {
             if (_waveformData == null || _waveformData.Length == 0) return;
+
+            _userScrolled = true;
 
             int visibleSamples = (int)(_waveformData.Length / _zoomLevel);
             int maxOffset = Math.Max(0, _waveformData.Length - visibleSamples);
@@ -724,11 +790,25 @@ namespace AirDirector.Forms
             _btnVideoPreview.Click += BtnVideoPreview_Click;
             toolbarPanel.Controls.Add(_btnVideoPreview);
 
-            // In RadioTV mode, auto-open video preview at bottom-left of screen
-            this.Shown += (s, ev) =>
+            // In RadioTV mode, auto-open video preview solo se era aperto in precedenza
+            bool videoPreviewWasOpen = true; // default: aperto
+            try
             {
-                OpenVideoPreviewBottomLeft();
-            };
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\AirDirector"))
+                {
+                    if (key != null)
+                        videoPreviewWasOpen = Convert.ToInt32(key.GetValue("VideoPreviewOpen", 1)) != 0;
+                }
+            }
+            catch { }
+
+            if (videoPreviewWasOpen)
+            {
+                this.Shown += (s, ev) =>
+                {
+                    OpenVideoPreviewBottomLeft();
+                };
+            }
         }
 
         private void OpenVideoPreviewBottomLeft()
@@ -1320,7 +1400,35 @@ namespace AirDirector.Forms
             txtAlbum.Text = _musicEntry.Album ?? "";
             numYear.Value = _musicEntry.Year > 0 ? _musicEntry.Year : DateTime.Now.Year;
             cmbGenre.Text = _musicEntry.Genre ?? "";
-            txtCategories.Text = _musicEntry.Categories ?? "";
+
+            // Seleziona le categorie correnti nella CheckedListBox
+            string currentCats = _musicEntry.Categories ?? "";
+            var selectedCats = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var part in currentCats.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string trimmed = part.Trim();
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                    selectedCats.Add(trimmed);
+            }
+            for (int i = 0; i < chkCategories.Items.Count; i++)
+            {
+                chkCategories.SetItemChecked(i, selectedCats.Contains(chkCategories.Items[i].ToString()));
+            }
+            // Aggiungi categorie non ancora nella lista
+            foreach (var cat in selectedCats)
+            {
+                bool found = false;
+                for (int i = 0; i < chkCategories.Items.Count; i++)
+                {
+                    if (string.Equals(chkCategories.Items[i].ToString(), cat, StringComparison.OrdinalIgnoreCase))
+                    { found = true; break; }
+                }
+                if (!found)
+                {
+                    int idx = chkCategories.Items.Add(cat);
+                    chkCategories.SetItemChecked(idx, true);
+                }
+            }
 
             LoadValidityData();
         }
@@ -1662,6 +1770,7 @@ namespace AirDirector.Forms
             _audioReader.Position = 0;
             _isPlaying = false;
             _positionTimer.Stop();
+            _userScrolled = false;
             btnPlay.Text = LanguageManager.GetString("MusicEditor.Play", "▶ PLAY");
             btnPlay.BackColor = Color.FromArgb(40, 160, 40);
             lblCurrentPosition.Text = "00:00:00.000";
@@ -1903,7 +2012,8 @@ namespace AirDirector.Forms
                 }
 
                 // ✅ Auto-scroll zoom: centra la posizione corrente se fuori dalla vista
-                if (_zoomLevel > 1.01f && _waveformData != null && _waveformData.Length > 0)
+                // Solo se l'utente non ha scrollato manualmente
+                if (!_userScrolled && _zoomLevel > 1.01f && _waveformData != null && _waveformData.Length > 0)
                 {
                     int totalMs = (int)_audioReader.TotalTime.TotalMilliseconds;
                     int visibleSamples = (int)(_waveformData.Length / _zoomLevel);
@@ -2025,6 +2135,7 @@ namespace AirDirector.Forms
             if (CheckMarkerLabelClickZoomed(e.X, e.Y, totalMs, _musicEntry.MarkerIN, "IN", false)) return;
 
             // ✅ Click su waveform = spostamento posizione (zoom-aware)
+            _userScrolled = false;
             int clickMs = PixelXToMs(e.X, totalMs);
             _audioReader.CurrentTime = TimeSpan.FromMilliseconds(clickMs);
 
@@ -2154,7 +2265,15 @@ namespace AirDirector.Forms
                 _musicEntry.Album = txtAlbum.Text ?? "";
                 _musicEntry.Year = (int)numYear.Value;
                 _musicEntry.Genre = cmbGenre.Text ?? "";
-                _musicEntry.Categories = txtCategories.Text ?? "";
+
+                // Categorie: join degli elementi selezionati con punto e virgola
+                var checkedCats = new List<string>();
+                for (int i = 0; i < chkCategories.Items.Count; i++)
+                {
+                    if (chkCategories.GetItemChecked(i))
+                        checkedCats.Add(chkCategories.Items[i].ToString());
+                }
+                _musicEntry.Categories = string.Join(";", checkedCats);
 
                 _musicEntry.MarkerIN = ParseTime(txtMarkerIn.Text);
                 _musicEntry.MarkerINTRO = ParseTime(txtMarkerIntro.Text);
@@ -2305,6 +2424,20 @@ namespace AirDirector.Forms
                 _waveOut?.Dispose();
                 _audioReader?.Dispose();
                 _waveformBitmap?.Dispose();
+
+                // Salva stato video preview nel registro
+                try
+                {
+                    if (_videoPath != null)
+                    {
+                        bool isOpen = _videoPreviewForm != null && !_videoPreviewForm.IsDisposed;
+                        using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\AirDirector"))
+                        {
+                            key?.SetValue("VideoPreviewOpen", isOpen ? 1 : 0);
+                        }
+                    }
+                }
+                catch { }
 
                 // Close and dispose VideoPreviewForm if open
                 try

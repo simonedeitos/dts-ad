@@ -1052,7 +1052,7 @@ namespace AirDirector.Controls
             {
                 if (batchForm.ShowDialog() == DialogResult.OK)
                 {
-                    await ApplyBatchEditAsync(batchForm.ModifyGenre, batchForm.NewGenre, batchForm.ModifyCategory, batchForm.NewCategory);
+                    await ApplyBatchEditAsync(batchForm.ModifyGenre, batchForm.NewGenre, batchForm.ModifyCategory, batchForm.NewCategory, batchForm.ModifyYear, batchForm.NewYear);
                 }
             }
         }
@@ -1209,9 +1209,9 @@ namespace AirDirector.Controls
             }
         }
 
-        private async Task ApplyBatchEditAsync(bool modifyGenre, string newGenre, bool modifyCategory, string newCategory)
+        private async Task ApplyBatchEditAsync(bool modifyGenre, string newGenre, bool modifyCategory, string newCategory, bool modifyYear = false, int? newYear = null)
         {
-            if (!modifyGenre && !modifyCategory)
+            if (!modifyGenre && !modifyCategory && !modifyYear)
             {
                 MessageBox.Show(
                     LanguageManager.GetString("Archive.NoModificationSelected", "Nessuna modifica selezionata! "),
@@ -1262,9 +1262,15 @@ namespace AirDirector.Controls
                                     }
                                 }
 
-                                if (modifyCategory && !string.IsNullOrWhiteSpace(newCategory))
+                                if (modifyCategory)
                                 {
-                                    musicEntry.Categories = newCategory;
+                                    musicEntry.Categories = newCategory ?? "";
+                                    changed = true;
+                                }
+
+                                if (modifyYear && newYear.HasValue)
+                                {
+                                    musicEntry.Year = newYear.Value;
                                     changed = true;
                                 }
 
@@ -1286,9 +1292,9 @@ namespace AirDirector.Controls
                                     }
                                 }
 
-                                if (modifyCategory && !string.IsNullOrWhiteSpace(newCategory))
+                                if (modifyCategory)
                                 {
-                                    clipEntry.Categories = newCategory;
+                                    clipEntry.Categories = newCategory ?? "";
                                     changed = true;
                                 }
 
@@ -2572,7 +2578,20 @@ namespace AirDirector.Controls
         private void LoadGenresAndCategories(List<MusicEntry> data)
         {
             var genres = data.Select(m => m.Genre ?? "").Where(g => !string.IsNullOrEmpty(g)).Distinct().OrderBy(g => g).ToList();
-            var categories = data.Select(m => m.Categories ?? "").Where(c => !string.IsNullOrEmpty(c)).Distinct().OrderBy(c => c).ToList();
+
+            // Estrai categorie individuali da valori separati da punto e virgola
+            var catSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var m in data)
+            {
+                if (string.IsNullOrWhiteSpace(m.Categories)) continue;
+                foreach (var part in m.Categories.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string trimmed = part.Trim();
+                    if (!string.IsNullOrWhiteSpace(trimmed))
+                        catSet.Add(trimmed);
+                }
+            }
+            var categories = catSet.OrderBy(c => c).ToList();
 
             string currentGenre = cmbGenreFilter.SelectedItem?.ToString();
             string currentCategory = cmbCategoryFilter.SelectedItem?.ToString();
@@ -2597,7 +2616,20 @@ namespace AirDirector.Controls
         private void LoadGenresAndCategoriesClips(List<ClipEntry> data)
         {
             var genres = data.Select(c => c.Genre ?? "").Where(g => !string.IsNullOrEmpty(g)).Distinct().OrderBy(g => g).ToList();
-            var categories = data.Select(c => c.Categories ?? "").Where(c => !string.IsNullOrEmpty(c)).Distinct().OrderBy(c => c).ToList();
+
+            // Estrai categorie individuali da valori separati da punto e virgola
+            var catSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in data)
+            {
+                if (string.IsNullOrWhiteSpace(c.Categories)) continue;
+                foreach (var part in c.Categories.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string trimmed = part.Trim();
+                    if (!string.IsNullOrWhiteSpace(trimmed))
+                        catSet.Add(trimmed);
+                }
+            }
+            var categories = catSet.OrderBy(c => c).ToList();
 
             cmbGenreFilter.Items.Clear();
             cmbGenreFilter.Items.Add(LanguageManager.GetString("Archive.AllGenres", "Tutti i Generi"));
@@ -2635,7 +2667,9 @@ namespace AirDirector.Controls
                     filtered = filtered.Where(m => m.Genre == selectedGenre);
 
                 if (selectedCategory != allCategoriesText)
-                    filtered = filtered.Where(m => m.Categories == selectedCategory);
+                    filtered = filtered.Where(m =>
+                        (m.Categories ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Any(c => c.Trim().Equals(selectedCategory, StringComparison.OrdinalIgnoreCase)));
 
                 foreach (var entry in filtered)
                 {
@@ -2672,7 +2706,9 @@ namespace AirDirector.Controls
                     filtered = filtered.Where(c => c.Genre == selectedGenre);
 
                 if (selectedCategory != allCategoriesText)
-                    filtered = filtered.Where(c => c.Categories == selectedCategory);
+                    filtered = filtered.Where(c =>
+                        (c.Categories ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Any(cat => cat.Trim().Equals(selectedCategory, StringComparison.OrdinalIgnoreCase)));
 
                 foreach (var entry in filtered)
                 {

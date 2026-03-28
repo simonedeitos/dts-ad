@@ -59,7 +59,9 @@
         private System.Windows.Forms.Label lblGenre;
         private System.Windows.Forms.ComboBox cmbGenre;
         private System.Windows.Forms.Label lblCategories;
-        private System.Windows.Forms.TextBox txtCategories;
+        private System.Windows.Forms.CheckedListBox chkCategories;
+        private System.Windows.Forms.TextBox txtNewCategory;
+        private System.Windows.Forms.Button btnAddCategory;
         private System.Windows.Forms.Label lblFilePath;
         private System.Windows.Forms.TextBox txtFilePath;
 
@@ -157,7 +159,9 @@
             lblGenre = new System.Windows.Forms.Label();
             cmbGenre = new System.Windows.Forms.ComboBox();
             lblCategories = new System.Windows.Forms.Label();
-            txtCategories = new System.Windows.Forms.TextBox();
+            chkCategories = new System.Windows.Forms.CheckedListBox();
+            txtNewCategory = new System.Windows.Forms.TextBox();
+            btnAddCategory = new System.Windows.Forms.Button();
             lblFilePath = new System.Windows.Forms.Label();
             txtFilePath = new System.Windows.Forms.TextBox();
             grpPeriod = new System.Windows.Forms.GroupBox();
@@ -697,7 +701,9 @@
             bottomPanel.Controls.Add(lblGenre);
             bottomPanel.Controls.Add(cmbGenre);
             bottomPanel.Controls.Add(lblCategories);
-            bottomPanel.Controls.Add(txtCategories);
+            bottomPanel.Controls.Add(chkCategories);
+            bottomPanel.Controls.Add(txtNewCategory);
+            bottomPanel.Controls.Add(btnAddCategory);
             bottomPanel.Controls.Add(lblFilePath);
             bottomPanel.Controls.Add(txtFilePath);
             bottomPanel.Controls.Add(grpPeriod);
@@ -805,12 +811,31 @@
             lblCategories.TabIndex = 10;
             lblCategories.Text = "Categorie:";
 
-            // txtCategories
-            txtCategories.Font = new System.Drawing.Font("Segoe UI", 10F);
-            txtCategories.Location = new System.Drawing.Point(920, 50);
-            txtCategories.Name = "txtCategories";
-            txtCategories.Size = new System.Drawing.Size(240, 25);
-            txtCategories.TabIndex = 11;
+            // chkCategories
+            chkCategories.Font = new System.Drawing.Font("Segoe UI", 9F);
+            chkCategories.Location = new System.Drawing.Point(920, 45);
+            chkCategories.Name = "chkCategories";
+            chkCategories.Size = new System.Drawing.Size(200, 49);
+            chkCategories.TabIndex = 11;
+            chkCategories.CheckOnClick = true;
+            chkCategories.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+
+            // txtNewCategory
+            txtNewCategory.Font = new System.Drawing.Font("Segoe UI", 9F);
+            txtNewCategory.Location = new System.Drawing.Point(1125, 45);
+            txtNewCategory.Name = "txtNewCategory";
+            txtNewCategory.Size = new System.Drawing.Size(100, 23);
+            txtNewCategory.TabIndex = 12;
+
+            // btnAddCategory
+            btnAddCategory.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            btnAddCategory.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            btnAddCategory.Location = new System.Drawing.Point(1125, 70);
+            btnAddCategory.Name = "btnAddCategory";
+            btnAddCategory.Size = new System.Drawing.Size(100, 24);
+            btnAddCategory.TabIndex = 13;
+            btnAddCategory.Text = "+ Aggiungi";
+            btnAddCategory.UseVisualStyleBackColor = true;
 
             // lblFilePath
             lblFilePath.AutoSize = true;
@@ -818,7 +843,7 @@
             lblFilePath.Location = new System.Drawing.Point(25, 261);
             lblFilePath.Name = "lblFilePath";
             lblFilePath.Size = new System.Drawing.Size(64, 15);
-            lblFilePath.TabIndex = 12;
+            lblFilePath.TabIndex = 14;
             lblFilePath.Text = "File Audio:";
 
             // txtFilePath
@@ -827,7 +852,7 @@
             txtFilePath.Name = "txtFilePath";
             txtFilePath.ReadOnly = true;
             txtFilePath.Size = new System.Drawing.Size(800, 22);
-            txtFilePath.TabIndex = 13;
+            txtFilePath.TabIndex = 15;
 
             // grpPeriod
             grpPeriod.Controls.Add(chkEnableValidFrom);
