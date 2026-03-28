@@ -292,21 +292,34 @@ namespace AirDirector.Forms
             }
 
             // Pannello in basso per aggiungere nuova categoria
-            var addPanel = new Panel { Dock = DockStyle.Bottom, Height = 30 };
+            var addPanel = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 36,
+                BackColor = AppTheme.BgLight,
+                Padding = new Padding(4, 4, 4, 4)
+            };
             var txtNew = new TextBox
             {
-                Location = new Point(2, 4),
-                Size = new Size(170, 22),
-                Font = new Font("Segoe UI", 9F)
+                Location = new Point(4, 6),
+                Size = new Size(168, 24),
+                Font = new Font("Segoe UI", 9F),
+                BackColor = AppTheme.Surface,
+                ForeColor = AppTheme.TextPrimary
             };
             var btnAdd = new Button
             {
-                Text = "+",
-                Location = new Point(176, 3),
-                Size = new Size(90, 24),
+                Text = "+ Aggiungi",
+                Location = new Point(176, 4),
+                Size = new Size(90, 26),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                BackColor = AppTheme.Primary,
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand
             };
+            btnAdd.FlatAppearance.BorderSize = 0;
+            txtNew.KeyDown += (sk, ek) => { if (ek.KeyCode == Keys.Enter) { ek.SuppressKeyPress = true; btnAdd.PerformClick(); } };
             btnAdd.Click += (s2, e2) =>
             {
                 string newCat = txtNew.Text.Trim();

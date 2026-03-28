@@ -1813,7 +1813,7 @@ namespace AirDirector.Controls
         // ─────────────────────────────────────────────────────────────────────────────
         private void OpenVideoConversionForm(string[] videoFiles)
         {
-            var convForm = new VideoConversionForm(videoFiles);
+            var convForm = new VideoConversionForm(videoFiles, _archiveType);
 
             // When conversion finishes, import the resulting mp4 files into the archive.
             // This callback is raised on the UI thread (see VideoConversionForm).

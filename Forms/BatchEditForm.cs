@@ -24,7 +24,7 @@ namespace AirDirector.Forms
         private TextBox txtCategoriesDisplay;
         private Button btnCategoriesDropdown;
         private CheckBox chkModifyYear;
-        private TextBox txtYear;
+        private NumericUpDown numYear;
         private Label lblTitle;
         private Button btnOK;
         private Button btnCancel;
@@ -180,19 +180,22 @@ namespace AirDirector.Forms
                 Margin = new Padding(0, 6, 8, 6),
                 Anchor = AnchorStyles.Left
             };
-            chkModifyYear.CheckedChanged += (s, e) => txtYear.Enabled = chkModifyYear.Checked;
+            chkModifyYear.CheckedChanged += (s, e) => numYear.Enabled = chkModifyYear.Checked;
 
-            txtYear = new TextBox
+            numYear = new NumericUpDown
             {
                 Font = new Font("Segoe UI", 9),
                 Enabled = false,
+                Minimum = 1900,
+                Maximum = 2100,
+                Value = DateTime.Now.Year,
                 Size = new Size(100, 25),
                 Margin = new Padding(0, 6, 0, 6),
                 Anchor = AnchorStyles.Left
             };
 
             tbl.Controls.Add(chkModifyYear, 0, 2);
-            tbl.Controls.Add(txtYear, 1, 2);
+            tbl.Controls.Add(numYear, 1, 2);
 
             // --- Bottoni ---
             var pnlButtons = new FlowLayoutPanel
@@ -278,21 +281,34 @@ namespace AirDirector.Forms
             }
 
             // Pannello in basso per aggiungere nuova categoria
-            var addPanel = new Panel { Dock = DockStyle.Bottom, Height = 30 };
+            var addPanel = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 36,
+                BackColor = AppTheme.BgLight,
+                Padding = new Padding(4, 4, 4, 4)
+            };
             var txtNew = new TextBox
             {
-                Location = new Point(2, 4),
-                Size = new Size(170, 22),
-                Font = new Font("Segoe UI", 9F)
+                Location = new Point(4, 6),
+                Size = new Size(168, 24),
+                Font = new Font("Segoe UI", 9F),
+                BackColor = AppTheme.Surface,
+                ForeColor = AppTheme.TextPrimary
             };
             var btnAdd = new Button
             {
-                Text = "+",
-                Location = new Point(176, 3),
-                Size = new Size(90, 24),
+                Text = "+ Aggiungi",
+                Location = new Point(176, 4),
+                Size = new Size(90, 26),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                BackColor = AppTheme.Primary,
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand
             };
+            btnAdd.FlatAppearance.BorderSize = 0;
+            txtNew.KeyDown += (sk, ek) => { if (ek.KeyCode == Keys.Enter) { ek.SuppressKeyPress = true; btnAdd.PerformClick(); } };
             btnAdd.Click += (s2, e2) =>
             {
                 string newCat = txtNew.Text.Trim();
@@ -466,27 +482,10 @@ namespace AirDirector.Forms
                 ? string.Join(";", _checkedCategories.OrderBy(c => c))
                 : "";
 
-            // Anno: parse del valore, vuoto = null
+            // Anno: valore dal NumericUpDown
             if (ModifyYear)
             {
-                string yearText = txtYear.Text.Trim();
-                if (string.IsNullOrEmpty(yearText))
-                {
-                    NewYear = 0; // vuoto = azzera anno
-                }
-                else if (int.TryParse(yearText, out int yearVal) && yearVal >= 0 && yearVal <= 2100)
-                {
-                    NewYear = yearVal;
-                }
-                else
-                {
-                    MessageBox.Show(
-                        LanguageManager.GetString("Archive.InvalidYearRange", "❌ Anno non valido!"),
-                        LanguageManager.GetString("Common.Warning", "Attenzione"),
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
-                    return;
-                }
+                NewYear = (int)numYear.Value;
             }
 
             if (!ModifyGenre && !ModifyCategory && !ModifyYear)
