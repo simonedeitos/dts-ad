@@ -135,6 +135,7 @@ namespace AirDirector.Controls
         private const float VU_DECAY = 0.93f, VU_PEAK_DECAY = 0.985f;
 
         private bool _isPlaying, _isPaused, _autoMode = true;
+        private bool _autoStartPending = false;
         private int _mixTriggeredFlag = 0;
         private bool TryTriggerMix() => Interlocked.CompareExchange(ref _mixTriggeredFlag, 1, 0) == 0;
         private void ResetMixTrigger() => Interlocked.Exchange(ref _mixTriggeredFlag, 0);
@@ -1214,6 +1215,19 @@ namespace AirDirector.Controls
 
         public void Play() { if (_isPaused) { Resume(); return; } if (!_isPlaying && _playlistQueue != null && _playlistQueue.GetItemCount() > 0) { var i = _playlistQueue.GetAllItems(); if (i.Count > 0) { LoadAndPlay(i[0]); _playlistQueue.SetCurrentPlaying(0); } PlayRequested?.Invoke(this, EventArgs.Empty); } }
 
+        public void NotifyQueueItemsAvailable()
+        {
+            SafeInvoke(() =>
+            {
+                if (_autoMode && !_isPlaying && _autoStartPending && _playlistQueue != null && _playlistQueue.GetItemCount() > 0)
+                {
+                    Log("[NotifyQueueItemsAvailable] Auto-start pending: avvio riproduzione");
+                    _autoStartPending = false;
+                    Play();
+                }
+            });
+        }
+
         private void SkipToNext() { if (_playlistQueue == null || _playlistQueue.GetItemCount() < 2) { Stop(); return; } SafeInvoke(() => { _mixCheckTimer.Stop(); _updateTimer.Stop(); }); Interlocked.Exchange(ref _mixTriggeredFlag, 1); _positionMs = 0; _playlistQueue.RemoveItem(0); var items = _playlistQueue.GetAllItems(); if (items.Count > 0) { _playlistQueue.SetCurrentPlaying(0); LoadAndPlay(items[0]); } else Stop(); }
 
         // ═══════════════════════════════════════════════════════════
@@ -1613,6 +1627,7 @@ namespace AirDirector.Controls
         public void SetPlaylistQueue(PlaylistQueueControl pq) { _playlistQueue = pq; }
         public void SetAutoMode(bool a) { _autoMode = a; SafeInvoke(() => { if (btnAutoManual != null) { btnAutoManual.Text = a ? "AUTO" : "MANUAL"; btnAutoManual.BackColor = a ? AppTheme.Success : AppTheme.Warning; } }); AutoModeChanged?.Invoke(this, _autoMode); }
         public void SetManualMode() { SetAutoMode(false); }
+        public void SetAutoStartPending(bool pending) { _autoStartPending = pending; }
         private static bool IsVideoFile(string p) { if (string.IsNullOrEmpty(p)) return false; string ext = Path.GetExtension(p).ToLowerInvariant(); return ext == ".mp4" || ext == ".avi" || ext == ".mov" || ext == ".mkv" || ext == ".wmv" || ext == ".webm" || ext == ".m4v"; }
         private void SafeInvoke(Action a) { if (IsDisposed || _isDisposed) return; try { if (InvokeRequired) BeginInvoke(a); else a(); } catch { } }
         private void UpdateTrackDisplay(PlayItem i) { if (i == null) return; bool isMusicArchive = i.ItemType.Equals("Music", StringComparison.OrdinalIgnoreCase) && !i.IsScheduled; string d = isMusicArchive ? (string.IsNullOrEmpty(i.Artist) ? (i.Title ?? "").ToUpper() : i.Artist.ToUpper() + " - " + (i.Title ?? "").ToUpper()) : (!string.IsNullOrEmpty(i.Title) ? i.Title : Path.GetFileNameWithoutExtension(i.FilePath ?? "")).ToUpper(); lblArtist.Text = d.Replace("&&", "&"); lblArtist.Invalidate(); if (i.Intro.TotalMilliseconds > 0) { lblIntro.Text = i.Intro.ToString(@"mm\:ss"); lblIntro.ForeColor = Color.White; lblIntro.BackColor = Color.Red; } else { lblIntro.Text = ""; lblIntro.BackColor = Color.Black; } }

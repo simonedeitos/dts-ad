@@ -44,6 +44,7 @@ namespace AirDirector.Controls
         private bool _isPlaying = false;
         private bool _isPaused = false;
         private bool _autoMode = true;
+        private bool _autoStartPending = false;
         private TimeSpan _totalDuration = TimeSpan.Zero;
         private TimeSpan _currentPosition = TimeSpan.Zero;
         private TimeSpan _introTime = TimeSpan.FromSeconds(10);
@@ -2120,6 +2121,28 @@ namespace AirDirector.Controls
             }
             AutoModeChanged?.Invoke(this, _autoMode);
             UpdateButtonStates();
+        }
+
+        public void SetAutoStartPending(bool pending) { _autoStartPending = pending; }
+
+        public void NotifyQueueItemsAvailable()
+        {
+            if (InvokeRequired) { BeginInvoke(new Action(NotifyQueueItemsAvailable)); return; }
+            if (_autoMode && !_isPlaying && !_isPaused && _autoStartPending && _playlistQueue != null && _playlistQueue.GetItemCount() > 0)
+            {
+                Log("[NotifyQueueItemsAvailable] Auto-start pending: avvio riproduzione");
+                _autoStartPending = false;
+                var items = _playlistQueue.GetAllItems();
+                if (items.Count > 0)
+                {
+                    var firstItem = items[0];
+                    LoadTrack(firstItem.FilePath, firstItem.Artist, firstItem.Title,
+                        firstItem.Intro, firstItem.MarkerIN, firstItem.MarkerINTRO,
+                        firstItem.MarkerMIX, firstItem.MarkerOUT, firstItem.ItemType);
+                    Play();
+                    _playlistQueue.SetCurrentPlaying(0);
+                }
+            }
         }
 
         private void BtnNext_Click(object sender, EventArgs e)
