@@ -511,7 +511,7 @@ namespace AirDirector.Forms
                 if (!isPlaying)
                     PlayerNotifyQueueItemsAvailable();
             }
-            catch { }
+            catch { /* non-critical: silently ignore errors in the safety-net handler */ }
         }
 
         private void PlayerControl_TrackEndedInManualMode(object sender, EventArgs e)
