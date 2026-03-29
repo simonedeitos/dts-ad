@@ -1631,9 +1631,14 @@ namespace AirDirector.Controls
                 bool isMusicArchive = t.Equals("Music", StringComparison.OrdinalIgnoreCase) && !(i?.IsScheduled ?? false);
                 if (isMusicArchive)
                 {
-                    TimeSpan effectiveDuration = (_markerMIX > 0)
-                        ? TimeSpan.FromMilliseconds(_markerMIX)
-                        : _totalDuration;
+                    int cgEndMs;
+                    if (_autoMode && _markerMIX > 0)
+                        cgEndMs = _markerMIX;
+                    else if (_markerOUT > 0)
+                        cgEndMs = _markerOUT;
+                    else
+                        cgEndMs = (int)_totalDuration.TotalMilliseconds;
+                    TimeSpan effectiveDuration = TimeSpan.FromMilliseconds(Math.Max(0, cgEndMs - _markerIN));
                     CGRenderer.OnTrackChanged(i.Artist ?? "", i.Title ?? "", "Music", effectiveDuration);
                 }
                 else
