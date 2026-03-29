@@ -56,6 +56,7 @@ namespace AirDirector.Controls
 
 		public event EventHandler<int> QueueReady;
 		public event EventHandler<int> QueueCountChanged;
+		public event EventHandler      ItemsAdded;
 		public event EventHandler<string> PreviewRequested;
 		public event EventHandler<string> ClockChanged;
 		public event EventHandler ReportUpdated;
@@ -1686,11 +1687,13 @@ namespace AirDirector.Controls
                     foreach (var item in earlyItems)
                         AddItemBatch(item);
                     FinalizeBatchModification();
+                    Log($"[GenerateClock] 📢 ItemsAdded (early batch, {_items.Count} in coda)");
+                    ItemsAdded?.Invoke(this, EventArgs.Empty);
                 }
 
                 // Fire QueueReady early so playback can start while generation continues
                 bool earlyQueueReadyFired = false;
-                if (_isInitialStartup && _items.Count >= 2)
+                if (_isInitialStartup && _items.Count >= 1)
                 {
                     Log($"[GenerateClock] ▶️ QueueReady anticipato con {_items.Count} elementi");
                     QueueReady?.Invoke(this, _items.Count);
@@ -1729,6 +1732,9 @@ namespace AirDirector.Controls
 
                     if (batchCount > 0)
                         FinalizeBatchModification();
+
+                    Log($"[GenerateClock] 📢 ItemsAdded (remaining batch, {_items.Count} in coda)");
+                    ItemsAdded?.Invoke(this, EventArgs.Empty);
                 }
 
                 _currentClockName = clockName;
@@ -1743,7 +1749,7 @@ namespace AirDirector.Controls
                 Log($"[GenerateClock] ═══════════════════════════════════════════");
                 Log($"");
 
-                if (!earlyQueueReadyFired && _isInitialStartup && _items.Count >= 2)
+                if (!earlyQueueReadyFired && _isInitialStartup && _items.Count >= 1)
                     QueueReady?.Invoke(this, _items.Count);
             }
             catch (Exception ex)

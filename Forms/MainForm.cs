@@ -160,6 +160,22 @@ namespace AirDirector.Forms
                 playerControl?.SetAutoMode(auto);
         }
 
+        private void PlayerSetAutoStartPending(bool pending)
+        {
+            if (_isRadioTVMode)
+                playerControlVideo?.SetAutoStartPending(pending);
+            else
+                playerControl?.SetAutoStartPending(pending);
+        }
+
+        private void PlayerNotifyQueueItemsAvailable()
+        {
+            if (_isRadioTVMode)
+                playerControlVideo?.NotifyQueueItemsAvailable();
+            else
+                playerControl?.NotifyQueueItemsAvailable();
+        }
+
         private void PlayerSetManualMode()
         {
             if (_isRadioTVMode)
@@ -433,10 +449,12 @@ namespace AirDirector.Forms
             playlistQueue.PreviewRequested += PlaylistQueue_PreviewRequested;
             playlistQueue.ClockChanged += PlaylistQueue_ClockChanged;
             playlistQueue.ReportUpdated += PlaylistQueue_ReportUpdated;
+            playlistQueue.ItemsAdded += PlaylistQueue_ItemsAdded;
 
             if (ConfigurationControl.GetAutoStartMode())
             {
                 UpdateStatus(LanguageManager.GetString("MainForm.AutoStartGenerating", "AutoStart: Generazione playlist in corso..."));
+                PlayerSetAutoStartPending(true);
                 playlistQueue.GenerateInitialPlaylist();
             }
             else
@@ -473,7 +491,27 @@ namespace AirDirector.Forms
 
                 PlayerPlay();
                 playlistQueue.SetCurrentPlaying(0);
+                PlayerSetAutoStartPending(false);
             }
+            else
+            {
+                // Coda ancora vuota: attiva _autoStartPending così ItemsAdded farà partire il player
+                PlayerSetAutoStartPending(true);
+            }
+        }
+
+        private void PlaylistQueue_ItemsAdded(object sender, EventArgs e)
+        {
+            try
+            {
+                bool isPlaying = _isRadioTVMode
+                    ? (playerControlVideo?.IsPlaying ?? false)
+                    : (playerControl?.IsPlaying ?? false);
+
+                if (!isPlaying)
+                    PlayerNotifyQueueItemsAvailable();
+            }
+            catch { }
         }
 
         private void PlayerControl_TrackEndedInManualMode(object sender, EventArgs e)
