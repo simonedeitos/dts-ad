@@ -1630,7 +1630,12 @@ namespace AirDirector.Controls
                 string t = i?.ItemType ?? "Music";
                 bool isMusicArchive = t.Equals("Music", StringComparison.OrdinalIgnoreCase) && !(i?.IsScheduled ?? false);
                 if (isMusicArchive)
-                    CGRenderer.OnTrackChanged(i.Artist ?? "", i.Title ?? "", "Music", _totalDuration);
+                {
+                    TimeSpan effectiveDuration = (_markerMIX > 0)
+                        ? TimeSpan.FromMilliseconds(_markerMIX)
+                        : _totalDuration;
+                    CGRenderer.OnTrackChanged(i.Artist ?? "", i.Title ?? "", "Music", effectiveDuration);
+                }
                 else
                     CGRenderer.OnTrackChanged("", "", t, TimeSpan.Zero);
             }
