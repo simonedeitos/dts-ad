@@ -143,7 +143,7 @@ namespace AirDirector.Services.RemoteControl
             float level = CalculateLevel(e.Buffer, e.BytesRecorded);
             InputLevelChanged?.Invoke(this, level);
 
-            // Encode to MP3 and send via WebSocket
+            // Encode to MP3 and send via WebSocket as base64 JSON so the relay server can forward it
             lock (_encodeLock)
             {
                 if (_mp3Writer == null || _encodingBuffer == null) return;
@@ -162,7 +162,11 @@ namespace AirDirector.Services.RemoteControl
                         _encodingBuffer.SetLength(0);
                         _encodingBuffer.Position = 0;
 
-                        _ = _remoteService.SendBinaryAsync(mp3Data);
+                        // Send as base64 JSON so the WS relay server can forward to browser clients
+                        var msg = new { type = "audio_data", data = Convert.ToBase64String(mp3Data) };
+                        string json = Newtonsoft.Json.JsonConvert.SerializeObject(msg);
+                        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
+                        _ = _remoteService.SendRawTextAsync(bytes);
                     }
                 }
                 catch (Exception ex)
@@ -229,6 +233,20 @@ namespace AirDirector.Services.RemoteControl
             catch (Exception ex)
             {
                 Console.WriteLine($"[RemoteAudioService] ⚠️ FeedReceivedAudio error: {ex.Message}");
+            }
+        }
+
+        /// <summary>Feed received audio from a base64-encoded JSON audio_data message.</summary>
+        public void FeedReceivedAudioBase64(string base64Data)
+        {
+            try
+            {
+                byte[] mp3Data = Convert.FromBase64String(base64Data);
+                FeedReceivedAudio(mp3Data);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RemoteAudioService] ⚠️ FeedReceivedAudioBase64 error: {ex.Message}");
             }
         }
 

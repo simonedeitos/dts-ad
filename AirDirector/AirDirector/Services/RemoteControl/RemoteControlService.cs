@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -48,6 +49,7 @@ namespace AirDirector.Services.RemoteControl
         public event EventHandler<List<ConnectedUser>> ConnectedUsersChanged;
         public event EventHandler<string> CommandReceived;
         public event EventHandler<JObject> MessageReceived;
+        public event EventHandler<byte[]> BinaryDataReceived;
         public event EventHandler<RemoteControlLogEntry> LogAdded;
 
         // ── Log ────────────────────────────────────────────────────────────────
@@ -219,6 +221,9 @@ namespace AirDirector.Services.RemoteControl
                 {
                     sb.Clear();
                     WebSocketReceiveResult result;
+                    bool isBinary = false;
+                    var binaryChunks = new System.IO.MemoryStream();
+
                     do
                     {
                         result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), _cts.Token);
@@ -228,8 +233,25 @@ namespace AirDirector.Services.RemoteControl
                             await HandleDisconnectAsync();
                             return;
                         }
-                        sb.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+                        if (result.MessageType == WebSocketMessageType.Binary)
+                        {
+                            isBinary = true;
+                            binaryChunks.Write(buffer, 0, result.Count);
+                        }
+                        else
+                        {
+                            sb.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+                        }
                     } while (!result.EndOfMessage);
+
+                    if (isBinary)
+                    {
+                        using (binaryChunks)
+                        {
+                            BinaryDataReceived?.Invoke(this, binaryChunks.ToArray());
+                        }
+                        continue;
+                    }
 
                     string json = sb.ToString();
                     try
@@ -270,6 +292,8 @@ namespace AirDirector.Services.RemoteControl
                     string cmd = msg["command"]?.ToString() ?? msg["action"]?.ToString() ?? "";
                     Log($"Command received: {cmd}");
                     CommandReceived?.Invoke(this, cmd);
+                    // Also fire MessageReceived so handlers can access command payload (e.g. queue_remove, queue_reorder, queue_add)
+                    MessageReceived?.Invoke(this, msg);
                     break;
 
                 case "connected_users":
@@ -408,6 +432,20 @@ namespace AirDirector.Services.RemoteControl
             catch (Exception ex)
             {
                 LogWarning($"Binary send error: {ex.Message}");
+            }
+        }
+
+        public async Task SendRawTextAsync(byte[] utf8Bytes)
+        {
+            if (_webSocket?.State != WebSocketState.Open) return;
+            try
+            {
+                await _webSocket.SendAsync(new ArraySegment<byte>(utf8Bytes), WebSocketMessageType.Text, true, _cts?.Token ?? CancellationToken.None);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                LogWarning($"Raw text send error: {ex.Message}");
             }
         }
 
