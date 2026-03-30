@@ -16,6 +16,8 @@ namespace AirDirector.Forms
     public partial class RemoteControlForm : Form
     {
         private const string REGISTRY_KEY = @"SOFTWARE\AirDirector";
+        private const float VU_DECAY_FACTOR = 0.85f;
+        private const int SCROLLBAR_WIDTH_OFFSET = 30;
 
         // ── Services ────────────────────────────────────────────────────────────
         private RemoteControlService _remoteService;
@@ -489,7 +491,7 @@ namespace AirDirector.Forms
         private void VuTimer_Tick(object sender, EventArgs e)
         {
             // Smoothly decay VU level
-            _currentVuLevel *= 0.85f;
+            _currentVuLevel *= VU_DECAY_FACTOR;
             if (_currentVuLevel < 0.005f) _currentVuLevel = 0f;
             _pnlVuMeter?.Invalidate();
         }
@@ -616,7 +618,7 @@ namespace AirDirector.Forms
                 ConfigureAudio();
                 await _remoteService.ConnectAsync(token);
 
-                // Audio start is now handled by OnConnectionStateChanged
+                // Audio start/stop is handled by OnConnectionStateChanged
             }
             else
             {
@@ -872,7 +874,7 @@ namespace AirDirector.Forms
             {
                 var userPanel = new Panel
                 {
-                    Width = _pnlUsersList.Width - 30,
+                    Width = _pnlUsersList.Width - SCROLLBAR_WIDTH_OFFSET,
                     Height = 36,
                     BackColor = Color.FromArgb(245, 248, 250),
                     Margin = new Padding(2, 2, 2, 2),

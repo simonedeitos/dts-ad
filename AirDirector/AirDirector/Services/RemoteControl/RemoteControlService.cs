@@ -433,7 +433,7 @@ namespace AirDirector.Services.RemoteControl
             if (!_manualDisconnect && !_cts.IsCancellationRequested)
             {
                 Log("Connection lost. Will attempt to reconnect...");
-                await ReconnectLoopAsync();
+                ScheduleReconnect();
             }
         }
 
@@ -453,12 +453,6 @@ namespace AirDirector.Services.RemoteControl
 
         private async Task ReconnectLoopAsync()
         {
-            lock (_reconnectLock)
-            {
-                if (_reconnecting) return;
-                _reconnecting = true;
-            }
-
             try
             {
                 while (!_manualDisconnect && !_cts.IsCancellationRequested && _state == ConnectionState.Disconnected)
@@ -483,7 +477,11 @@ namespace AirDirector.Services.RemoteControl
 
         private void SetState(ConnectionState state)
         {
-            if (_state == state) return;
+            if (_state == state)
+            {
+                AddLog("DEBUG", $"Redundant state change ignored: {state}");
+                return;
+            }
             var prev = _state;
             _state = state;
             Log($"State: {prev} → {state}");
