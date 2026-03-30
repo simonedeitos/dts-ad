@@ -78,7 +78,8 @@ namespace AirDirector.Services.RemoteControl
             {
                 _webSocket?.Dispose();
                 _webSocket = new ClientWebSocket();
-                await _webSocket.ConnectAsync(new Uri(ServerUrl), _cts.Token);
+                string wsUrl = $"{ServerUrl}?ad_token={Uri.EscapeDataString(_token)}";
+                await _webSocket.ConnectAsync(new Uri(wsUrl), _cts.Token);
 
                 SetState(ConnectionState.Connected);
                 await AuthenticateAsync();
