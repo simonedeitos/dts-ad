@@ -578,10 +578,6 @@ namespace AirDirector.Forms
             _lblUsers.Text = LanguageManager.GetString("RemoteControl.ConnectedUsers", "Utenti collegati");
             _btnSave.Text = "💾 " + LanguageManager.GetString("RemoteControl.SaveSettings", "Salva impostazioni");
 
-            // Update combobox display items for audio source
-            UpdateAudioSourceDisplay();
-            UpdateAudioQualityDisplay();
-
             // Update column headers
             if (_listUsers.Columns.Count >= 2)
             {
@@ -600,24 +596,6 @@ namespace AirDirector.Forms
 
             // Update status label
             OnConnectionStateChanged(this, _remoteService.State);
-        }
-
-        private void UpdateAudioSourceDisplay()
-        {
-            int selectedIndex = _cmbAudioSource.SelectedIndex;
-            if (selectedIndex < 0) selectedIndex = 0;
-
-            string savedSource = _cmbAudioSource.SelectedItem?.ToString() ?? "airdirector";
-
-            // Repopulate with localized "airdirector" entry as display-only
-            // We keep raw values and display them directly — no re-mapping needed
-            // The first item "airdirector" is always shown with localized text in tooltip only
-            // (keeping the combobox values as device names/identifiers)
-        }
-
-        private void UpdateAudioQualityDisplay()
-        {
-            // Quality items are internal keys (low/medium/high/studio) — labels shown separately
         }
 
         private void RemoteControlForm_FormClosing(object sender, FormClosingEventArgs e)

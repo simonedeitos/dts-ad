@@ -104,7 +104,8 @@ namespace AirDirector.Services.RemoteControl
         public void Disconnect()
         {
             _cts?.Cancel();
-            try { _webSocket?.CloseAsync(WebSocketCloseStatus.NormalClosure, "User disconnected", CancellationToken.None).Wait(2000); } catch { }
+            try { _webSocket?.CloseAsync(WebSocketCloseStatus.NormalClosure, "User disconnected", CancellationToken.None).Wait(2000); }
+            catch (Exception ex) { Console.WriteLine($"[RemoteControlService] ⚠️ Disconnect close error: {ex.Message}"); }
             SetState(ConnectionState.Disconnected);
             _reconnecting = false;
         }

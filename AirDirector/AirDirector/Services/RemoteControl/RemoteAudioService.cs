@@ -226,7 +226,10 @@ namespace AirDirector.Services.RemoteControl
                 float level = CalculateLevel(pcmData, pcmData.Length);
                 OutputLevelChanged?.Invoke(this, level);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RemoteAudioService] ⚠️ FeedReceivedAudio error: {ex.Message}");
+            }
         }
 
         // ── Device enumeration ────────────────────────────────────────────────
