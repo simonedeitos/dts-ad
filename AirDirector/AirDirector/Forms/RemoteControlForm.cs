@@ -1178,7 +1178,8 @@ namespace AirDirector.Forms
         private void HandleQueueRemove(JObject msg)
         {
             if (_playlistQueue == null) return;
-            string idStr = msg["item_id"]?.ToString();
+            // Browser sends "id"; older/server code may send "item_id" — accept both
+            string idStr = msg["id"]?.ToString() ?? msg["item_id"]?.ToString();
             if (string.IsNullOrEmpty(idStr)) return;
             if (Guid.TryParse(idStr, out Guid uid))
             {
@@ -1188,14 +1189,15 @@ namespace AirDirector.Forms
             }
             else
             {
-                _remoteService.LogWarning($"queue_remove: invalid item_id '{idStr}'");
+                _remoteService.LogWarning($"queue_remove: invalid id '{idStr}'");
             }
         }
 
         private void HandleQueueReorder(JObject msg)
         {
             if (_playlistQueue == null) return;
-            var orderArr = msg["order"] as Newtonsoft.Json.Linq.JArray;
+            // Browser sends "ids"; older/server code may send "order" — accept both
+            var orderArr = (msg["ids"] ?? msg["order"]) as Newtonsoft.Json.Linq.JArray;
             if (orderArr == null) return;
 
             var orderedIds = new List<Guid>();
@@ -1216,11 +1218,13 @@ namespace AirDirector.Forms
         private void HandleQueueAdd(JObject msg)
         {
             if (_playlistQueue == null) return;
-            int itemId = msg["item_id"]?.Value<int>() ?? -1;
+            // Browser sends "trackId"; older/server code may send "item_id" — accept both
+            int itemId = (msg["trackId"] ?? msg["item_id"])?.Value<int>() ?? -1;
             if (itemId < 0) return;
 
             int position = msg["position"]?.Value<int>() ?? -1;
-            string itemType = msg["item_type"]?.ToString() ?? "";
+            // Browser sends "type"; older/server code may send "item_type" — accept both
+            string itemType = (msg["type"] ?? msg["item_type"])?.ToString() ?? "";
 
             PlaylistQueueItem newItem = null;
 
@@ -1250,7 +1254,7 @@ namespace AirDirector.Forms
 
             if (newItem == null)
             {
-                _remoteService.LogWarning($"queue_add: item_id {itemId} not found in archive");
+                _remoteService.LogWarning($"queue_add: trackId {itemId} not found in archive");
                 return;
             }
 
