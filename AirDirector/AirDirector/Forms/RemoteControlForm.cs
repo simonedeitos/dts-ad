@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using Newtonsoft.Json.Linq;
 using AirDirector.Controls;
 using AirDirector.Models;
 using AirDirector.Services.Database;
@@ -96,6 +97,8 @@ namespace AirDirector.Forms
             _remoteService.ConnectionStateChanged += OnConnectionStateChanged;
             _remoteService.ConnectedUsersChanged += OnConnectedUsersChanged;
             _remoteService.CommandReceived += OnCommandReceived;
+            _remoteService.MessageReceived += OnMessageReceived;
+            _remoteService.BinaryDataReceived += OnBinaryDataReceived;
 
             _audioService.InputLevelChanged += OnInputLevelChanged;
 
@@ -806,6 +809,13 @@ namespace AirDirector.Forms
             // Every 20 ticks = ~10 seconds
             if (_stateTick % 20 == 0)
                 _ = SendPlaylistQueueToRemoteAsync();
+
+            // Every 240 ticks = ~2 minutes — push archive so late-joining clients receive it
+            if (_stateTick % 240 == 0)
+            {
+                RefreshArchiveData();
+                _ = _remoteService.SendArchiveListAsync();
+            }
         }
 
         private void UpdatePlayerState()
@@ -837,14 +847,17 @@ namespace AirDirector.Forms
                 if (_playlistQueue == null) return;
                 var items = _playlistQueue.GetAllItems();
                 if (items == null) return;
-                var serialized = items.Select(i => (object)new
+
+                // Skip index 0 — that is the currently playing track; it is shown in the player panel
+                var queueItems = items.Skip(1).Select(i => (object)new
                 {
+                    id = i.UniqueId.ToString(),
                     artist = i.Artist ?? "",
                     title = i.Title ?? "",
                     duration = (int)i.Duration.TotalSeconds,
                     type = i.ItemType
                 }).ToList();
-                await _remoteService.SendPlaylistQueueAsync(serialized);
+                await _remoteService.SendPlaylistQueueAsync(queueItems);
             }
             catch { }
         }
@@ -924,8 +937,10 @@ namespace AirDirector.Forms
                     // Start audio on (re)connect
                     ConfigureAudio();
                     StartAudioAndTimer();
-                    // Populate archive data for remote requests
+                    // Populate archive data for remote requests and push immediately
                     RefreshArchiveData();
+                    _ = _remoteService.SendArchiveListAsync();
+                    _ = SendPlaylistQueueToRemoteAsync();
                     break;
 
                 case ConnectionState.Connecting:
@@ -1077,6 +1092,168 @@ namespace AirDirector.Forms
                 _remoteService?.LogWarning($"Command error: {ex.Message}");
             }
         }
+
+        private void OnMessageReceived(object sender, JObject msg)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => OnMessageReceived(sender, msg)));
+                return;
+            }
+
+            try
+            {
+                string msgType = msg["type"]?.ToString() ?? "";
+                string action = msg["action"]?.ToString() ?? msg["command"]?.ToString() ?? "";
+
+                // Handle queue commands sent by the web client
+                if (msgType == "command")
+                {
+                    switch (action)
+                    {
+                        case "queue_remove":
+                            HandleQueueRemove(msg);
+                            break;
+
+                        case "queue_reorder":
+                            HandleQueueReorder(msg);
+                            break;
+
+                        case "queue_add":
+                            HandleQueueAdd(msg);
+                            break;
+
+                        case "request_archive":
+                            RefreshArchiveData();
+                            _ = _remoteService.SendArchiveListAsync();
+                            break;
+                    }
+                }
+                else if (msgType == "request_archive")
+                {
+                    RefreshArchiveData();
+                    _ = _remoteService.SendArchiveListAsync();
+                }
+                else if (msgType == "audio_data")
+                {
+                    // Incoming audio from browser client (base64 MP3)
+                    string b64 = msg["data"]?.ToString();
+                    if (!string.IsNullOrEmpty(b64))
+                        _audioService?.FeedReceivedAudioBase64(b64);
+                }
+            }
+            catch (Exception ex)
+            {
+                _remoteService?.LogWarning($"MessageReceived handler error: {ex.Message}");
+            }
+        }
+
+        private void OnBinaryDataReceived(object sender, byte[] data)
+        {
+            // Binary audio data received from browser client (raw PCM or MP3)
+            try
+            {
+                _audioService?.FeedReceivedAudio(data);
+            }
+            catch (Exception ex)
+            {
+                _remoteService?.LogWarning($"BinaryDataReceived handler error: {ex.Message}");
+            }
+        }
+
+        private void HandleQueueRemove(JObject msg)
+        {
+            if (_playlistQueue == null) return;
+            string idStr = msg["item_id"]?.ToString();
+            if (string.IsNullOrEmpty(idStr)) return;
+            if (Guid.TryParse(idStr, out Guid uid))
+            {
+                _remoteService.Log($"Queue remove: {uid}");
+                _playlistQueue.RemoveItemByUniqueId(uid);
+                _ = SendPlaylistQueueToRemoteAsync();
+            }
+            else
+            {
+                _remoteService.LogWarning($"queue_remove: invalid item_id '{idStr}'");
+            }
+        }
+
+        private void HandleQueueReorder(JObject msg)
+        {
+            if (_playlistQueue == null) return;
+            var orderArr = msg["order"] as Newtonsoft.Json.Linq.JArray;
+            if (orderArr == null) return;
+
+            var orderedIds = new List<Guid>();
+            foreach (var token in orderArr)
+            {
+                if (Guid.TryParse(token.ToString(), out Guid uid))
+                    orderedIds.Add(uid);
+            }
+
+            if (orderedIds.Count > 0)
+            {
+                _remoteService.Log($"Queue reorder: {orderedIds.Count} items");
+                _playlistQueue.ReorderByUniqueIds(orderedIds);
+                _ = SendPlaylistQueueToRemoteAsync();
+            }
+        }
+
+        private void HandleQueueAdd(JObject msg)
+        {
+            if (_playlistQueue == null) return;
+            int itemId = msg["item_id"]?.Value<int>() ?? -1;
+            if (itemId < 0) return;
+
+            int position = msg["position"]?.Value<int>() ?? -1;
+            string itemType = msg["item_type"]?.ToString() ?? "";
+
+            PlaylistQueueItem newItem = null;
+
+            // Try music archive first (or if item_type says music)
+            if (string.IsNullOrEmpty(itemType) || itemType == "music")
+            {
+                var musicData = _musicArchiveControl?.GetMusicData();
+                if (musicData != null)
+                {
+                    var entry = musicData.FirstOrDefault(m => m.ID == itemId);
+                    if (entry != null)
+                        newItem = _playlistQueue.CreateMusicQueueItem(entry);
+                }
+            }
+
+            // Try clips archive if not found in music
+            if (newItem == null && (string.IsNullOrEmpty(itemType) || itemType == "clips"))
+            {
+                var clipsData = _clipsArchiveControl?.GetClipsData();
+                if (clipsData != null)
+                {
+                    var entry = clipsData.FirstOrDefault(c => c.ID == itemId);
+                    if (entry != null)
+                        newItem = _playlistQueue.CreateClipQueueItem(entry);
+                }
+            }
+
+            if (newItem == null)
+            {
+                _remoteService.LogWarning($"queue_add: item_id {itemId} not found in archive");
+                return;
+            }
+
+            _remoteService.Log($"Queue add: [{newItem.ItemType}] {newItem.Artist} - {newItem.Title}");
+            if (position < 0)
+                _playlistQueue.AddItem(newItem);
+            else
+            {
+                // +1 to account for the playing item at index 0 that is not shown on the client
+                int insertIndex = Math.Clamp(position + 1, 1, _playlistQueue.GetItemCount());
+                _playlistQueue.InsertItem(insertIndex, newItem);
+            }
+
+            _ = SendPlaylistQueueToRemoteAsync();
+        }
+
+
 
         private void OnLanguageChanged(object sender, EventArgs e) => ApplyLanguage();
 
