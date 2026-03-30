@@ -24,6 +24,11 @@ namespace AirDirector.Forms
         private System.Windows.Forms.Timer _updateTimer;
         private volatile bool _blinkState = false;
 
+        // Countdown font: prefer DSEG7 Classic (digital LCD look), fall back to Consolas
+        private static readonly string _countdownFontFamily =
+            System.Linq.Enumerable.Any(System.Drawing.FontFamily.Families, f => f.Name == "DSEG7 Classic")
+                ? "DSEG7 Classic" : "Consolas";
+
         // ADV Cache (same pattern as OverviewControl)
         private List<AirDirectorPlaylistItem> _cachedAdvItems = new List<AirDirectorPlaylistItem>();
         private DateTime _advCacheDate = DateTime.MinValue;
@@ -65,7 +70,7 @@ namespace AirDirector.Forms
             ApplyLanguage();
             LoadAdvCache();
 
-            _updateTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+            _updateTimer = new System.Windows.Forms.Timer { Interval = 250 };
             _updateTimer.Tick += UpdateTimer_Tick;
             _updateTimer.Start();
 
@@ -134,7 +139,8 @@ namespace AirDirector.Forms
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 11f, FontStyle.Bold),
-                Height = 26,
+                Height = 30,
+                AutoEllipsis = true,
                 BackColor = Color.Transparent,
                 Text = "--"
             };
@@ -168,7 +174,7 @@ namespace AirDirector.Forms
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.White,
                 BackColor = Color.Transparent,
-                Font = new Font("Consolas", 28f, FontStyle.Bold),
+                Font = new Font(_countdownFontFamily, 28f, FontStyle.Bold),
                 Text = "--:--:--"
             };
             _pnlIntroSide.Controls.Add(_lblIntroCountdown);
@@ -191,7 +197,7 @@ namespace AirDirector.Forms
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.Red,
                 BackColor = Color.Transparent,
-                Font = new Font("Consolas", 28f, FontStyle.Bold),
+                Font = new Font(_countdownFontFamily, 28f, FontStyle.Bold),
                 Text = "--:--:--"
             };
             _pnlMixSide.Controls.Add(_lblMixCountdown);
@@ -228,7 +234,8 @@ namespace AirDirector.Forms
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 11f, FontStyle.Bold),
-                Height = 26,
+                Height = 30,
+                AutoEllipsis = true,
                 BackColor = Color.Transparent,
                 Text = "--"
             };
@@ -238,7 +245,7 @@ namespace AirDirector.Forms
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.White,
                 BackColor = Color.Transparent,
-                Font = new Font("Consolas", 28f, FontStyle.Bold),
+                Font = new Font(_countdownFontFamily, 28f, FontStyle.Bold),
                 Text = "--:--:--"
             };
             _pnlSchedule.Controls.Add(_lblScheduleCountdown);
@@ -268,7 +275,8 @@ namespace AirDirector.Forms
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 11f, FontStyle.Bold),
-                Height = 26,
+                Height = 30,
+                AutoEllipsis = true,
                 BackColor = Color.Transparent,
                 Text = "--"
             };
@@ -278,7 +286,7 @@ namespace AirDirector.Forms
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.White,
                 BackColor = Color.Transparent,
-                Font = new Font("Consolas", 28f, FontStyle.Bold),
+                Font = new Font(_countdownFontFamily, 28f, FontStyle.Bold),
                 Text = "--:--:--"
             };
             _pnlAd.Controls.Add(_lblAdCountdown);
@@ -317,7 +325,7 @@ namespace AirDirector.Forms
             try
             {
                 var old = lbl.Font;
-                lbl.Font = new Font("Consolas", Math.Max(8f, size), FontStyle.Bold);
+                lbl.Font = new Font(_countdownFontFamily, Math.Max(8f, size), FontStyle.Bold);
                 old.Dispose();
             }
             catch { }
@@ -339,11 +347,15 @@ namespace AirDirector.Forms
         {
             DateTime now = DateTime.Now;
 
+            // Blink state is time-based (500 ms on / 500 ms off), independent of timer interval
+            _blinkState = now.Millisecond < 500;
+
             bool reload = _cachedAdvItems.Count == 0
                 || _advCacheDate != now.Date
-                || (now.Hour == 23 && now.Minute == 59 && now.Second >= 55)
-                || (now.Hour == 0 && now.Minute == 0 && now.Second >= 5 && now.Second <= 10)
-                || (now.Minute == 0 && now.Second >= 5 && now.Second <= 10 && (now - _lastAdvReloadTime).TotalMinutes > 1);
+                || ((now - _lastAdvReloadTime).TotalSeconds >= 1 && (
+                    (now.Hour == 23 && now.Minute == 59 && now.Second >= 55)
+                    || (now.Hour == 0 && now.Minute == 0 && now.Second >= 5 && now.Second <= 10)
+                    || (now.Minute == 0 && now.Second >= 5 && now.Second <= 10 && (now - _lastAdvReloadTime).TotalMinutes > 1)));
 
             if (reload) LoadAdvCache();
 
@@ -460,7 +472,6 @@ namespace AirDirector.Forms
 
                     if (sec <= 120)
                     {
-                        _blinkState = !_blinkState;
                         _lblScheduleCountdown.ForeColor = _blinkState ? Color.Red : Color.White;
                     }
                     else
@@ -531,7 +542,6 @@ namespace AirDirector.Forms
 
                     if (sec <= 120)
                     {
-                        _blinkState = !_blinkState;
                         _lblAdCountdown.ForeColor = _blinkState ? Color.Red : Color.White;
                     }
                     else
