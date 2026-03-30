@@ -99,6 +99,7 @@ namespace AirDirector.Forms
             _remoteService.CommandReceived += OnCommandReceived;
             _remoteService.MessageReceived += OnMessageReceived;
             _remoteService.BinaryDataReceived += OnBinaryDataReceived;
+            _remoteService.AudioDataReceived += OnAudioDataReceived;
 
             _audioService.InputLevelChanged += OnInputLevelChanged;
 
@@ -1158,6 +1159,19 @@ namespace AirDirector.Forms
             catch (Exception ex)
             {
                 _remoteService?.LogWarning($"BinaryDataReceived handler error: {ex.Message}");
+            }
+        }
+
+        private void OnAudioDataReceived(object sender, string base64Data)
+        {
+            // Encoded audio (WebM/Opus) received from browser client via audio_data command
+            try
+            {
+                _audioService?.FeedReceivedAudioBase64(base64Data);
+            }
+            catch (Exception ex)
+            {
+                _remoteService?.LogWarning($"AudioDataReceived handler error: {ex.Message}");
             }
         }
 

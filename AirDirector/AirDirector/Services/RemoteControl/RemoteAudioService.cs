@@ -35,10 +35,18 @@ namespace AirDirector.Services.RemoteControl
         private MemoryStream _encodingBuffer;
         private LameMP3FileWriter _mp3Writer;
         private readonly object _encodeLock = new object();
+        private WaveFormat _captureFormat;
+        private WaveFormat _targetMp3Format;
+        private bool _needsConversion;
 
         // Playback
         private WaveOutEvent _waveOut;
         private BufferedWaveProvider _playbackBuffer;
+
+        // Receive decode buffer: accumulate WebM/encoded chunks in a temp file for MediaFoundationReader
+        private string _receiveTempPath = null;
+        private long _receiveReaderPcmPosition = 0;
+        private readonly object _receiveLock = new object();
 
         private bool _isCapturing = false;
         private bool _disposed = false;
@@ -91,10 +99,14 @@ namespace AirDirector.Services.RemoteControl
                     _captureDevice = waveIn;
                 }
 
-                var captureFormat = _captureDevice.WaveFormat;
-                var mp3Format = new WaveFormat(preset.SampleRate, 16, preset.Channels);
+                _captureFormat = _captureDevice.WaveFormat;
+                _targetMp3Format = new WaveFormat(preset.SampleRate, 16, preset.Channels);
+                _needsConversion = _captureFormat.Encoding != WaveFormatEncoding.Pcm
+                                   || _captureFormat.BitsPerSample != 16
+                                   || _captureFormat.SampleRate != _targetMp3Format.SampleRate
+                                   || _captureFormat.Channels != _targetMp3Format.Channels;
 
-                _mp3Writer = new LameMP3FileWriter(_encodingBuffer, mp3Format, preset.Bitrate / 1000);
+                _mp3Writer = new LameMP3FileWriter(_encodingBuffer, _targetMp3Format, preset.Bitrate / 1000);
 
                 _captureDevice.DataAvailable += OnCaptureDataAvailable;
                 _captureDevice.StartRecording();
@@ -149,8 +161,17 @@ namespace AirDirector.Services.RemoteControl
                 if (_mp3Writer == null || _encodingBuffer == null) return;
                 try
                 {
+                    byte[] dataToEncode = e.Buffer;
+                    int bytesToEncode = e.BytesRecorded;
+
+                    if (_needsConversion)
+                    {
+                        dataToEncode = ConvertAudioBuffer(e.Buffer, e.BytesRecorded, _captureFormat, _targetMp3Format);
+                        bytesToEncode = dataToEncode.Length;
+                    }
+
                     long positionBefore = _encodingBuffer.Position;
-                    _mp3Writer.Write(e.Buffer, 0, e.BytesRecorded);
+                    _mp3Writer.Write(dataToEncode, 0, bytesToEncode);
                     _mp3Writer.Flush();
 
                     long newBytes = _encodingBuffer.Position - positionBefore;
@@ -213,6 +234,19 @@ namespace AirDirector.Services.RemoteControl
                 _waveOut?.Dispose();
                 _waveOut = null;
                 _playbackBuffer = null;
+
+                // Reset receive decode state so the next session starts fresh
+                lock (_receiveLock)
+                {
+                    _receiveReaderPcmPosition = 0;
+                    if (_receiveTempPath != null)
+                    {
+                        try { File.Delete(_receiveTempPath); }
+                        catch (Exception ex) { Console.WriteLine($"[RemoteAudioService] ⚠️ Could not delete receive temp file: {ex.Message}"); }
+                        _receiveTempPath = null;
+                    }
+                }
+
                 Console.WriteLine("[RemoteAudioService] ⏹ Playback stopped");
             }
             catch (Exception ex)
@@ -236,17 +270,78 @@ namespace AirDirector.Services.RemoteControl
             }
         }
 
-        /// <summary>Feed received audio from a base64-encoded JSON audio_data message.</summary>
-        public void FeedReceivedAudioBase64(string base64Data)
+        private void FeedReceivedAudio(byte[] pcmData, int length)
         {
+            if (_playbackBuffer == null) return;
             try
             {
-                byte[] mp3Data = Convert.FromBase64String(base64Data);
-                FeedReceivedAudio(mp3Data);
+                _playbackBuffer.AddSamples(pcmData, 0, length);
+                float level = CalculateLevel(pcmData, length);
+                OutputLevelChanged?.Invoke(this, level);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RemoteAudioService] ⚠️ FeedReceivedAudioBase64 error: {ex.Message}");
+                Console.WriteLine($"[RemoteAudioService] ⚠️ FeedReceivedAudio error: {ex.Message}");
+            }
+        }
+
+        /// <summary>Feed received audio from a base64-encoded JSON audio_data message (WebM/Opus or MP3).</summary>
+        public void FeedReceivedAudioBase64(string base64Data)
+        {
+            lock (_receiveLock)
+            {
+                if (_playbackBuffer == null) return;
+                try
+                {
+                    byte[] encoded = Convert.FromBase64String(base64Data);
+
+                    // Accumulate encoded chunks in a temp file so MediaFoundationReader can decode them.
+                    // WebM/Opus from browser MediaRecorder requires all chunks because the first one
+                    // carries the container header (EBML) needed to decode subsequent clusters.
+                    if (_receiveTempPath == null)
+                        _receiveTempPath = Path.Combine(Path.GetTempPath(), $"ad_rcv_{Guid.NewGuid():N}.webm");
+
+                    using (var fs = new FileStream(_receiveTempPath, FileMode.Append, FileAccess.Write, FileShare.None))
+                        fs.Write(encoded, 0, encoded.Length);
+
+                    try
+                    {
+                        using var reader = new MediaFoundationReader(_receiveTempPath);
+                        if (_receiveReaderPcmPosition >= reader.Length)
+                            return; // No new decodable data yet
+
+                        if (_receiveReaderPcmPosition > 0)
+                            reader.Position = _receiveReaderPcmPosition;
+
+                        var targetFmt = _playbackBuffer.WaveFormat;
+                        byte[] pcmBuf = new byte[4096];
+                        int n;
+
+                        if (!reader.WaveFormat.Equals(targetFmt))
+                        {
+                            using var resampler = new MediaFoundationResampler(reader, targetFmt) { ResamplerQuality = 60 };
+                            while ((n = resampler.Read(pcmBuf, 0, pcmBuf.Length)) > 0)
+                                FeedReceivedAudio(pcmBuf, n);
+                        }
+                        else
+                        {
+                            while ((n = reader.Read(pcmBuf, 0, pcmBuf.Length)) > 0)
+                                FeedReceivedAudio(pcmBuf, n);
+                        }
+
+                        // Track reader's PCM position so next call skips already-decoded audio
+                        _receiveReaderPcmPosition = reader.Position;
+                    }
+                    catch (Exception ex)
+                    {
+                        // Not enough data to decode yet (expected on initial chunks); log at a low severity
+                        Console.WriteLine($"[RemoteAudioService] 📭 Receive decode skipped ({ex.GetType().Name}): {ex.Message}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[RemoteAudioService] ⚠️ FeedReceivedAudioBase64 error: {ex.Message}");
+                }
             }
         }
 
@@ -313,6 +408,19 @@ namespace AirDirector.Services.RemoteControl
                 sum += normalized * normalized;
             }
             return (float)Math.Sqrt(sum / samples);
+        }
+
+        /// <summary>Convert an audio buffer from sourceFormat (e.g. IEEE Float 32-bit loopback) to targetFormat (PCM 16-bit).</summary>
+        private static byte[] ConvertAudioBuffer(byte[] input, int length, WaveFormat sourceFormat, WaveFormat targetFormat)
+        {
+            using var sourceStream = new RawSourceWaveStream(new MemoryStream(input, 0, length), sourceFormat);
+            using var resampler = new MediaFoundationResampler(sourceStream, targetFormat) { ResamplerQuality = 60 };
+            var output = new MemoryStream();
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = resampler.Read(buffer, 0, buffer.Length)) > 0)
+                output.Write(buffer, 0, bytesRead);
+            return output.ToArray();
         }
 
         // ── IDisposable ──────────────────────────────────────────────────────

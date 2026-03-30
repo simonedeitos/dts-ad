@@ -50,6 +50,7 @@ namespace AirDirector.Services.RemoteControl
         public event EventHandler<string> CommandReceived;
         public event EventHandler<JObject> MessageReceived;
         public event EventHandler<byte[]> BinaryDataReceived;
+        public event EventHandler<string> AudioDataReceived;
         public event EventHandler<RemoteControlLogEntry> LogAdded;
 
         // ── Log ────────────────────────────────────────────────────────────────
@@ -335,7 +336,18 @@ namespace AirDirector.Services.RemoteControl
                     break;
 
                 default:
-                    MessageReceived?.Invoke(this, msg);
+                    // Browser sends { command: "audio_data", data: "..." } without a type field
+                    string defaultCmd = msg["command"]?.ToString();
+                    if (defaultCmd == "audio_data")
+                    {
+                        string audioData = msg["data"]?.ToString();
+                        if (!string.IsNullOrEmpty(audioData))
+                            AudioDataReceived?.Invoke(this, audioData);
+                    }
+                    else
+                    {
+                        MessageReceived?.Invoke(this, msg);
+                    }
                     break;
             }
         }
