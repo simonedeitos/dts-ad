@@ -881,7 +881,7 @@ namespace AirDirector.Forms
             if (_remoteControlForm == null || _remoteControlForm.IsDisposed)
             {
                 _remoteControlForm = new RemoteControlForm();
-                _remoteControlForm.SetReferences(playlistQueue, playerControl, playerControlVideo);
+                _remoteControlForm.SetReferences(playlistQueue, playerControl, playerControlVideo, musicArchiveControl, clipsArchiveControl);
             }
 
             if (_remoteControlForm.WindowState == FormWindowState.Minimized)

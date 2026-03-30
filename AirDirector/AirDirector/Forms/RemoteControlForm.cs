@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using AirDirector.Controls;
 using AirDirector.Models;
+using AirDirector.Services.Database;
 using AirDirector.Services.Localization;
 using AirDirector.Services.RemoteControl;
 using AirDirector.Themes;
@@ -29,7 +31,12 @@ namespace AirDirector.Forms
         private PlayerControl _playerControl;
         private PlayerControlVideo _playerControlVideo;
         private PlaylistQueueControl _playlistQueue;
+        private ArchiveControl _musicArchiveControl;
+        private ArchiveControl _clipsArchiveControl;
         private bool _isRadioTVMode;
+
+        // ── State tick counter ──────────────────────────────────────────────────
+        private int _stateTick;
 
         // ── UI controls ─────────────────────────────────────────────────────────
 
@@ -103,11 +110,14 @@ namespace AirDirector.Forms
             this.FormClosing += RemoteControlForm_FormClosing;
         }
 
-        public void SetReferences(PlaylistQueueControl queue, PlayerControl player, PlayerControlVideo playerVideo)
+        public void SetReferences(PlaylistQueueControl queue, PlayerControl player, PlayerControlVideo playerVideo,
+            ArchiveControl musicArchive = null, ArchiveControl clipsArchive = null)
         {
             _playlistQueue = queue;
             _playerControl = player;
             _playerControlVideo = playerVideo;
+            _musicArchiveControl = musicArchive;
+            _clipsArchiveControl = clipsArchive;
         }
 
         // ── Build UI ─────────────────────────────────────────────────────────────
@@ -785,6 +795,17 @@ namespace AirDirector.Forms
         private void StateTimer_Tick(object sender, EventArgs e)
         {
             UpdatePlayerState();
+            _stateTick++;
+
+            if (_remoteService.State != ConnectionState.Connected) return;
+
+            // Timer interval is 500 ms; every 2 ticks = ~1 second
+            if (_stateTick % 2 == 0)
+                _ = SendCountdownToRemoteAsync();
+
+            // Every 20 ticks = ~10 seconds
+            if (_stateTick % 20 == 0)
+                _ = SendPlaylistQueueToRemoteAsync();
         }
 
         private void UpdatePlayerState()
@@ -809,6 +830,80 @@ namespace AirDirector.Forms
             catch { }
         }
 
+        private async Task SendPlaylistQueueToRemoteAsync()
+        {
+            try
+            {
+                if (_playlistQueue == null) return;
+                var items = _playlistQueue.GetAllItems();
+                if (items == null) return;
+                var serialized = items.Select(i => (object)new
+                {
+                    artist = i.Artist ?? "",
+                    title = i.Title ?? "",
+                    duration = (int)i.Duration.TotalSeconds,
+                    type = i.ItemType
+                }).ToList();
+                await _remoteService.SendPlaylistQueueAsync(serialized);
+            }
+            catch { }
+        }
+
+        private async Task SendCountdownToRemoteAsync()
+        {
+            try
+            {
+                int nextScheduleSec = 0;
+                string scheduleName = "";
+                int nextAdSec = 0;
+
+                if (_playlistQueue != null)
+                {
+                    var nextSchedule = _playlistQueue.GetNextSchedule();
+                    if (nextSchedule.HasValue)
+                    {
+                        nextScheduleSec = (int)nextSchedule.Value.remaining.TotalSeconds;
+                        scheduleName = nextSchedule.Value.schedule?.Name ?? "";
+                    }
+                }
+
+                await _remoteService.SendCountdownAsync(nextScheduleSec, nextAdSec, scheduleName);
+            }
+            catch { }
+        }
+
+        private void RefreshArchiveData()
+        {
+            try
+            {
+                if (_musicArchiveControl == null && _clipsArchiveControl == null) return;
+
+                var musicData = _musicArchiveControl?.GetMusicData() ?? new List<MusicEntry>();
+                var clipsData = _clipsArchiveControl?.GetClipsData() ?? new List<ClipEntry>();
+
+                var musicList = musicData.Select(m => (object)new
+                {
+                    id = m.ID,
+                    artist = m.Artist ?? "",
+                    title = m.Title ?? "",
+                    album = m.Album ?? "",
+                    genre = m.Genre ?? "",
+                    duration = m.Duration
+                }).ToList();
+
+                var clipsList = clipsData.Select(c => (object)new
+                {
+                    id = c.ID,
+                    title = c.Title ?? "",
+                    genre = c.Genre ?? "",
+                    duration = c.Duration
+                }).ToList();
+
+                _remoteService.SetArchiveData(musicList, clipsList);
+            }
+            catch { }
+        }
+
         private void OnConnectionStateChanged(object sender, ConnectionState state)
         {
             if (InvokeRequired)
@@ -829,6 +924,8 @@ namespace AirDirector.Forms
                     // Start audio on (re)connect
                     ConfigureAudio();
                     StartAudioAndTimer();
+                    // Populate archive data for remote requests
+                    RefreshArchiveData();
                     break;
 
                 case ConnectionState.Connecting:

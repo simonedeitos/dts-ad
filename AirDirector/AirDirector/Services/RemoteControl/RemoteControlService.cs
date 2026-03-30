@@ -31,7 +31,7 @@ namespace AirDirector.Services.RemoteControl
 
     public class RemoteControlService : IDisposable
     {
-        private const string ServerUrl = "wss://client.airdirector.app/ws";
+        public string ServerUrl { get; set; } = "wss://store-uglh.onrender.com";
         private const int ReconnectDelayMs = 5000;
         private const int StateSendIntervalMs = 500;
         private const int MaxLogEntries = 500;
@@ -267,20 +267,22 @@ namespace AirDirector.Services.RemoteControl
             switch (type)
             {
                 case "command":
-                    string cmd = msg["command"]?.ToString() ?? "";
+                    string cmd = msg["command"]?.ToString() ?? msg["action"]?.ToString() ?? "";
                     Log($"Command received: {cmd}");
                     CommandReceived?.Invoke(this, cmd);
                     break;
 
+                case "connected_users":
                 case "users_update":
                     var users = new List<ConnectedUser>();
-                    if (msg["users"] is JArray arr)
+                    var usersArray = msg["data"] as JArray ?? msg["users"] as JArray;
+                    if (usersArray is JArray arr)
                     {
                         foreach (var u in arr)
                         {
                             users.Add(new ConnectedUser
                             {
-                                Name = u["name"]?.ToString() ?? "",
+                                Name = u["name"]?.ToString() ?? u["userName"]?.ToString() ?? "",
                                 MicActive = u["mic_active"]?.Value<bool>() ?? false
                             });
                         }
