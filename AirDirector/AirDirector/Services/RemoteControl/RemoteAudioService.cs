@@ -38,12 +38,19 @@ namespace AirDirector.Services.RemoteControl
         private WaveFormat _captureFormat;
         private WaveFormat _targetMp3Format;
         private bool _needsConversion;
+        // Outgoing audio: accumulate encoded MP3 bytes until we have at least this many before sending,
+        // so that browser decodeAudioData() gets a chunk large enough to contain valid MP3 frames.
+        private readonly MemoryStream _sendAccumulateBuffer = new MemoryStream();
+        private const int MinSendBytes = 4096; // 4 KB minimum chunk size
 
         // Playback
         private WaveOutEvent _waveOut;
         private BufferedWaveProvider _playbackBuffer;
 
-        // Receive decode buffer: accumulate WebM/encoded chunks in a temp file for MediaFoundationReader
+        // Receive decode buffer: accumulate WebM/Opus chunks in memory; write to a temp file so
+        // MediaFoundationReader can open it (it requires a seekable file path, not a MemoryStream).
+        // Using FileShare.ReadWrite avoids lock conflicts between the writer and the MF reader.
+        private MemoryStream _receiveWebmBuffer = null;
         private string _receiveTempPath = null;
         private long _receiveReaderPcmPosition = 0;
         private readonly object _receiveLock = new object();
@@ -136,6 +143,9 @@ namespace AirDirector.Services.RemoteControl
                     _mp3Writer = null;
                     _encodingBuffer?.Dispose();
                     _encodingBuffer = null;
+                    // Discard any buffered-but-unsent data
+                    _sendAccumulateBuffer.SetLength(0);
+                    _sendAccumulateBuffer.Position = 0;
                 }
 
                 _isCapturing = false;
@@ -183,11 +193,21 @@ namespace AirDirector.Services.RemoteControl
                         _encodingBuffer.SetLength(0);
                         _encodingBuffer.Position = 0;
 
-                        // Send as base64 JSON so the WS relay server can forward to browser clients
-                        var msg = new { type = "audio_data", data = Convert.ToBase64String(mp3Data) };
-                        string json = Newtonsoft.Json.JsonConvert.SerializeObject(msg);
-                        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
-                        _ = _remoteService.SendRawTextAsync(bytes);
+                        // Accumulate until we have at least MinSendBytes so the browser's
+                        // decodeAudioData() receives a chunk large enough to contain valid MP3 frames.
+                        _sendAccumulateBuffer.Write(mp3Data, 0, mp3Data.Length);
+                        if (_sendAccumulateBuffer.Length >= MinSendBytes)
+                        {
+                            byte[] toSend = _sendAccumulateBuffer.ToArray();
+                            _sendAccumulateBuffer.SetLength(0);
+                            _sendAccumulateBuffer.Position = 0;
+
+                            // Send as base64 JSON so the WS relay server can forward to browser clients
+                            var msg = new { type = "audio_data", data = Convert.ToBase64String(toSend) };
+                            string json = Newtonsoft.Json.JsonConvert.SerializeObject(msg);
+                            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
+                            _ = _remoteService.SendRawTextAsync(bytes);
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -239,6 +259,8 @@ namespace AirDirector.Services.RemoteControl
                 lock (_receiveLock)
                 {
                     _receiveReaderPcmPosition = 0;
+                    _receiveWebmBuffer?.Dispose();
+                    _receiveWebmBuffer = null;
                     if (_receiveTempPath != null)
                     {
                         try { File.Delete(_receiveTempPath); }
@@ -295,14 +317,25 @@ namespace AirDirector.Services.RemoteControl
                 {
                     byte[] encoded = Convert.FromBase64String(base64Data);
 
-                    // Accumulate encoded chunks in a temp file so MediaFoundationReader can decode them.
+                    // Accumulate all encoded chunks in a MemoryStream.
                     // WebM/Opus from browser MediaRecorder requires all chunks because the first one
                     // carries the container header (EBML) needed to decode subsequent clusters.
+                    if (_receiveWebmBuffer == null)
+                        _receiveWebmBuffer = new MemoryStream();
+
+                    _receiveWebmBuffer.Write(encoded, 0, encoded.Length);
+
+                    // Write accumulated buffer to a temp file so MediaFoundationReader can open it
+                    // (MediaFoundationReader requires a seekable file path, not a MemoryStream).
                     if (_receiveTempPath == null)
                         _receiveTempPath = Path.Combine(Path.GetTempPath(), $"ad_rcv_{Guid.NewGuid():N}.webm");
 
-                    using (var fs = new FileStream(_receiveTempPath, FileMode.Append, FileAccess.Write, FileShare.None))
-                        fs.Write(encoded, 0, encoded.Length);
+                    // Use ReadWrite sharing so the MF reader can open the file while we write
+                    using (var fs = new FileStream(_receiveTempPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                    {
+                        _receiveWebmBuffer.Position = 0;
+                        _receiveWebmBuffer.CopyTo(fs);
+                    }
 
                     try
                     {
@@ -334,8 +367,10 @@ namespace AirDirector.Services.RemoteControl
                     }
                     catch (Exception ex)
                     {
-                        // Not enough data to decode yet (expected on initial chunks); log at a low severity
-                        Console.WriteLine($"[RemoteAudioService] 📭 Receive decode skipped ({ex.GetType().Name}): {ex.Message}");
+                        // Not enough data to decode yet (expected on initial chunks); log at low severity.
+                        // If this persists, WebM/Opus may not be supported by Media Foundation on this Windows version.
+                        Console.WriteLine($"[RemoteAudioService] ⚠️ Browser→AirDirector audio decode failed ({ex.GetType().Name}): {ex.Message}. " +
+                            "Ensure Windows 10+ with Media Foundation codecs installed, or check that browser sends WebM/Opus.");
                     }
                 }
                 catch (Exception ex)
@@ -431,6 +466,7 @@ namespace AirDirector.Services.RemoteControl
             _disposed = true;
             StopCapture();
             StopPlayback();
+            _sendAccumulateBuffer.Dispose();
         }
     }
 }
