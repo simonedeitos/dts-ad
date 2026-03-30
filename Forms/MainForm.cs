@@ -48,6 +48,7 @@ namespace AirDirector.Forms
         private ClocksControl clocksControl;
         private ReportControl reportControl;
         private WhatsAppControl whatsAppControl;
+        private TimersForm _timersForm;
 
         private Label lblCurrentClock;
         private Label lblQueueTitle;
@@ -711,7 +712,10 @@ namespace AirDirector.Forms
             ToolStripMenuItem menuFile = new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuFile", "File"));
             menuFile.DropDownItems.Add(LanguageManager.GetString("MainForm.MenuExit", "Esci"), null, MenuExit_Click);
             menuStrip.Items.Add(menuFile);
-            ToolStripMenuItem menuTools = new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuTools", "Strumenti"));
+            ToolStripMenuItem menuView = new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuView", "Visualizza"));
+            menuView.DropDownItems.Add("⏱ " + LanguageManager.GetString("MainForm.MenuTimers", "Timers"), null, MenuTimers_Click);
+            menuStrip.Items.Add(menuView);
+            ToolStripMenuItem menuTools= new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuTools", "Strumenti"));
             menuTools.DropDownItems.Add(LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"), null, MenuSettings_Click);
             menuTools.DropDownItems.Add(new ToolStripSeparator());
             menuTools.DropDownItems.Add("💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"), null, MenuBackup_Click);
@@ -800,6 +804,20 @@ namespace AirDirector.Forms
         private void MenuExit_Click(object sender, EventArgs e)
         {
             this.Close(); // FormClosing gestirà la conferma
+        }
+        private void MenuTimers_Click(object sender, EventArgs e)
+        {
+            if (_timersForm == null || _timersForm.IsDisposed)
+            {
+                _timersForm = new TimersForm();
+                _timersForm.SetReferences(playlistQueue, playerControl, playerControlVideo);
+                _timersForm.Show(this);
+            }
+            else
+            {
+                if (!_timersForm.Visible) _timersForm.Show(this);
+                _timersForm.BringToFront();
+            }
         }
         private void MenuSettings_Click(object sender, EventArgs e) { tabControl.SelectedIndex = tabControl.TabPages.Count - 1; UpdateStatus(LanguageManager.GetString("MainForm.GoToConfig", "Vai alla sezione Configurazione")); }
 

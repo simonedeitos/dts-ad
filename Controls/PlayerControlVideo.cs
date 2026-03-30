@@ -148,6 +148,9 @@ namespace AirDirector.Controls
         public bool IsCurrentlyPlaying => _isPlaying && !_isPaused;
         public bool IsPlaying => _isPlaying && !_isPaused;
         public bool IsAutoMode => _autoMode;
+        public int CurrentPositionMs => _positionMs;
+        public int CurrentMarkerINTRO => _markerINTRO;
+        public int CurrentMarkerMIX => _markerMIX;
         private TimeSpan _totalDuration, _introTime;
         private int _markerIN, _markerINTRO, _markerMIX, _markerOUT;
         private volatile int _mixGeneration = 0;

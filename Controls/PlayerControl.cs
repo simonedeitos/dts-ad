@@ -129,6 +129,9 @@ namespace AirDirector.Controls
         public string CurrentArtist { get; private set; } = "";
         public string CurrentTitle { get; private set; } = "";
         public bool IsCurrentlyPlaying => _isPlaying && !_isPaused;
+        public int CurrentPositionMs => (int)_currentPosition.TotalMilliseconds;
+        public int CurrentMarkerINTRO => _markerINTRO;
+        public int CurrentMarkerMIX => _markerMIX;
 
         private CancellationTokenSource _waveformCts = null;
 
