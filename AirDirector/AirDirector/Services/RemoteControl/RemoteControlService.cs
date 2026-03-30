@@ -22,23 +22,42 @@ namespace AirDirector.Services.RemoteControl
         public bool MicActive { get; set; } = false;
     }
 
+    public class RemoteControlLogEntry
+    {
+        public DateTime Timestamp { get; set; }
+        public string Level { get; set; } = "INFO";
+        public string Message { get; set; } = "";
+    }
+
     public class RemoteControlService : IDisposable
     {
         private const string ServerUrl = "wss://client.airdirector.app/ws";
         private const int ReconnectDelayMs = 5000;
         private const int StateSendIntervalMs = 500;
+        private const int MaxLogEntries = 500;
 
         private ClientWebSocket _webSocket;
         private CancellationTokenSource _cts;
         private string _token = "";
         private ConnectionState _state = ConnectionState.Disconnected;
         private bool _disposed = false;
+        private bool _manualDisconnect = false;
 
         // ── Events ─────────────────────────────────────────────────────────────
         public event EventHandler<ConnectionState> ConnectionStateChanged;
         public event EventHandler<List<ConnectedUser>> ConnectedUsersChanged;
         public event EventHandler<string> CommandReceived;
         public event EventHandler<JObject> MessageReceived;
+        public event EventHandler<RemoteControlLogEntry> LogAdded;
+
+        // ── Log ────────────────────────────────────────────────────────────────
+        private readonly List<RemoteControlLogEntry> _logEntries = new List<RemoteControlLogEntry>();
+        private readonly object _logLock = new object();
+
+        public IReadOnlyList<RemoteControlLogEntry> LogEntries
+        {
+            get { lock (_logLock) { return _logEntries.ToArray(); } }
+        }
 
         // ── Player State (set by MainForm) ─────────────────────────────────────
         public string PlayerStatus { get; set; } = "stopped";
@@ -55,19 +74,56 @@ namespace AirDirector.Services.RemoteControl
         private List<object> _clipsArchive = new List<object>();
 
         // ── State ───────────────────────────────────────────────────────────────
+        private readonly object _reconnectLock = new object();
         private bool _reconnecting = false;
+        private int _reconnectAttempt = 0;
 
         public ConnectionState State => _state;
+
+        // ── Logging ────────────────────────────────────────────────────────────
+
+        private void AddLog(string level, string message)
+        {
+            var entry = new RemoteControlLogEntry
+            {
+                Timestamp = DateTime.Now,
+                Level = level,
+                Message = message
+            };
+            lock (_logLock)
+            {
+                _logEntries.Add(entry);
+                if (_logEntries.Count > MaxLogEntries)
+                    _logEntries.RemoveAt(0);
+            }
+            LogAdded?.Invoke(this, entry);
+        }
+
+        public void Log(string message) => AddLog("INFO", message);
+        public void LogWarning(string message) => AddLog("WARN", message);
+        public void LogError(string message) => AddLog("ERROR", message);
+
+        public void ClearLog()
+        {
+            lock (_logLock) { _logEntries.Clear(); }
+        }
 
         // ── Connect / Disconnect ────────────────────────────────────────────────
 
         public async Task ConnectAsync(string token)
         {
             if (_state != ConnectionState.Disconnected)
+            {
+                LogWarning("ConnectAsync called but state is not Disconnected — ignored.");
                 return;
+            }
 
             _token = token;
+            _manualDisconnect = false;
+            _reconnectAttempt = 0;
             _cts = new CancellationTokenSource();
+
+            Log($"Connecting with token: {MaskToken(token)}");
             await ConnectInternalAsync();
         }
 
@@ -78,37 +134,66 @@ namespace AirDirector.Services.RemoteControl
             {
                 _webSocket?.Dispose();
                 _webSocket = new ClientWebSocket();
+
                 string wsUrl = $"{ServerUrl}?ad_token={Uri.EscapeDataString(_token)}";
+                Log($"WebSocket connecting to {ServerUrl}...");
+
                 await _webSocket.ConnectAsync(new Uri(wsUrl), _cts.Token);
+                Log("WebSocket connected successfully.");
 
                 SetState(ConnectionState.Connected);
+                _reconnectAttempt = 0;
+
+                Log("Sending authentication message...");
                 await AuthenticateAsync();
+                Log("Authentication message sent.");
 
                 // Start background loops
                 _ = Task.Run(ReceiveLoopAsync);
                 _ = Task.Run(StateSendLoopAsync);
-                _reconnecting = false;
             }
             catch (OperationCanceledException)
             {
+                Log("Connection cancelled by user.");
                 SetState(ConnectionState.Disconnected);
+            }
+            catch (WebSocketException wsEx)
+            {
+                LogError($"WebSocket error: {wsEx.Message} (Code: {wsEx.WebSocketErrorCode})");
+                if (wsEx.InnerException != null)
+                    LogError($"  Inner: {wsEx.InnerException.Message}");
+                SetState(ConnectionState.Disconnected);
+                ScheduleReconnect();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RemoteControlService] ❌ Connection error: {ex.Message}");
+                LogError($"Connection error: {ex.Message}");
+                if (ex.InnerException != null)
+                    LogError($"  Inner: {ex.InnerException.Message}");
                 SetState(ConnectionState.Disconnected);
-                if (!_reconnecting && _cts != null && !_cts.IsCancellationRequested)
-                    _ = Task.Run(ReconnectLoopAsync);
+                ScheduleReconnect();
             }
         }
 
         public void Disconnect()
         {
+            _manualDisconnect = true;
             _cts?.Cancel();
-            try { _webSocket?.CloseAsync(WebSocketCloseStatus.NormalClosure, "User disconnected", CancellationToken.None).Wait(2000); }
-            catch (Exception ex) { Console.WriteLine($"[RemoteControlService] ⚠️ Disconnect close error: {ex.Message}"); }
+            Log("User requested disconnect.");
+
+            try
+            {
+                if (_webSocket?.State == WebSocketState.Open || _webSocket?.State == WebSocketState.CloseReceived)
+                    _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "User disconnected", CancellationToken.None).Wait(2000);
+            }
+            catch (Exception ex)
+            {
+                LogWarning($"Disconnect close error: {ex.Message}");
+            }
+
             SetState(ConnectionState.Disconnected);
-            _reconnecting = false;
+            lock (_reconnectLock) { _reconnecting = false; }
+            Log("Disconnected.");
         }
 
         // ── Authentication ──────────────────────────────────────────────────────
@@ -126,6 +211,8 @@ namespace AirDirector.Services.RemoteControl
             var buffer = new byte[65536];
             var sb = new StringBuilder();
 
+            Log("Receive loop started.");
+
             try
             {
                 while (_webSocket.State == WebSocketState.Open && !_cts.IsCancellationRequested)
@@ -137,6 +224,7 @@ namespace AirDirector.Services.RemoteControl
                         result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), _cts.Token);
                         if (result.MessageType == WebSocketMessageType.Close)
                         {
+                            Log($"Server closed connection: {result.CloseStatusDescription ?? "no reason"}");
                             await HandleDisconnectAsync();
                             return;
                         }
@@ -151,14 +239,21 @@ namespace AirDirector.Services.RemoteControl
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[RemoteControlService] ⚠️ Parse error: {ex.Message}");
+                        LogWarning($"Message parse error: {ex.Message}");
                     }
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                Log("Receive loop cancelled.");
+            }
+            catch (WebSocketException wsEx)
+            {
+                LogError($"Receive WebSocket error: {wsEx.Message} (Code: {wsEx.WebSocketErrorCode})");
+            }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RemoteControlService] ❌ Receive error: {ex.Message}");
+                LogError($"Receive loop error: {ex.Message}");
             }
 
             if (!_cts.IsCancellationRequested)
@@ -173,6 +268,7 @@ namespace AirDirector.Services.RemoteControl
             {
                 case "command":
                     string cmd = msg["command"]?.ToString() ?? "";
+                    Log($"Command received: {cmd}");
                     CommandReceived?.Invoke(this, cmd);
                     break;
 
@@ -189,11 +285,27 @@ namespace AirDirector.Services.RemoteControl
                             });
                         }
                     }
+                    Log($"Users update: {users.Count} user(s) connected.");
                     ConnectedUsersChanged?.Invoke(this, users);
                     break;
 
                 case "request_archive":
+                    Log("Archive list requested by client.");
                     await SendArchiveListAsync();
+                    break;
+
+                case "auth_ok":
+                    Log("Authentication accepted by server.");
+                    break;
+
+                case "auth_error":
+                    string reason = msg["message"]?.ToString() ?? "Unknown reason";
+                    LogError($"Authentication rejected: {reason}");
+                    break;
+
+                case "error":
+                    string errMsg = msg["message"]?.ToString() ?? "Unknown error";
+                    LogError($"Server error: {errMsg}");
                     break;
 
                 default:
@@ -217,7 +329,7 @@ namespace AirDirector.Services.RemoteControl
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RemoteControlService] ⚠️ State loop error: {ex.Message}");
+                LogWarning($"State send loop error: {ex.Message}");
             }
         }
 
@@ -293,7 +405,7 @@ namespace AirDirector.Services.RemoteControl
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RemoteControlService] ⚠️ Binary send error: {ex.Message}");
+                LogWarning($"Binary send error: {ex.Message}");
             }
         }
 
@@ -309,7 +421,7 @@ namespace AirDirector.Services.RemoteControl
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RemoteControlService] ⚠️ Send error: {ex.Message}");
+                LogWarning($"JSON send error: {ex.Message}");
             }
         }
 
@@ -318,30 +430,71 @@ namespace AirDirector.Services.RemoteControl
         private async Task HandleDisconnectAsync()
         {
             SetState(ConnectionState.Disconnected);
-            if (!_cts.IsCancellationRequested)
+            if (!_manualDisconnect && !_cts.IsCancellationRequested)
+            {
+                Log("Connection lost. Will attempt to reconnect...");
                 await ReconnectLoopAsync();
+            }
+        }
+
+        private void ScheduleReconnect()
+        {
+            if (_manualDisconnect || _cts == null || _cts.IsCancellationRequested)
+                return;
+
+            lock (_reconnectLock)
+            {
+                if (_reconnecting) return;
+                _reconnecting = true;
+            }
+
+            _ = Task.Run(ReconnectLoopAsync);
         }
 
         private async Task ReconnectLoopAsync()
         {
-            _reconnecting = true;
-            while (!_cts.IsCancellationRequested && _state == ConnectionState.Disconnected)
+            lock (_reconnectLock)
             {
-                Console.WriteLine("[RemoteControlService] 🔄 Reconnecting in 5s...");
-                try { await Task.Delay(ReconnectDelayMs, _cts.Token); } catch (OperationCanceledException) { break; }
-
-                if (!_cts.IsCancellationRequested)
-                    await ConnectInternalAsync();
+                if (_reconnecting) return;
+                _reconnecting = true;
             }
-            _reconnecting = false;
+
+            try
+            {
+                while (!_manualDisconnect && !_cts.IsCancellationRequested && _state == ConnectionState.Disconnected)
+                {
+                    _reconnectAttempt++;
+                    Log($"Reconnect attempt #{_reconnectAttempt} in {ReconnectDelayMs / 1000}s...");
+
+                    try { await Task.Delay(ReconnectDelayMs, _cts.Token); }
+                    catch (OperationCanceledException) { break; }
+
+                    if (!_manualDisconnect && !_cts.IsCancellationRequested)
+                        await ConnectInternalAsync();
+                }
+            }
+            finally
+            {
+                lock (_reconnectLock) { _reconnecting = false; }
+            }
         }
 
         // ── State helper ────────────────────────────────────────────────────────
 
         private void SetState(ConnectionState state)
         {
+            if (_state == state) return;
+            var prev = _state;
             _state = state;
+            Log($"State: {prev} → {state}");
             ConnectionStateChanged?.Invoke(this, state);
+        }
+
+        private static string MaskToken(string token)
+        {
+            if (string.IsNullOrEmpty(token)) return "(empty)";
+            if (token.Length <= 8) return new string('*', token.Length);
+            return token.Substring(0, 4) + "..." + token.Substring(token.Length - 4);
         }
 
         // ── IDisposable ─────────────────────────────────────────────────────────
@@ -350,6 +503,7 @@ namespace AirDirector.Services.RemoteControl
         {
             if (_disposed) return;
             _disposed = true;
+            _manualDisconnect = true;
             _cts?.Cancel();
             _cts?.Dispose();
             _webSocket?.Dispose();

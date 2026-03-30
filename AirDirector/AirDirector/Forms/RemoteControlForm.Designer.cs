@@ -14,6 +14,8 @@ namespace AirDirector.Forms
                 _audioService?.Dispose();
                 _stateTimer?.Stop();
                 _stateTimer?.Dispose();
+                _vuTimer?.Stop();
+                _vuTimer?.Dispose();
             }
             base.Dispose(disposing);
         }
