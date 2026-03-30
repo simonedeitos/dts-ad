@@ -2495,6 +2495,16 @@ namespace AirDirector.Controls
         // REFRESH & FILTERS
         // ═══════════════════════════════════════════════════════════
 
+        public List<MusicEntry> GetMusicData()
+        {
+            return new List<MusicEntry>(_allMusicData);
+        }
+
+        public List<ClipEntry> GetClipsData()
+        {
+            return new List<ClipEntry>(_allClipsData);
+        }
+
         public void RefreshArchive()
         {
             try
