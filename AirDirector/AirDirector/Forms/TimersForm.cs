@@ -67,6 +67,7 @@ namespace AirDirector.Forms
             InitializeComponent();
             _isRadioTVMode = ConfigurationControl.IsRadioTVMode();
             BuildUI();
+            ResizeFonts();
             ApplyLanguage();
             LoadAdvCache();
 
@@ -308,7 +309,18 @@ namespace AirDirector.Forms
 
             float rowH = Math.Max(60f, _mainLayout.Height / 3.0f);
             float countdown = Math.Max(12f, Math.Min(80f, rowH * 0.32f));
-            float name     = Math.Max(9f,  Math.Min(22f, rowH * 0.12f));
+            float name     = Math.Max(8f,  Math.Min(22f, rowH * 0.12f));
+            int   labelH   = Math.Max(18, Math.Min(40, (int)(rowH * 0.22f)));
+
+            // Scale fixed-height labels so the countdown always has room to render
+            _lblOnAirHeader.Height    = labelH;
+            _lblOnAirName.Height      = labelH;
+            _lblIntroHeader.Height    = labelH;
+            _lblMixHeader.Height      = labelH;
+            _lblScheduleHeader.Height = labelH;
+            _lblScheduleName.Height   = labelH;
+            _lblAdHeader.Height       = labelH;
+            _lblAdInfo.Height         = labelH;
 
             ScaleCountdown(_lblIntroCountdown, countdown * 0.8f);
             ScaleCountdown(_lblMixCountdown, countdown * 0.8f);
