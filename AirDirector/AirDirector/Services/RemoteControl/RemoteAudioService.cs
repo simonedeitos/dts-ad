@@ -41,7 +41,7 @@ namespace AirDirector.Services.RemoteControl
         // Outgoing audio: accumulate encoded MP3 bytes until we have at least this many before sending,
         // so that browser decodeAudioData() gets a chunk large enough to contain valid MP3 frames.
         private readonly MemoryStream _sendAccumulateBuffer = new MemoryStream();
-        private const int MinSendBytes = 4096; // 4 KB minimum chunk size
+        private const int MinSendBytes = 16384; // 16 KB — ensures complete MP3 frames for browser decoding
 
         // Playback
         private WaveOutEvent _waveOut;
@@ -53,6 +53,7 @@ namespace AirDirector.Services.RemoteControl
         private MemoryStream _receiveWebmBuffer = null;
         private string _receiveTempPath = null;
         private long _receiveReaderPcmPosition = 0;
+        private int _receiveChunkCount = 0;
         private readonly object _receiveLock = new object();
 
         private bool _isCapturing = false;
@@ -259,6 +260,7 @@ namespace AirDirector.Services.RemoteControl
                 lock (_receiveLock)
                 {
                     _receiveReaderPcmPosition = 0;
+                    _receiveChunkCount = 0;
                     _receiveWebmBuffer?.Dispose();
                     _receiveWebmBuffer = null;
                     if (_receiveTempPath != null)
@@ -316,6 +318,34 @@ namespace AirDirector.Services.RemoteControl
                 try
                 {
                     byte[] encoded = Convert.FromBase64String(base64Data);
+                    _receiveChunkCount++;
+
+                    // First, try direct MP3 decoding via Mp3FileReader on a MemoryStream.
+                    // This handles the case where the browser (or a future client) sends MP3 directly.
+                    try
+                    {
+                        using var mp3Stream = new MemoryStream(encoded);
+                        using var mp3Reader = new Mp3FileReader(mp3Stream);
+                        var targetFmt = _playbackBuffer.WaveFormat;
+                        byte[] pcmBuf = new byte[4096];
+                        int n;
+                        if (!mp3Reader.WaveFormat.Equals(targetFmt))
+                        {
+                            using var resampler = new MediaFoundationResampler(mp3Reader, targetFmt) { ResamplerQuality = 60 };
+                            while ((n = resampler.Read(pcmBuf, 0, pcmBuf.Length)) > 0)
+                                FeedReceivedAudio(pcmBuf, n);
+                        }
+                        else
+                        {
+                            while ((n = mp3Reader.Read(pcmBuf, 0, pcmBuf.Length)) > 0)
+                                FeedReceivedAudio(pcmBuf, n);
+                        }
+                        return;
+                    }
+                    catch
+                    {
+                        // Not MP3 — fall through to WebM/Opus path
+                    }
 
                     // Accumulate all encoded chunks in a MemoryStream.
                     // WebM/Opus from browser MediaRecorder requires all chunks because the first one
@@ -367,10 +397,11 @@ namespace AirDirector.Services.RemoteControl
                     }
                     catch (Exception ex)
                     {
-                        // Not enough data to decode yet (expected on initial chunks); log at low severity.
-                        // If this persists, WebM/Opus may not be supported by Media Foundation on this Windows version.
-                        Console.WriteLine($"[RemoteAudioService] ⚠️ Browser→AirDirector audio decode failed ({ex.GetType().Name}): {ex.Message}. " +
-                            "Ensure Windows 10+ with Media Foundation codecs installed, or check that browser sends WebM/Opus.");
+                        // The first few chunks may not yet contain enough data for a complete WebM header.
+                        // Only log a warning after the 5th failed chunk to avoid spamming on startup.
+                        if (_receiveChunkCount > 5)
+                            Console.WriteLine($"[RemoteAudioService] ⚠️ Browser→AirDirector audio decode failed ({ex.GetType().Name}): {ex.Message}. " +
+                                "Ensure Windows 10+ with Media Foundation codecs installed, or check that browser sends WebM/Opus.");
                     }
                 }
                 catch (Exception ex)
