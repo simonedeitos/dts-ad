@@ -337,8 +337,11 @@ namespace AirDirector.Services.RemoteControl
 
                 case "audio_data":
                     string audioPayload = msg["data"]?.ToString();
-                    if (!string.IsNullOrEmpty(audioPayload))
+                    string direction = msg["direction"]?.ToString();
+                    // Only process audio that is directed to AirDirector (from browser mic)
+                    if (!string.IsNullOrEmpty(audioPayload) && direction != "to_browser")
                     {
+                        Log($"Audio data received from client (chunk ~{audioPayload.Length} chars base64).");
                         AudioDataReceived?.Invoke(this, audioPayload);
                     }
                     break;

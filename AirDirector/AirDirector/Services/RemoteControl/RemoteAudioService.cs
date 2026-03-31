@@ -41,7 +41,8 @@ namespace AirDirector.Services.RemoteControl
         // Outgoing audio: accumulate encoded MP3 bytes until we have at least this many before sending,
         // so that browser decodeAudioData() gets a chunk large enough to contain valid MP3 frames.
         private readonly MemoryStream _sendAccumulateBuffer = new MemoryStream();
-        private const int MinSendBytes = 16384; // 16 KB — ensures complete MP3 frames for browser decoding
+        private const int MinSendBytes = 4096; // 4 KB — ~250ms at 128kbps MP3, low enough for real-time
+        private System.Threading.Timer _flushTimer;
 
         // Playback
         private WaveOutEvent _waveOut;
@@ -120,6 +121,9 @@ namespace AirDirector.Services.RemoteControl
                 _captureDevice.StartRecording();
                 _isCapturing = true;
 
+                // Periodic flush: send any buffered audio every 500 ms even if MinSendBytes not reached
+                _flushTimer = new System.Threading.Timer(_ => FlushSendBuffer(), null, 500, 500);
+
                 Console.WriteLine($"[RemoteAudioService] 🎤 Capture started — source: {_audioSource}, quality: {_audioQuality}");
             }
             catch (Exception ex)
@@ -137,6 +141,9 @@ namespace AirDirector.Services.RemoteControl
                 _captureDevice?.StopRecording();
                 _captureDevice?.Dispose();
                 _captureDevice = null;
+
+                _flushTimer?.Dispose();
+                _flushTimer = null;
 
                 lock (_encodeLock)
                 {
@@ -156,6 +163,25 @@ namespace AirDirector.Services.RemoteControl
             {
                 Console.WriteLine($"[RemoteAudioService] ⚠️ StopCapture error: {ex.Message}");
             }
+        }
+
+        /// <summary>Send any pending encoded audio from the accumulate buffer, even if MinSendBytes not yet reached.</summary>
+        private void FlushSendBuffer()
+        {
+            byte[] toSend;
+            lock (_encodeLock)
+            {
+                if (_sendAccumulateBuffer.Length == 0) return;
+                toSend = _sendAccumulateBuffer.ToArray();
+                _sendAccumulateBuffer.SetLength(0);
+                _sendAccumulateBuffer.Position = 0;
+            }
+
+            // Perform serialization outside the lock to avoid blocking OnCaptureDataAvailable
+            var msg = new { type = "audio_data", data = Convert.ToBase64String(toSend) };
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(msg);
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
+            _ = _remoteService.SendRawTextAsync(bytes);
         }
 
         private void OnCaptureDataAvailable(object sender, WaveInEventArgs e)
@@ -309,6 +335,23 @@ namespace AirDirector.Services.RemoteControl
             }
         }
 
+        /// <summary>Returns true if the data starts with an MP3 sync word or ID3 tag.</summary>
+        private static bool IsMp3Data(byte[] data)
+        {
+            if (data.Length < 2) return false;
+            // ID3 tag header: "ID3"
+            if (data.Length >= 3 && data[0] == 0x49 && data[1] == 0x44 && data[2] == 0x33) return true;
+            // MPEG sync word: 0xFF followed by 0xE0-0xFF (MPEG-1/2/2.5 Layer I/II/III)
+            if (data[0] == 0xFF && (data[1] & 0xE0) == 0xE0) return true;
+            return false;
+        }
+
+        /// <summary>Returns true if the data starts with the EBML magic bytes (WebM/Matroska container).</summary>
+        private static bool IsWebMData(byte[] data)
+        {
+            return data.Length >= 4 && data[0] == 0x1A && data[1] == 0x45 && data[2] == 0xDF && data[3] == 0xA3;
+        }
+
         /// <summary>Feed received audio from a base64-encoded JSON audio_data message (WebM/Opus or MP3).</summary>
         public void FeedReceivedAudioBase64(string base64Data)
         {
@@ -318,49 +361,56 @@ namespace AirDirector.Services.RemoteControl
                 try
                 {
                     byte[] encoded = Convert.FromBase64String(base64Data);
+                    if (encoded.Length == 0) return;
                     _receiveChunkCount++;
 
-                    // First, try direct MP3 decoding via Mp3FileReader on a MemoryStream.
-                    // This handles the case where the browser (or a future client) sends MP3 directly.
-                    try
+                    // Detect format by inspecting the first bytes rather than relying on try/catch.
+                    bool isWebM = IsWebMData(encoded);
+                    // Default to MP3 when format is not explicitly WebM (lamejs sends MP3)
+                    bool isMp3 = !isWebM;
+
+                    if (isMp3)
                     {
-                        using var mp3Stream = new MemoryStream(encoded);
-                        using var mp3Reader = new Mp3FileReader(mp3Stream);
-                        var targetFmt = _playbackBuffer.WaveFormat;
-                        byte[] pcmBuf = new byte[4096];
-                        int n;
-                        if (!mp3Reader.WaveFormat.Equals(targetFmt))
+                        // MP3: each chunk from lamejs contains self-contained frames — decode directly.
+                        try
                         {
-                            using var resampler = new MediaFoundationResampler(mp3Reader, targetFmt) { ResamplerQuality = 60 };
-                            while ((n = resampler.Read(pcmBuf, 0, pcmBuf.Length)) > 0)
-                                FeedReceivedAudio(pcmBuf, n);
+                            using var mp3Stream = new MemoryStream(encoded);
+                            using var mp3Reader = new Mp3FileReader(mp3Stream);
+                            var targetFmt = _playbackBuffer.WaveFormat;
+                            byte[] pcmBuf = new byte[4096];
+                            int n;
+                            if (!mp3Reader.WaveFormat.Equals(targetFmt))
+                            {
+                                using var resampler = new MediaFoundationResampler(mp3Reader, targetFmt) { ResamplerQuality = 60 };
+                                while ((n = resampler.Read(pcmBuf, 0, pcmBuf.Length)) > 0)
+                                    FeedReceivedAudio(pcmBuf, n);
+                            }
+                            else
+                            {
+                                while ((n = mp3Reader.Read(pcmBuf, 0, pcmBuf.Length)) > 0)
+                                    FeedReceivedAudio(pcmBuf, n);
+                            }
+                            return;
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            while ((n = mp3Reader.Read(pcmBuf, 0, pcmBuf.Length)) > 0)
-                                FeedReceivedAudio(pcmBuf, n);
+                            if (_receiveChunkCount > 5)
+                                Console.WriteLine($"[RemoteAudioService] ⚠️ MP3 decode failed ({ex.GetType().Name}): {ex.Message}");
+                            // Fall through to WebM path as last resort
                         }
-                        return;
-                    }
-                    catch
-                    {
-                        // Not MP3 — fall through to WebM/Opus path
                     }
 
-                    // Accumulate all encoded chunks in a MemoryStream.
-                    // WebM/Opus from browser MediaRecorder requires all chunks because the first one
-                    // carries the container header (EBML) needed to decode subsequent clusters.
+                    // WebM/Opus: accumulate all chunks because the EBML header in the first chunk is
+                    // required by MediaFoundationReader to decode subsequent clusters.
                     if (_receiveWebmBuffer == null)
                         _receiveWebmBuffer = new MemoryStream();
 
                     _receiveWebmBuffer.Write(encoded, 0, encoded.Length);
 
-                    // Write accumulated buffer to a temp file so MediaFoundationReader can open it
-                    // (MediaFoundationReader requires a seekable file path, not a MemoryStream).
+                    // Write accumulated buffer to a temp .webm file so MediaFoundationReader can open it.
                     if (_receiveTempPath == null)
                         _receiveTempPath = Path.Combine(Path.GetTempPath(), $"ad_rcv_{Guid.NewGuid():N}.webm");
 
-                    // Use ReadWrite sharing so the MF reader can open the file while we write
                     using (var fs = new FileStream(_receiveTempPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
                     {
                         _receiveWebmBuffer.Position = 0;
@@ -392,15 +442,13 @@ namespace AirDirector.Services.RemoteControl
                                 FeedReceivedAudio(pcmBuf, n);
                         }
 
-                        // Track reader's PCM position so next call skips already-decoded audio
                         _receiveReaderPcmPosition = reader.Position;
                     }
                     catch (Exception ex)
                     {
                         // The first few chunks may not yet contain enough data for a complete WebM header.
-                        // Only log a warning after the 5th failed chunk to avoid spamming on startup.
                         if (_receiveChunkCount > 5)
-                            Console.WriteLine($"[RemoteAudioService] ⚠️ Browser→AirDirector audio decode failed ({ex.GetType().Name}): {ex.Message}. " +
+                            Console.WriteLine($"[RemoteAudioService] ⚠️ WebM/Opus decode failed ({ex.GetType().Name}): {ex.Message}. " +
                                 "Ensure Windows 10+ with Media Foundation codecs installed, or check that browser sends WebM/Opus.");
                     }
                 }
