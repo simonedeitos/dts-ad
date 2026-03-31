@@ -335,14 +335,29 @@ namespace AirDirector.Services.RemoteControl
                     LogError($"Server error: {errMsg}");
                     break;
 
+                case "audio_data":
+                    string audioPayload = msg["data"]?.ToString();
+                    if (!string.IsNullOrEmpty(audioPayload))
+                    {
+                        AudioDataReceived?.Invoke(this, audioPayload);
+                    }
+                    break;
+
                 default:
-                    // Browser sends { command: "audio_data", data: "..." } without a type field
                     string defaultCmd = msg["command"]?.ToString();
                     if (defaultCmd == "audio_data")
                     {
+                        // Legacy format: { command: "audio_data", data: "..." } without type field
                         string audioData = msg["data"]?.ToString();
                         if (!string.IsNullOrEmpty(audioData))
                             AudioDataReceived?.Invoke(this, audioData);
+                    }
+                    else if (!string.IsNullOrEmpty(defaultCmd))
+                    {
+                        // Handle commands that arrive without type: "command" wrapper (legacy)
+                        Log($"Command received (legacy format): {defaultCmd}");
+                        CommandReceived?.Invoke(this, defaultCmd);
+                        MessageReceived?.Invoke(this, msg);
                     }
                     else
                     {
