@@ -49,7 +49,6 @@ namespace AirDirector.Forms
         private ReportControl reportControl;
         private WhatsAppControl whatsAppControl;
         private TimersForm _timersForm;
-        private RemoteControlForm _remoteControlForm;
 
         private Label lblCurrentClock;
         private Label lblQueueTitle;
@@ -464,14 +463,6 @@ namespace AirDirector.Forms
                 UpdateStatus(LanguageManager.GetString("MainForm.ManualMode", "Player in modalità Manual"));
                 PlayerSetManualMode();
             }
-
-            // Auto-open Remote Control form if configured
-            if (RemoteControlForm.GetAutoOpenOnStartup())
-            {
-                OpenRemoteControlForm();
-                if (RemoteControlForm.GetMinimizeToTrayOnStartup() && _remoteControlForm != null)
-                    _remoteControlForm.WindowState = FormWindowState.Minimized;
-            }
         }
 
         private void PlaylistQueueControl_QueueReady(object sender, int count)
@@ -551,10 +542,6 @@ namespace AirDirector.Forms
                 // Dispose del player attivo
                 playerControl?.Dispose();
                 playerControlVideo?.Dispose();
-
-                // Dispose Remote Control
-                _remoteControlForm?.Close();
-                _remoteControlForm?.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -584,7 +571,7 @@ namespace AirDirector.Forms
         {
             if (menuStrip == null || menuStrip.Items.Count < 3) return;
             if (menuStrip.Items[0] is ToolStripMenuItem menuFile) { menuFile.Text = LanguageManager.GetString("MainForm.MenuFile", "File"); if (menuFile.DropDownItems.Count > 0) menuFile.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuExit", "Esci"); }
-            if (menuStrip.Items[1] is ToolStripMenuItem menuTools) { menuTools.Text = LanguageManager.GetString("MainForm.MenuTools", "Strumenti"); if (menuTools.DropDownItems.Count > 0) { menuTools.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"); if (menuTools.DropDownItems.Count > 2) menuTools.DropDownItems[2].Text = "💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"); if (menuTools.DropDownItems.Count > 4) menuTools.DropDownItems[4].Text = LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"); if (menuTools.DropDownItems.Count > 6) menuTools.DropDownItems[6].Text = "📡 " + LanguageManager.GetString("RemoteControl.Title", "Remote Control"); } }
+            if (menuStrip.Items[1] is ToolStripMenuItem menuTools) { menuTools.Text = LanguageManager.GetString("MainForm.MenuTools", "Strumenti"); if (menuTools.DropDownItems.Count > 0) { menuTools.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"); if (menuTools.DropDownItems.Count > 2) menuTools.DropDownItems[2].Text = "💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"); if (menuTools.DropDownItems.Count > 4) menuTools.DropDownItems[4].Text = LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"); } }
             if (menuStrip.Items[2] is ToolStripMenuItem menuHelp) { menuHelp.Text = LanguageManager.GetString("MainForm.MenuHelp", "Aiuto"); if (menuHelp.DropDownItems.Count > 0) menuHelp.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuAbout", "Informazioni"); }
         }
 
@@ -734,8 +721,6 @@ namespace AirDirector.Forms
             menuTools.DropDownItems.Add("💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"), null, MenuBackup_Click);
             menuTools.DropDownItems.Add(new ToolStripSeparator());
             menuTools.DropDownItems.Add(LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"), null, MenuLicense_Click);
-            menuTools.DropDownItems.Add(new ToolStripSeparator());
-            menuTools.DropDownItems.Add("📡 " + LanguageManager.GetString("RemoteControl.Title", "Remote Control"), null, MenuRemoteControl_Click);
             menuStrip.Items.Add(menuTools);
             ToolStripMenuItem menuHelp = new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuHelp", "Aiuto"));
             menuHelp.DropDownItems.Add(LanguageManager.GetString("MainForm.MenuAbout", "Informazioni"), null, MenuAbout_Click);
@@ -870,26 +855,6 @@ namespace AirDirector.Forms
         }
 
         private void MenuAbout_Click(object sender, EventArgs e) { MessageBox.Show(LanguageManager.GetString("MainForm.AboutText", "AirDirector v1.0.0\n\nPlayout Radiofonico e TV Professionale\n\n© 2025 AirDirector\nTutti i diritti riservati."), LanguageManager.GetString("MainForm.AboutTitle", "Informazioni su AirDirector"), MessageBoxButtons.OK, MessageBoxIcon.Information); }
-
-        private void MenuRemoteControl_Click(object sender, EventArgs e)
-        {
-            OpenRemoteControlForm();
-        }
-
-        private void OpenRemoteControlForm()
-        {
-            if (_remoteControlForm == null || _remoteControlForm.IsDisposed)
-            {
-                _remoteControlForm = new RemoteControlForm();
-                _remoteControlForm.SetReferences(playlistQueue, playerControl, playerControlVideo, musicArchiveControl, clipsArchiveControl);
-            }
-
-            if (_remoteControlForm.WindowState == FormWindowState.Minimized)
-                _remoteControlForm.WindowState = FormWindowState.Normal;
-
-            _remoteControlForm.Show();
-            _remoteControlForm.Activate();
-        }
     }
 
     [Serializable]

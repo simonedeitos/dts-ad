@@ -149,16 +149,8 @@ namespace AirDirector.Controls
         public bool IsPlaying => _isPlaying && !_isPaused;
         public bool IsAutoMode => _autoMode;
         public int CurrentPositionMs => _positionMs;
-        public int CurrentDurationMs => (int)_totalDuration.TotalMilliseconds;
         public int CurrentMarkerINTRO => _markerINTRO;
         public int CurrentMarkerMIX => _markerMIX;
-
-        public void Skip()
-        {
-            if (!_isPlaying && !_isPaused) Play();
-            else SkipToNext();
-            NextRequested?.Invoke(this, EventArgs.Empty);
-        }
         private TimeSpan _totalDuration, _introTime;
         private int _markerIN, _markerINTRO, _markerMIX, _markerOUT;
         private volatile int _mixGeneration = 0;

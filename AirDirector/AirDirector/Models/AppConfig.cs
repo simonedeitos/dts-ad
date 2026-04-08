@@ -35,8 +35,6 @@ namespace AirDirector.Models
         // Licenza
         public bool LicenseActivated { get; set; }
 
-        public RemoteControlConfig RemoteControl { get; set; } = new RemoteControlConfig();
-
         public AppConfig()
         {
             // Valori di default

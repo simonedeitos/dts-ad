@@ -2509,12 +2509,12 @@ namespace AirDirector.Controls
             };
         }
 
-        public PlaylistQueueItem CreateMusicQueueItem(MusicEntry entry)
+        private PlaylistQueueItem CreateMusicQueueItem(MusicEntry entry)
 		{
 			return CreateMusicQueueItemWithEntry(entry, entry);
 		}
 
-		public PlaylistQueueItem CreateClipQueueItem(ClipEntry entry)
+		private PlaylistQueueItem CreateClipQueueItem(ClipEntry entry)
 		{
 			int effectiveDurationMs = entry.MarkerMIX > entry.MarkerIN
 				? entry.MarkerMIX - entry.MarkerIN
@@ -3076,55 +3076,6 @@ namespace AirDirector.Controls
 			}
 		}
 
-		/// <summary>Removes a queue item identified by its UniqueId. Never removes the currently playing item (index 0).</summary>
-		public void RemoveItemByUniqueId(Guid uniqueId)
-		{
-			int index = _items.FindIndex(i => i.UniqueId == uniqueId);
-			if (index > 0)  // index 0 is currently playing — protect it
-				RemoveItem(index);
-		}
-
-		/// <summary>Reorders the queue items (excluding index 0, the currently playing item) to match the provided UniqueId order.</summary>
-		public void ReorderByUniqueIds(List<Guid> orderedIds)
-		{
-			if (orderedIds == null || orderedIds.Count == 0) return;
-
-			var lookup = new Dictionary<Guid, PlaylistQueueItem>();
-			foreach (var item in _items)
-				lookup[item.UniqueId] = item;
-
-			// Preserve the currently playing item (index 0) at the head
-			PlaylistQueueItem playing = (_items.Count > 0) ? _items[0] : null;
-
-			var newItems = new List<PlaylistQueueItem>();
-			if (playing != null)
-				newItems.Add(playing);
-
-			// Add items in the new order provided by the client
-			foreach (var uid in orderedIds)
-			{
-				if (lookup.TryGetValue(uid, out var item) && item != playing)
-					newItems.Add(item);
-			}
-
-			// Append any items the client did not include in the order (safety net)
-			foreach (var item in _items)
-			{
-				if (item != playing && !orderedIds.Contains(item.UniqueId))
-					newItems.Add(item);
-			}
-
-			_items.Clear();
-			_items.AddRange(newItems);
-			if (playing != null)
-				_currentPlayingIndex = 0;
-
-			RecalculateScheduledTimes();
-			UpdateScrollBar();
-			this.Invalidate();
-			NotifyQueueCountChanged();
-		}
-
 		public void Clear()
 		{
 			if (_currentPlayingIndex == 0 && _items.Count > 0)
@@ -3269,9 +3220,6 @@ namespace AirDirector.Controls
 
 	public class PlaylistQueueItem
 	{
-		/// <summary>Stable identifier used by the remote web client to reference this item.</summary>
-		public Guid UniqueId { get; } = Guid.NewGuid();
-
 		public PlaylistItemType Type { get; set; }
 		public DateTime ScheduledTime { get; set; }
 		public DateTime ActualStartTime { get; set; }
