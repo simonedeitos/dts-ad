@@ -33,10 +33,11 @@ namespace AirDirector.Services.Licensing
 
         private const string REGISTRY_KEY = @"SOFTWARE\AirDirector";
         private const string REGISTRY_VALUE_NAME = "ApiKey";
+        private const string DEFAULT_API_KEY = "73a434a1107442481e13ed52ceba1a574648adb12fd5bc0e0c967f25f6743731";
 
         /// <summary>
         /// Carica la API key dal Registry di Windows (HKCU\SOFTWARE\AirDirector\ApiKey).
-        /// Se il valore non esiste, lo crea vuoto e restituisce stringa vuota.
+        /// Se il valore non esiste, lo crea con la API key di default e la restituisce.
         /// </summary>
         private static string LoadApiKey()
         {
@@ -52,8 +53,8 @@ namespace AirDirector.Services.Licensing
                             return apiKey;
                     }
 
-                    // Valore non trovato → crea il campo vuoto nel registro
-                    key.SetValue(REGISTRY_VALUE_NAME, string.Empty, RegistryValueKind.String);
+                    // Valore non trovato → crea il campo con la API key di default
+                    key.SetValue(REGISTRY_VALUE_NAME, DEFAULT_API_KEY, RegistryValueKind.String);
                 }
             }
             catch (Exception ex)
@@ -61,7 +62,7 @@ namespace AirDirector.Services.Licensing
                 Console.WriteLine($"Errore lettura ApiKey dal Registry: {ex.Message}");
             }
 
-            return string.Empty;
+            return DEFAULT_API_KEY;
         }
 
         private static HttpClient CreateHttpClient()
