@@ -1216,6 +1216,7 @@ namespace AirDirector.Controls
 				if (i == _currentPlayingIndex) continue; // playing item handled separately
 				var item = _items[i];
 				if ((item.IsScheduled || item.Type == PlaylistItemType.ADV) &&
+					item.ScheduledTime >= now &&
 					item.ScheduledTime <= protectionWindow)
 				{
 					preservedItems.Add(item);
