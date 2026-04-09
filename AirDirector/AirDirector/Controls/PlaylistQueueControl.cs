@@ -1206,12 +1206,36 @@ namespace AirDirector.Controls
 
 		private void ClearNonPlayingItems()
 		{
+			const int protectionWindowMinutes = 10;
+
 			if (_currentPlayingIndex == 0 && _items.Count > 0)
 			{
 				var playingItem = _items[0];
+
+				// Collect scheduled/ADV items that should be preserved
+				var preservedItems = new List<PlaylistQueueItem>();
+				double accumulatedMs = playingItem.Duration.TotalMilliseconds;
+
+				for (int i = 1; i < _items.Count; i++)
+				{
+					var item = _items[i];
+					bool isProtected = item.IsScheduled || item.Type == PlaylistItemType.ADV;
+
+					if (isProtected && accumulatedMs <= protectionWindowMinutes * 60 * 1000)
+					{
+						preservedItems.Add(item);
+					}
+
+					accumulatedMs += item.Duration.TotalMilliseconds;
+				}
+
 				_items.Clear();
 				_items.Add(playingItem);
+				_items.AddRange(preservedItems);
 				_currentPlayingIndex = 0;
+
+				if (preservedItems.Count > 0)
+					Log($"[ClearNonPlayingItems] Preserved {preservedItems.Count} scheduled/ADV items within {protectionWindowMinutes} min window");
 			}
 			else
 			{
