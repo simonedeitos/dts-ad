@@ -599,7 +599,7 @@ namespace AirDirector.Controls
 
             btnPause = new Button
             {
-                Text = "⏸",
+                Text = "‖",
                 Font = new Font("Segoe UI", 18, FontStyle.Bold),
                 Size = new Size(btnSize, btnSize),
                 Location = new Point(startX + btnSize + spacing, btnY),
@@ -2364,11 +2364,28 @@ namespace AirDirector.Controls
 
         private void BtnAutoManual_Click(object sender, EventArgs e)
         {
+            bool wasManual = !_autoMode;
             _autoMode = !_autoMode;
             Button btn = sender as Button;
             btn.Text = _autoMode ? "AUTO" : "MANUAL";
             btn.BackColor = _autoMode ? AppTheme.Success : AppTheme.Warning;
             AutoModeChanged?.Invoke(this, _autoMode);
+
+            // Se passiamo da MANUAL ad AUTO e non stiamo riproducendo, avvia il primo elemento in coda
+            if (_autoMode && wasManual && !_isPlaying && !_isPaused && _playlistQueue != null && _playlistQueue.GetItemCount() > 0)
+            {
+                Log("[AUTO] Passaggio MANUAL→AUTO: avvio riproduzione");
+                var items = _playlistQueue.GetAllItems();
+                if (items.Count > 0)
+                {
+                    var firstItem = items[0];
+                    LoadTrack(firstItem.FilePath, firstItem.Artist, firstItem.Title,
+                        firstItem.Intro, firstItem.MarkerIN, firstItem.MarkerINTRO,
+                        firstItem.MarkerMIX, firstItem.MarkerOUT, firstItem.ItemType);
+                    Play();
+                    _playlistQueue.SetCurrentPlaying(0);
+                }
+            }
         }
 
         private void PlayNextTrack()
@@ -2416,6 +2433,12 @@ namespace AirDirector.Controls
             }
             else
             {
+                // Rimuovi l'elemento completato dalla coda così il prossimo PLAY riproduce il successivo
+                if (_playlistQueue != null && _playlistQueue.GetItemCount() > 0)
+                {
+                    _playlistQueue.RemoveItem(0);
+                    Log("[MANUAL] Track ended: rimosso elemento completato dalla coda");
+                }
                 Stop();
                 ClearPlayer();
                 TrackEndedInManualMode?.Invoke(this, EventArgs.Empty);
