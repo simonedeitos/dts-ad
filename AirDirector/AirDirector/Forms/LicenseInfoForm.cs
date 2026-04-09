@@ -209,8 +209,15 @@ namespace AirDirector.Forms
                     if (LicenseManager.RemoveLicense(out string error))
                     {
                         LicenseRemoved = true;
-                        this.DialogResult = DialogResult.OK;
-                        this.Close();
+                        MessageBox.Show(
+                            LanguageManager.GetString("LicenseRemove.RemovedClosing",
+                                "Licenza rimossa con successo.\nL'applicazione verrà chiusa."),
+                            LanguageManager.GetString("Common.Info", "Informazione"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+
+                        // Force close the app even if playing
+                        Environment.Exit(0);
                     }
                     else
                     {
