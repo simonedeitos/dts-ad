@@ -2947,23 +2947,23 @@ namespace AirDirector.Controls
 				}
 
 				// Bordo: VERDE per playing, altrimenti colore sideBar con alpha 150
-			Color borderColor;
-			float borderWidth;
-			if (isPlaying)
-			{
-				borderColor = Color.FromArgb(200, 76, 175, 80);
-				borderWidth = 2f;
-			}
-			else
-			{
-				borderColor = Color.FromArgb(150, sideBarColor.R, sideBarColor.G, sideBarColor.B);
-				borderWidth = 1.5f;
-			}
+				Color borderColor;
+				float borderWidth;
+				if (isPlaying)
+				{
+					borderColor = Color.FromArgb(200, 76, 175, 80);
+					borderWidth = 2f;
+				}
+				else
+				{
+					borderColor = Color.FromArgb(150, sideBarColor.R, sideBarColor.G, sideBarColor.B);
+					borderWidth = 1.5f;
+				}
 
-			using (Pen borderPen = new Pen(borderColor, borderWidth))
-			{
-				g.DrawPath(borderPen, mainPath);
-			}
+				using (Pen borderPen = new Pen(borderColor, borderWidth))
+				{
+					g.DrawPath(borderPen, mainPath);
+				}
 			}
 
 			// ── BARRA LATERALE SINISTRA ──
