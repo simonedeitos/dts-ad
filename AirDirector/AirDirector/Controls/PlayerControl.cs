@@ -55,6 +55,7 @@ namespace AirDirector.Controls
         private int _markerOUT = 0;
         private int _mixDuration = 5000;
         private bool _mixRequested = false;
+        private bool _trackEndedHandled = false;
 
         private bool _isPlayerAActive = true;
         private VolumeSampleProvider _volumeFadingOut = null;
@@ -2410,6 +2411,9 @@ namespace AirDirector.Controls
 
         private void OnTrackEnded()
         {
+            if (_trackEndedHandled) return;
+            _trackEndedHandled = true;
+
             if (_autoMode)
             {
                 PlayNextTrack();
@@ -2427,6 +2431,7 @@ namespace AirDirector.Controls
         {
             try
             {
+                _trackEndedHandled = false;
                 ClearWaveformImmediate();
                 Stop();
 
