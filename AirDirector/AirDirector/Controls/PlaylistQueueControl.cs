@@ -3002,6 +3002,12 @@ namespace AirDirector.Controls
 		{
 			try
 			{
+				if (_currentPlayingIndex < 0 || _items.Count == 0)
+				{
+					Log($"[PlaylistQueue] RemoveFinishedTrackInManualMode ignorato: currentPlayingIndex={_currentPlayingIndex}, items={_items.Count}");
+					return;
+				}
+
 				if (_lastPlayedForReport != null && _currentPlayingIndex == 0 && _items.Count > 0)
 				{
 					try
