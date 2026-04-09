@@ -28,7 +28,7 @@ namespace AirDirector.Controls
 		private const int SIDE_BAR_WIDTH = 5;
 		private const int BUTTON_WIDTH = 36;
 		private const int CONTENT_PADDING = 10;
-		private const int NUM_PANEL_WIDTH = 38;
+		private const int NUM_PANEL_WIDTH = 50;
 		private const int ICON_PANEL_WIDTH = 42;
 
 		private int _dragSourceIndex = -1;
@@ -36,6 +36,9 @@ namespace AirDirector.Controls
 		private Point _dragStartPoint;
 		private int _hoverButtonIndex = -1;
 		private string _hoverButtonType = null; // "preview" o "delete" o null
+
+		private bool _isPlayerStopped = true;
+		private ToolTip _buttonToolTip;
 
 		private System.Windows.Forms.Timer _queueMonitorTimer;
 		private System.Windows.Forms.Timer _scheduleMonitorTimer;
@@ -76,6 +79,13 @@ namespace AirDirector.Controls
 
 			this.DoubleBuffered = true;
 			this.BackColor = Color.Black;
+
+			_buttonToolTip = new ToolTip
+			{
+				InitialDelay = 400,
+				ReshowDelay = 200,
+				AutoPopDelay = 3000
+			};
 
 			this.AllowDrop = true;
 			this.DragEnter += PlaylistQueueControl_DragEnter;
@@ -2584,7 +2594,7 @@ namespace AirDirector.Controls
 				{
 					Rectangle itemRect = GetItemRect(index);
 
-					bool showButtons = (index != 0 && index != _currentPlayingIndex);
+					bool showButtons = (index != _currentPlayingIndex) || (index == 0 && _currentPlayingIndex == 0);
 					bool showPreview = showButtons && _items[index].Type != PlaylistItemType.ADV;
 
 					if (showButtons)
@@ -2617,6 +2627,9 @@ namespace AirDirector.Controls
 						Rectangle deleteZone = new Rectangle(btnX + 1, itemRect.Y, BUTTON_WIDTH - 1, ITEM_HEIGHT);
 						if (deleteZone.Contains(e.Location))
 						{
+							// Slot playing e player non stoppato: delete disabilitato
+							if (index == _currentPlayingIndex && !_isPlayerStopped)
+								return;
 							RemoveItem(index);
 							return;
 						}
@@ -2666,7 +2679,7 @@ namespace AirDirector.Controls
                     int index = GetItemIndexAtPoint(e.Location);
                     if (index >= 0 && index < _items.Count)
                     {
-                        bool showButtons = (index != 0 && index != _currentPlayingIndex);
+                        bool showButtons = (index != _currentPlayingIndex) || (index == 0 && _currentPlayingIndex == 0);
                         bool showPreview = showButtons && _items[index].Type != PlaylistItemType.ADV;
 
                         if (showButtons)
@@ -2704,7 +2717,16 @@ namespace AirDirector.Controls
                         this.Cursor = Cursors.Default;
 
                     if (oldHoverIndex != _hoverButtonIndex || oldHoverType != _hoverButtonType)
+                    {
+                        if (_hoverButtonType == "preview")
+                            _buttonToolTip.SetToolTip(this, "Preview");
+                        else if (_hoverButtonType == "delete")
+                            _buttonToolTip.SetToolTip(this, "Remove");
+                        else
+                            _buttonToolTip.SetToolTip(this, null);
+
                         this.Invalidate();
+                    }
                 }
             }
             catch (Exception ex)
@@ -2845,7 +2867,7 @@ namespace AirDirector.Controls
 			int totalWidth = this.Width - (_scrollBar.Visible ? _scrollBar.Width : 0) - 10;
 			Rectangle fullRect = new Rectangle(5, yPos, totalWidth, ITEM_HEIGHT);
 
-			bool showButtons = (index != 0 && index != _currentPlayingIndex);
+			bool showButtons = (index != _currentPlayingIndex) || (index == 0 && _currentPlayingIndex == 0);
 			bool showPreview = showButtons && item.Type != PlaylistItemType.ADV;
 
 			int buttonsArea = 0;
@@ -2924,12 +2946,21 @@ namespace AirDirector.Controls
 					g.FillPath(bgBrush, mainPath);
 				}
 
-				// Bordo: VERDE per playing, altrimenti grigio sottile
-				Color borderColor = isPlaying
-					? Color.FromArgb(200, 76, 175, 80)
-					: Color.FromArgb(60, 255, 255, 255);
+				// Bordo: VERDE per playing, altrimenti colore sideBar con alpha 150
+				Color borderColor;
+				float borderWidth;
+				if (isPlaying)
+				{
+					borderColor = Color.FromArgb(200, 76, 175, 80);
+					borderWidth = 2f;
+				}
+				else
+				{
+					borderColor = Color.FromArgb(150, sideBarColor.R, sideBarColor.G, sideBarColor.B);
+					borderWidth = 1.5f;
+				}
 
-				using (Pen borderPen = new Pen(borderColor, isPlaying ? 2f : 1f))
+				using (Pen borderPen = new Pen(borderColor, borderWidth))
 				{
 					g.DrawPath(borderPen, mainPath);
 				}
@@ -2966,11 +2997,11 @@ namespace AirDirector.Controls
 				g.Clip = oldClip;
 			}
 
-			using (Font numFont = new Font("Segoe UI", 10, FontStyle.Bold))
+			using (Font numFont = new Font("Segoe UI", 20, FontStyle.Bold))
 			using (SolidBrush numBrush = new SolidBrush(Color.FromArgb(180, textColor)))
 			using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
 			{
-				g.DrawString($"#{index + 1}", numFont, numBrush, numPanel, sf);
+				g.DrawString($"{index + 1}", numFont, numBrush, numPanel, sf);
 			}
 
 			// ── PANNELLO ICONA (riquadro separato) ──
@@ -3179,10 +3210,13 @@ namespace AirDirector.Controls
 
 				Rectangle deleteRect = new Rectangle(btnX + 1, fullRect.Y, BUTTON_WIDTH - 1, ITEM_HEIGHT);
 
-				bool isDeleteHover = (_hoverButtonIndex == index && _hoverButtonType == "delete");
-				Color deleteBgColor = isDeleteHover
-					? Color.FromArgb(60, 255, 0, 0)
-					: Color.FromArgb(30, 255, 0, 0);
+				bool isDeleteDisabled = (index == _currentPlayingIndex && !_isPlayerStopped);
+				bool isDeleteHover = !isDeleteDisabled && (_hoverButtonIndex == index && _hoverButtonType == "delete");
+				Color deleteBgColor = isDeleteDisabled
+					? Color.FromArgb(15, 255, 255, 255)
+					: (isDeleteHover
+						? Color.FromArgb(60, 255, 0, 0)
+						: Color.FromArgb(30, 255, 0, 0));
 
 				using (SolidBrush deleteBg = new SolidBrush(deleteBgColor))
 				{
@@ -3195,9 +3229,11 @@ namespace AirDirector.Controls
 					}
 				}
 
-				Color deleteIconColor = isDeleteHover
-					? Color.FromArgb(255, 255, 80, 80)
-					: Color.FromArgb(200, 255, 60, 60);
+				Color deleteIconColor = isDeleteDisabled
+					? Color.FromArgb(80, 255, 255, 255)
+					: (isDeleteHover
+						? Color.FromArgb(255, 255, 80, 80)
+						: Color.FromArgb(200, 255, 60, 60));
 
 				using (Font deleteFont = new Font("Segoe UI", 14, FontStyle.Bold))
 				using (SolidBrush deleteTextBrush = new SolidBrush(deleteIconColor))
@@ -3206,6 +3242,12 @@ namespace AirDirector.Controls
 					g.DrawString("✖", deleteFont, deleteTextBrush, deleteRect, sf);
 				}
 			}
+		}
+
+		public void SetPlayerStopped(bool isStopped)
+		{
+			_isPlayerStopped = isStopped;
+			this.Invalidate();
 		}
 
 		public void SetCurrentPlaying(int index)
@@ -3483,6 +3525,7 @@ namespace AirDirector.Controls
 				_scheduleMonitorTimer?.Stop();
 				_scheduleMonitorTimer?.Dispose();
 				try { _dailyLogger?.Dispose(); } catch { }
+				_buttonToolTip?.Dispose();
 			}
 			base.Dispose(disposing);
 		}
