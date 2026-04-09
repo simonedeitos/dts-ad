@@ -599,7 +599,7 @@ namespace AirDirector.Controls
 
             btnPause = new Button
             {
-                Text = "⏸",
+                Text = "❚❚",
                 Font = new Font("Segoe UI", 18, FontStyle.Bold),
                 Size = new Size(btnSize, btnSize),
                 Location = new Point(startX + btnSize + spacing, btnY),
