@@ -1206,17 +1206,53 @@ namespace AirDirector.Controls
 
 		private void ClearNonPlayingItems()
 		{
+			var now = DateTime.Now;
+			var protectionWindow = now.AddMinutes(10);
+
+			// Preserve scheduled/ADV items that are close to their play time (within 10 min)
+			var preservedItems = new List<PlaylistQueueItem>();
+			for (int i = 0; i < _items.Count; i++)
+			{
+				if (i == _currentPlayingIndex) continue; // playing item handled separately
+				var item = _items[i];
+				if ((item.IsScheduled || item.Type == PlaylistItemType.ADV) &&
+					item.ScheduledTime >= now &&
+					item.ScheduledTime <= protectionWindow)
+				{
+					preservedItems.Add(item);
+					Log($"[ClearNonPlayingItems] 🛡️ Preservato: {item.Artist} - {item.Title} (Scheduled: {item.ScheduledTime:HH:mm:ss}, IsScheduled={item.IsScheduled}, Type={item.Type})");
+				}
+			}
+
 			if (_currentPlayingIndex == 0 && _items.Count > 0)
 			{
 				var playingItem = _items[0];
 				_items.Clear();
 				_items.Add(playingItem);
 				_currentPlayingIndex = 0;
+
+				// Re-insert preserved items after the playing item
+				foreach (var preserved in preservedItems.OrderBy(p => p.ScheduledTime))
+				{
+					_items.Add(preserved);
+				}
 			}
 			else
 			{
 				_items.Clear();
 				_currentPlayingIndex = -1;
+
+				// Re-insert preserved items
+				foreach (var preserved in preservedItems.OrderBy(p => p.ScheduledTime))
+				{
+					_items.Add(preserved);
+				}
+			}
+
+			if (preservedItems.Count > 0)
+			{
+				Log($"[ClearNonPlayingItems] 🛡️ Totale elementi preservati: {preservedItems.Count}");
+				RecalculateScheduledTimes();
 			}
 
 			UpdateScrollBar();
