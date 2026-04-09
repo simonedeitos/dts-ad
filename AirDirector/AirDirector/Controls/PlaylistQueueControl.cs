@@ -2594,12 +2594,9 @@ namespace AirDirector.Controls
 				{
 					Rectangle itemRect = GetItemRect(index);
 
-					bool showButtons = (index != _currentPlayingIndex) || (index == 0 && _currentPlayingIndex == 0);
-					bool showPreview = showButtons && _items[index].Type != PlaylistItemType.ADV;
+					bool showPreview = _items[index].Type != PlaylistItemType.ADV;
 
-					if (showButtons)
-					{
-						int buttonsArea = showPreview ? (BUTTON_WIDTH * 2 + 3) : (BUTTON_WIDTH + 1);
+					int buttonsArea = showPreview ? (BUTTON_WIDTH * 2 + 3) : (BUTTON_WIDTH + 1);
 						int btnX = itemRect.Right - buttonsArea;
 
 						if (showPreview)
@@ -2625,14 +2622,13 @@ namespace AirDirector.Controls
 						}
 
 						Rectangle deleteZone = new Rectangle(btnX + 1, itemRect.Y, BUTTON_WIDTH - 1, ITEM_HEIGHT);
-						if (deleteZone.Contains(e.Location))
-						{
-							// Slot playing e player non stoppato: delete disabilitato
-							if (index == _currentPlayingIndex && !_isPlayerStopped)
-								return;
-							RemoveItem(index);
+					if (deleteZone.Contains(e.Location))
+					{
+						// Slot playing e player non stoppato: delete disabilitato
+						if (index == _currentPlayingIndex && !_isPlayerStopped)
 							return;
-						}
+						RemoveItem(index);
+						return;
 					}
 
 					if (index == 0 && _currentPlayingIndex == 0)
@@ -2679,10 +2675,8 @@ namespace AirDirector.Controls
                     int index = GetItemIndexAtPoint(e.Location);
                     if (index >= 0 && index < _items.Count)
                     {
-                        bool showButtons = (index != _currentPlayingIndex) || (index == 0 && _currentPlayingIndex == 0);
-                        bool showPreview = showButtons && _items[index].Type != PlaylistItemType.ADV;
+                        bool showPreview = _items[index].Type != PlaylistItemType.ADV;
 
-                        if (showButtons)
                         {
                             Rectangle itemRect = GetItemRect(index);
                             int buttonsArea = showPreview ? (BUTTON_WIDTH * 2 + 3) : (BUTTON_WIDTH + 1);
@@ -2704,8 +2698,12 @@ namespace AirDirector.Controls
                                 Rectangle deleteZone = new Rectangle(btnX + 1, itemRect.Y, BUTTON_WIDTH - 1, ITEM_HEIGHT);
                                 if (deleteZone.Contains(e.Location))
                                 {
-                                    _hoverButtonIndex = index;
-                                    _hoverButtonType = "delete";
+                                    // Suppress hover on disabled delete button (currently playing and not stopped)
+                                    if (!(index == _currentPlayingIndex && !_isPlayerStopped))
+                                    {
+                                        _hoverButtonIndex = index;
+                                        _hoverButtonType = "delete";
+                                    }
                                 }
                             }
                         }
@@ -2867,8 +2865,8 @@ namespace AirDirector.Controls
 			int totalWidth = this.Width - (_scrollBar.Visible ? _scrollBar.Width : 0) - 10;
 			Rectangle fullRect = new Rectangle(5, yPos, totalWidth, ITEM_HEIGHT);
 
-			bool showButtons = (index != _currentPlayingIndex) || (index == 0 && _currentPlayingIndex == 0);
-			bool showPreview = showButtons && item.Type != PlaylistItemType.ADV;
+			bool showButtons = true;
+			bool showPreview = item.Type != PlaylistItemType.ADV;
 
 			int buttonsArea = 0;
 			if (showPreview && showButtons)

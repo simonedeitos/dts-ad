@@ -396,6 +396,10 @@ namespace AirDirector.Forms
                     LanguageManager.GetString("MainForm.ModeAuto", "Modalità AUTO") :
                     LanguageManager.GetString("MainForm.ModeManual", "Modalità MANUAL"));
                 playerControlVideo.TrackEndedInManualMode += PlayerControl_TrackEndedInManualMode;
+                playerControlVideo.PlayStateChanged += (s, args) =>
+                {
+                    playlistQueue.SetPlayerStopped(!args.IsPlaying && !args.IsPaused);
+                };
 
                 playerPanel.Controls.Add(playerControlVideo);
             }
@@ -417,6 +421,10 @@ namespace AirDirector.Forms
                     LanguageManager.GetString("MainForm.ModeAuto", "Modalità AUTO") :
                     LanguageManager.GetString("MainForm.ModeManual", "Modalità MANUAL"));
                 playerControl.TrackEndedInManualMode += PlayerControl_TrackEndedInManualMode;
+                playerControl.PlayStateChanged += (s, args) =>
+                {
+                    playlistQueue.SetPlayerStopped(!args.IsPlaying && !args.IsPaused);
+                };
 
                 playerPanel.Controls.Add(playerControl);
             }
