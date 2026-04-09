@@ -23,7 +23,11 @@ namespace AirDirector.Controls
 		private VScrollBar _scrollBar;
 		private int _scrollOffset = 0;
 		private const int ITEM_HEIGHT = 80;
-		private const int ITEM_MARGIN = 2;
+		private const int ITEM_MARGIN = 3;
+		private const int CORNER_RADIUS = 8;
+		private const int SIDE_BAR_WIDTH = 5;
+		private const int BUTTON_WIDTH = 36;
+		private const int CONTENT_PADDING = 10;
 
 		private int _dragSourceIndex = -1;
 		private bool _isDragging = false;
@@ -2576,32 +2580,38 @@ namespace AirDirector.Controls
 				{
 					Rectangle itemRect = GetItemRect(index);
 
-					if (index != 0 && index != _currentPlayingIndex && _items[index].Type != PlaylistItemType.ADV)
-					{
-						int previewButtonX = itemRect.Right - 60;
-						Rectangle previewRect = new Rectangle(previewButtonX, itemRect.Bottom - 28, 24, 24);
+					bool showButtons = (index != 0 && index != _currentPlayingIndex);
+					bool showPreview = showButtons && _items[index].Type != PlaylistItemType.ADV;
 
-						if (previewRect.Contains(e.Location))
+					if (showButtons)
+					{
+						int buttonsArea = showPreview ? (BUTTON_WIDTH * 2 + 3) : (BUTTON_WIDTH + 1);
+						int btnX = itemRect.Right - buttonsArea;
+
+						if (showPreview)
 						{
-							var item = _items[index];
-							if (File.Exists(item.FilePath))
+							Rectangle previewZone = new Rectangle(btnX + 1, itemRect.Y, BUTTON_WIDTH, ITEM_HEIGHT);
+							if (previewZone.Contains(e.Location))
 							{
-								PreviewRequested?.Invoke(this, item.FilePath);
+								var item = _items[index];
+								if (File.Exists(item.FilePath))
+								{
+									PreviewRequested?.Invoke(this, item.FilePath);
+								}
+								else
+								{
+									MessageBox.Show(
+										LanguageManager.GetString("Queue.FileNotFound", "File non trovato!"),
+										LanguageManager.GetString("Common.Error", "Errore"),
+										MessageBoxButtons.OK, MessageBoxIcon.Error);
+								}
+								return;
 							}
-							else
-							{
-								MessageBox.Show(LanguageManager.GetString("Queue.FileNotFound", "File non trovato!"), LanguageManager.GetString("Common.Error", "Errore"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-							}
-							return;
+							btnX += BUTTON_WIDTH + 1;
 						}
-					}
 
-					if (index != 0 && index != _currentPlayingIndex)
-					{
-						int xButtonX = itemRect.Right - 30;
-						Rectangle deleteRect = new Rectangle(xButtonX, itemRect.Bottom - 28, 24, 24);
-
-						if (deleteRect.Contains(e.Location))
+						Rectangle deleteZone = new Rectangle(btnX + 1, itemRect.Y, BUTTON_WIDTH - 1, ITEM_HEIGHT);
+						if (deleteZone.Contains(e.Location))
 						{
 							RemoveItem(index);
 							return;
@@ -2762,200 +2772,289 @@ namespace AirDirector.Controls
 			}
 		}
 
+		private GraphicsPath GetRoundedRectPath(Rectangle rect, int radius)
+		{
+			var path = new GraphicsPath();
+			int d = radius * 2;
+			path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+			path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+			path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+			path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+			path.CloseFigure();
+			return path;
+		}
+
+		private string FormatDuration(TimeSpan duration)
+		{
+			if (duration.TotalHours >= 1)
+				return $"{(int)duration.TotalHours:D2}:{duration.Minutes:D2}:{duration.Seconds:D2}";
+			else
+				return $"{duration.Minutes:D2}:{duration.Seconds:D2}";
+		}
+
 		private void DrawPlaylistItem(Graphics g, PlaylistQueueItem item, int yPos, int index, bool isPlaying)
 		{
-			int width = this.Width - (_scrollBar.Visible ? _scrollBar.Width : 0) - 10;
-			Rectangle rect = new Rectangle(5, yPos, width, ITEM_HEIGHT);
+			int totalWidth = this.Width - (_scrollBar.Visible ? _scrollBar.Width : 0) - 10;
+			Rectangle fullRect = new Rectangle(5, yPos, totalWidth, ITEM_HEIGHT);
+
+			bool showButtons = (index != 0 && index != _currentPlayingIndex);
+			bool showPreview = showButtons && item.Type != PlaylistItemType.ADV;
+
+			int buttonsArea = 0;
+			if (showPreview && showButtons)
+				buttonsArea = BUTTON_WIDTH * 2 + 3;
+			else if (showButtons)
+				buttonsArea = BUTTON_WIDTH + 1;
+
+			int contentWidth = totalWidth - SIDE_BAR_WIDTH - buttonsArea;
+			Rectangle contentRect = new Rectangle(fullRect.X + SIDE_BAR_WIDTH, fullRect.Y, contentWidth, ITEM_HEIGHT);
 
 			Color bgColor;
 			Color textColor;
+			Color sideBarColor;
 
 			if (item.Type == PlaylistItemType.ADV)
 			{
-				bgColor = Color.FromArgb(200, 0, 0);
+				bgColor = Color.FromArgb(45, 10, 10);
 				textColor = Color.White;
+				sideBarColor = Color.FromArgb(220, 30, 30);
 			}
 			else if (isPlaying)
 			{
-				bgColor = Color.Black;
+				bgColor = Color.FromArgb(10, 10, 10);
 				textColor = Color.White;
+				sideBarColor = Color.FromArgb(0, 180, 255);
 			}
 			else if (item.IsScheduled)
 			{
-				bgColor = Color.FromArgb(138, 43, 226);
+				bgColor = Color.FromArgb(30, 15, 50);
 				textColor = Color.White;
+				sideBarColor = Color.FromArgb(138, 43, 226);
 			}
 			else
 			{
 				switch (item.Type)
 				{
 					case PlaylistItemType.Music:
-						bgColor = Color.FromArgb(255, 255, 100);
-						textColor = Color.Black;
+						bgColor = Color.FromArgb(40, 40, 15);
+						textColor = Color.White;
+						sideBarColor = Color.FromArgb(255, 215, 0);
 						break;
 					case PlaylistItemType.Clip:
-						bgColor = Color.FromArgb(100, 200, 255);
-						textColor = Color.Black;
+						bgColor = Color.FromArgb(15, 30, 45);
+						textColor = Color.White;
+						sideBarColor = Color.FromArgb(0, 180, 255);
 						break;
 					default:
 						bgColor = Color.FromArgb(30, 30, 30);
 						textColor = Color.White;
+						sideBarColor = Color.FromArgb(100, 100, 100);
 						break;
 				}
 			}
 
-			using (LinearGradientBrush brush = new LinearGradientBrush(
-				rect,
-				bgColor,
-				Color.FromArgb(Math.Max(0, bgColor.R - 20), Math.Max(0, bgColor.G - 20), Math.Max(0, bgColor.B - 20)),
-				LinearGradientMode.Vertical))
+			Rectangle shadowRect = new Rectangle(fullRect.X + 2, fullRect.Y + 2, fullRect.Width, fullRect.Height);
+			using (var shadowPath = GetRoundedRectPath(shadowRect, CORNER_RADIUS))
+			using (SolidBrush shadowBrush = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
 			{
-				g.FillRectangle(brush, rect);
+				g.FillPath(shadowBrush, shadowPath);
 			}
 
-			using (Pen pen = new Pen(Color.Gray, 1))
+			using (var mainPath = GetRoundedRectPath(fullRect, CORNER_RADIUS))
 			{
-				g.DrawRectangle(pen, rect);
+				using (LinearGradientBrush bgBrush = new LinearGradientBrush(
+					fullRect,
+					bgColor,
+					Color.FromArgb(Math.Max(0, bgColor.R - 15), Math.Max(0, bgColor.G - 15), Math.Max(0, bgColor.B - 15)),
+					LinearGradientMode.Vertical))
+				{
+					g.FillPath(bgBrush, mainPath);
+				}
+
+				Color borderColor = isPlaying ? Color.FromArgb(180, 0, 180, 255) : Color.FromArgb(60, 255, 255, 255);
+				using (Pen borderPen = new Pen(borderColor, isPlaying ? 2f : 1f))
+				{
+					g.DrawPath(borderPen, mainPath);
+				}
 			}
 
-			int xPos = rect.X + 5;
-
-			using (Font numFont = new Font("Segoe UI", 16, FontStyle.Bold))
-			using (SolidBrush numBrush = new SolidBrush(textColor))
+			Rectangle sideBar = new Rectangle(fullRect.X, fullRect.Y, SIDE_BAR_WIDTH, ITEM_HEIGHT);
+			using (var sideClip = GetRoundedRectPath(fullRect, CORNER_RADIUS))
 			{
-				string numText = $"#{index + 1}";
-				g.DrawString(numText, numFont, numBrush, xPos, rect.Y + 28);
-				xPos += 45;
+				var oldClip = g.Clip;
+				g.SetClip(sideClip, System.Drawing.Drawing2D.CombineMode.Intersect);
+				using (SolidBrush sideBrush = new SolidBrush(sideBarColor))
+				{
+					g.FillRectangle(sideBrush, sideBar);
+				}
+				g.Clip = oldClip;
+			}
+
+			int xPos = contentRect.X + CONTENT_PADDING;
+			int row1Y = contentRect.Y + 8;
+
+			using (Font numFont = new Font("Segoe UI", 9, FontStyle.Bold))
+			using (SolidBrush numBrush = new SolidBrush(Color.FromArgb(150, textColor)))
+			{
+				g.DrawString($"#{index + 1}", numFont, numBrush, xPos, row1Y + 2);
+				xPos += 32;
 			}
 
 			string icon;
 			if (item.Type == PlaylistItemType.ADV)
-			{
 				icon = "💲";
-			}
 			else if (!string.IsNullOrEmpty(item.FilePath) &&
 					 (item.FilePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
 					  item.FilePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
-			{
 				icon = "🌐";
-			}
 			else if (item.Type == PlaylistItemType.Music)
-			{
 				icon = "🎵";
-			}
 			else
-			{
 				icon = "⚡";
-			}
 
-			using (Font iconFont = new Font("Segoe UI Emoji", 22, FontStyle.Regular))
+			using (Font iconFont = new Font("Segoe UI Emoji", 16, FontStyle.Regular))
 			using (SolidBrush iconBrush = new SolidBrush(textColor))
 			{
-				g.DrawString(icon, iconFont, iconBrush, xPos, rect.Y + 24);
-				xPos += 40;
+				g.DrawString(icon, iconFont, iconBrush, xPos, row1Y - 2);
+				xPos += 30;
 			}
 
-			xPos += 15;
-			using (Font titleFont = new Font("Segoe UI", 13, FontStyle.Bold))
+			string titleText = string.IsNullOrEmpty(item.Artist) ? item.Title : $"{item.Artist} - {item.Title}";
+			if (item.Year > 0)
+				titleText += $" ({item.Year})";
+
+			int titleMaxWidth = contentRect.Right - xPos - CONTENT_PADDING;
+			using (Font titleFont = new Font("Segoe UI", 12, FontStyle.Bold))
 			using (SolidBrush titleBrush = new SolidBrush(textColor))
+			using (StringFormat titleFormat = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
 			{
-				string titleText = string.IsNullOrEmpty(item.Artist)
-					? item.Title
-					: $"{item.Artist} - {item.Title}";
+				RectangleF titleRect = new RectangleF(xPos, row1Y, titleMaxWidth, 22);
+				g.DrawString(titleText, titleFont, titleBrush, titleRect, titleFormat);
+			}
 
-				if (item.Year > 0)
-					titleText += $" ({item.Year})";
-
-				g.DrawString(titleText, titleFont, titleBrush, xPos, rect.Y + 12);
+			int row2Y = contentRect.Y + 33;
+			string durationText = $"⏱ {FormatDuration(item.Duration)}";
+			using (Font durationFont = new Font("Segoe UI", 10, FontStyle.Bold))
+			using (SolidBrush durationBrush = new SolidBrush(textColor))
+			{
+				SizeF durationSize = g.MeasureString(durationText, durationFont);
+				g.DrawString(durationText, durationFont, durationBrush, contentRect.Right - durationSize.Width - CONTENT_PADDING, row2Y);
 			}
 
 			if (item.Type != PlaylistItemType.ADV)
 			{
-				using (Font introFont = new Font("Segoe UI", 9, FontStyle.Regular))
-				using (SolidBrush introBrush = new SolidBrush(textColor))
+				using (Font introFont = new Font("Segoe UI", 8, FontStyle.Regular))
+				using (SolidBrush introBrush = new SolidBrush(Color.FromArgb(180, textColor)))
 				{
 					string introText = $"INTRO: {item.Intro.TotalSeconds:F1}s";
 					SizeF introSize = g.MeasureString(introText, introFont);
-					g.DrawString(introText, introFont, introBrush, rect.Right - introSize.Width - 10, rect.Y + 8);
+					g.DrawString(introText, introFont, introBrush, contentRect.Right - introSize.Width - CONTENT_PADDING, row2Y - 16);
 				}
 			}
 
-			using (Font durationFont = new Font("Segoe UI", 10, FontStyle.Bold))
-			using (SolidBrush durationBrush = new SolidBrush(textColor))
-			{
-				string durationText;
-				if (item.Duration.TotalMinutes >= 60)
-				{
-					durationText = $"⏱ {item.Duration:hh\\:mm\\:ss}";
-				}
-				else
-				{
-					durationText = $"⏱ {item.Duration:mm\\:ss}";
-				}
-
-				SizeF durationSize = g.MeasureString(durationText, durationFont);
-				g.DrawString(durationText, durationFont, durationBrush, rect.Right - durationSize.Width - 10, rect.Y + 26);
-			}
+			int row3Y = contentRect.Bottom - 22;
+			int infoX = contentRect.X + CONTENT_PADDING;
 
 			using (Font timeFont = new Font("Segoe UI", 8, FontStyle.Regular))
-			using (SolidBrush timeBrush = new SolidBrush(textColor))
+			using (SolidBrush timeBrush = new SolidBrush(Color.FromArgb(180, textColor)))
 			{
 				string timeText = item.ScheduledTime.ToString("HH:mm:ss");
-
-				if (item.Type == PlaylistItemType.Music && item.OriginalMusicEntry != null)
-				{
-					var violations = GetViolations(item.OriginalMusicEntry);
-					if (violations.Count > 0)
-						timeText += " | ⚠ " + string.Join(", ", violations);
-				}
-
-				g.DrawString(timeText, timeFont, timeBrush, xPos, rect.Bottom - 20);
+				g.DrawString(timeText, timeFont, timeBrush, infoX, row3Y);
+				SizeF timeSize = g.MeasureString(timeText, timeFont);
+				infoX += (int)timeSize.Width + 4;
 			}
 
 			if (item.IsScheduled)
 			{
 				using (Font schedFont = new Font("Segoe UI", 7, FontStyle.Bold))
-				using (SolidBrush schedBrush = new SolidBrush(Color.Yellow))
 				{
 					string schedText = "SCHEDULED";
 					SizeF schedSize = g.MeasureString(schedText, schedFont);
-					g.DrawString(schedText, schedFont, schedBrush, rect.Right - schedSize.Width - 90, rect.Bottom - 20);
+					Rectangle badgeRect = new Rectangle(infoX, row3Y + 1, (int)schedSize.Width + 8, 15);
+					using (var badgePath = GetRoundedRectPath(badgeRect, 7))
+					using (SolidBrush badgeBg = new SolidBrush(Color.FromArgb(138, 43, 226)))
+					{
+						g.FillPath(badgeBg, badgePath);
+					}
+					using (SolidBrush badgeTextBrush = new SolidBrush(Color.White))
+					using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+					{
+						g.DrawString(schedText, schedFont, badgeTextBrush, badgeRect, sf);
+					}
+					infoX += badgeRect.Width + 6;
 				}
 			}
 
-			if (index != 0 && index != _currentPlayingIndex && item.Type != PlaylistItemType.ADV)
+			if (item.Type == PlaylistItemType.Music && item.OriginalMusicEntry != null)
 			{
-				int previewButtonX = rect.Right - 60;
-				Rectangle previewRect = new Rectangle(previewButtonX, rect.Bottom - 28, 24, 24);
-
-				using (SolidBrush previewBrush = new SolidBrush(Color.FromArgb(200, 0, 120, 215)))
+				var violations = GetViolations(item.OriginalMusicEntry);
+				if (violations.Count > 0)
 				{
-					g.FillEllipse(previewBrush, previewRect);
-				}
-
-				using (Font headphoneFont = new Font("Segoe UI", 14, FontStyle.Bold))
-				using (SolidBrush headphoneTextBrush = new SolidBrush(Color.White))
-				{
-					StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-					g.DrawString("▶", headphoneFont, headphoneTextBrush, previewRect, sf);
+					using (Font violFont = new Font("Segoe UI", 7, FontStyle.Bold))
+					{
+						string violText = "⚠ " + string.Join(", ", violations);
+						SizeF violSize = g.MeasureString(violText, violFont);
+						Rectangle violRect = new Rectangle(infoX, row3Y + 1, (int)violSize.Width + 8, 15);
+						using (var violPath = GetRoundedRectPath(violRect, 7))
+						using (SolidBrush violBg = new SolidBrush(Color.FromArgb(180, 200, 120, 0)))
+						{
+							g.FillPath(violBg, violPath);
+						}
+						using (SolidBrush violTextBrush = new SolidBrush(Color.White))
+						using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+						{
+							g.DrawString(violText, violFont, violTextBrush, violRect, sf);
+						}
+					}
 				}
 			}
 
-			if (index != 0 && index != _currentPlayingIndex)
+			if (showButtons)
 			{
-				int xButtonX = rect.Right - 30;
-				Rectangle deleteRect = new Rectangle(xButtonX, rect.Bottom - 28, 24, 24);
-
-				using (SolidBrush xBrush = new SolidBrush(Color.FromArgb(200, 255, 0, 0)))
+				int btnX = fullRect.Right - buttonsArea;
+				using (Pen sepPen = new Pen(Color.FromArgb(50, 255, 255, 255), 1))
 				{
-					g.FillEllipse(xBrush, deleteRect);
+					g.DrawLine(sepPen, btnX, fullRect.Y + 6, btnX, fullRect.Bottom - 6);
 				}
 
-				using (Font xFont = new Font("Segoe UI", 12, FontStyle.Bold))
-				using (SolidBrush xTextBrush = new SolidBrush(Color.White))
+				if (showPreview)
 				{
-					StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-					g.DrawString("✖", xFont, xTextBrush, deleteRect, sf);
+					Rectangle previewRect = new Rectangle(btnX + 1, fullRect.Y, BUTTON_WIDTH, ITEM_HEIGHT);
+					using (SolidBrush previewBg = new SolidBrush(Color.FromArgb(30, 0, 120, 255)))
+					using (var clipPath = GetRoundedRectPath(fullRect, CORNER_RADIUS))
+					{
+						var oldClip = g.Clip;
+						g.SetClip(clipPath, System.Drawing.Drawing2D.CombineMode.Intersect);
+						g.FillRectangle(previewBg, previewRect);
+						g.Clip = oldClip;
+					}
+					using (Font previewFont = new Font("Segoe UI", 16, FontStyle.Bold))
+					using (SolidBrush previewTextBrush = new SolidBrush(Color.FromArgb(200, 0, 150, 255)))
+					using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+					{
+						g.DrawString("▶", previewFont, previewTextBrush, previewRect, sf);
+					}
+					btnX += BUTTON_WIDTH + 1;
+					using (Pen sepPen2 = new Pen(Color.FromArgb(40, 255, 255, 255), 1))
+					{
+						g.DrawLine(sepPen2, btnX, fullRect.Y + 6, btnX, fullRect.Bottom - 6);
+					}
+				}
+
+				Rectangle deleteRect = new Rectangle(btnX + 1, fullRect.Y, BUTTON_WIDTH - 1, ITEM_HEIGHT);
+				using (SolidBrush deleteBg = new SolidBrush(Color.FromArgb(30, 255, 0, 0)))
+				using (var clipPath = GetRoundedRectPath(fullRect, CORNER_RADIUS))
+				{
+					var oldClip = g.Clip;
+					g.SetClip(clipPath, System.Drawing.Drawing2D.CombineMode.Intersect);
+					g.FillRectangle(deleteBg, deleteRect);
+					g.Clip = oldClip;
+				}
+				using (Font deleteFont = new Font("Segoe UI", 14, FontStyle.Bold))
+				using (SolidBrush deleteTextBrush = new SolidBrush(Color.FromArgb(200, 255, 60, 60)))
+				using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+				{
+					g.DrawString("✖", deleteFont, deleteTextBrush, deleteRect, sf);
 				}
 			}
 		}
