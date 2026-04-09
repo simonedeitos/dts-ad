@@ -28,10 +28,14 @@ namespace AirDirector.Controls
 		private const int SIDE_BAR_WIDTH = 5;
 		private const int BUTTON_WIDTH = 36;
 		private const int CONTENT_PADDING = 10;
+		private const int NUM_PANEL_WIDTH = 38;
+		private const int ICON_PANEL_WIDTH = 42;
 
 		private int _dragSourceIndex = -1;
 		private bool _isDragging = false;
 		private Point _dragStartPoint;
+		private int _hoverButtonIndex = -1;
+		private string _hoverButtonType = null; // "preview" o "delete" o null
 
 		private System.Windows.Forms.Timer _queueMonitorTimer;
 		private System.Windows.Forms.Timer _scheduleMonitorTimer;
@@ -2632,36 +2636,80 @@ namespace AirDirector.Controls
         {
             try
             {
+                // Drag logic (existing)
                 if (e.Button == MouseButtons.Left && _dragSourceIndex >= 0 && !_isDragging)
                 {
                     if (Math.Abs(e.X - _dragStartPoint.X) > 5 || Math.Abs(e.Y - _dragStartPoint.Y) > 5)
                     {
-                        Log($"[MouseMove] ??  Inizio drag da index {_dragSourceIndex}");
+                        Log($"[MouseMove] Inizio drag da index {_dragSourceIndex}");
                         Log($"[MouseMove] Item: '{_items[_dragSourceIndex].Title}'");
 
                         _isDragging = true;
-
-                        // Cambia cursore
                         this.Cursor = Cursors.Hand;
 
-                        // Avvia DragDrop
                         var result = this.DoDragDrop(_items[_dragSourceIndex], DragDropEffects.Move);
 
-                        Log($"[MouseMove] ?? DragDrop completato, result: {result}");
-
-                        // Ripristina cursore
+                        Log($"[MouseMove] DragDrop completato, result: {result}");
                         this.Cursor = Cursors.Default;
                     }
+                    return;
                 }
-                else if (e.Button != MouseButtons.Left)
+
+                // Hover tracking for buttons (when not dragging)
+                if (e.Button == MouseButtons.None || e.Button != MouseButtons.Left)
                 {
-                    // Ripristina cursore se non si sta draggando
-                    this.Cursor = Cursors.Default;
+                    int oldHoverIndex = _hoverButtonIndex;
+                    string oldHoverType = _hoverButtonType;
+                    _hoverButtonIndex = -1;
+                    _hoverButtonType = null;
+
+                    int index = GetItemIndexAtPoint(e.Location);
+                    if (index >= 0 && index < _items.Count)
+                    {
+                        bool showButtons = (index != 0 && index != _currentPlayingIndex);
+                        bool showPreview = showButtons && _items[index].Type != PlaylistItemType.ADV;
+
+                        if (showButtons)
+                        {
+                            Rectangle itemRect = GetItemRect(index);
+                            int buttonsArea = showPreview ? (BUTTON_WIDTH * 2 + 3) : (BUTTON_WIDTH + 1);
+                            int btnX = itemRect.Right - buttonsArea;
+
+                            if (showPreview)
+                            {
+                                Rectangle previewZone = new Rectangle(btnX + 1, itemRect.Y, BUTTON_WIDTH, ITEM_HEIGHT);
+                                if (previewZone.Contains(e.Location))
+                                {
+                                    _hoverButtonIndex = index;
+                                    _hoverButtonType = "preview";
+                                }
+                                btnX += BUTTON_WIDTH + 1;
+                            }
+
+                            if (_hoverButtonType == null)
+                            {
+                                Rectangle deleteZone = new Rectangle(btnX + 1, itemRect.Y, BUTTON_WIDTH - 1, ITEM_HEIGHT);
+                                if (deleteZone.Contains(e.Location))
+                                {
+                                    _hoverButtonIndex = index;
+                                    _hoverButtonType = "delete";
+                                }
+                            }
+                        }
+                    }
+
+                    if (_hoverButtonIndex >= 0)
+                        this.Cursor = Cursors.Hand;
+                    else
+                        this.Cursor = Cursors.Default;
+
+                    if (oldHoverIndex != _hoverButtonIndex || oldHoverType != _hoverButtonType)
+                        this.Invalidate();
                 }
             }
             catch (Exception ex)
             {
-                Log($"[MouseMove] ?? Errore: {ex.Message}");
+                Log($"[MouseMove] Errore: {ex.Message}");
                 this.Cursor = Cursors.Default;
             }
         }
@@ -2806,28 +2854,28 @@ namespace AirDirector.Controls
 			else if (showButtons)
 				buttonsArea = BUTTON_WIDTH + 1;
 
-			int contentWidth = totalWidth - SIDE_BAR_WIDTH - buttonsArea;
-			Rectangle contentRect = new Rectangle(fullRect.X + SIDE_BAR_WIDTH, fullRect.Y, contentWidth, ITEM_HEIGHT);
+			int leftPanelsWidth = SIDE_BAR_WIDTH + NUM_PANEL_WIDTH + ICON_PANEL_WIDTH;
+			int contentWidth = totalWidth - leftPanelsWidth - buttonsArea;
+			Rectangle contentRect = new Rectangle(fullRect.X + leftPanelsWidth, fullRect.Y, contentWidth, ITEM_HEIGHT);
 
-			Color bgColor;
-			Color textColor;
-			Color sideBarColor;
+			// ── COLORI ──
+			Color bgColor, textColor, sideBarColor;
 
 			if (item.Type == PlaylistItemType.ADV)
 			{
-				bgColor = Color.FromArgb(45, 10, 10);
+				bgColor = Color.FromArgb(60, 15, 15);
 				textColor = Color.White;
 				sideBarColor = Color.FromArgb(220, 30, 30);
 			}
 			else if (isPlaying)
 			{
-				bgColor = Color.FromArgb(10, 10, 10);
+				bgColor = Color.FromArgb(20, 20, 20);
 				textColor = Color.White;
-				sideBarColor = Color.FromArgb(0, 180, 255);
+				sideBarColor = Color.FromArgb(76, 175, 80); // Verde StatePlaying
 			}
 			else if (item.IsScheduled)
 			{
-				bgColor = Color.FromArgb(30, 15, 50);
+				bgColor = Color.FromArgb(45, 25, 65);
 				textColor = Color.White;
 				sideBarColor = Color.FromArgb(138, 43, 226);
 			}
@@ -2836,24 +2884,24 @@ namespace AirDirector.Controls
 				switch (item.Type)
 				{
 					case PlaylistItemType.Music:
-						bgColor = Color.FromArgb(40, 40, 15);
+						bgColor = Color.FromArgb(55, 55, 25);
 						textColor = Color.White;
 						sideBarColor = Color.FromArgb(255, 215, 0);
 						break;
 					case PlaylistItemType.Clip:
-						bgColor = Color.FromArgb(15, 30, 45);
+						bgColor = Color.FromArgb(25, 40, 60);
 						textColor = Color.White;
 						sideBarColor = Color.FromArgb(0, 180, 255);
 						break;
 					default:
-						bgColor = Color.FromArgb(30, 30, 30);
+						bgColor = Color.FromArgb(40, 40, 40);
 						textColor = Color.White;
 						sideBarColor = Color.FromArgb(100, 100, 100);
 						break;
 				}
 			}
 
-			// Ombra
+			// ── OMBRA ──
 			Rectangle shadowRect = new Rectangle(fullRect.X + 2, fullRect.Y + 2, fullRect.Width, fullRect.Height);
 			using (var shadowPath = GetRoundedRectPath(shadowRect, CORNER_RADIUS))
 			using (SolidBrush shadowBrush = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
@@ -2861,7 +2909,7 @@ namespace AirDirector.Controls
 				g.FillPath(shadowBrush, shadowPath);
 			}
 
-			// Sfondo principale arrotondato
+			// ── SFONDO PRINCIPALE ──
 			using (var mainPath = GetRoundedRectPath(fullRect, CORNER_RADIUS))
 			{
 				using (LinearGradientBrush bgBrush = new LinearGradientBrush(
@@ -2876,8 +2924,9 @@ namespace AirDirector.Controls
 					g.FillPath(bgBrush, mainPath);
 				}
 
+				// Bordo: VERDE per playing, altrimenti grigio sottile
 				Color borderColor = isPlaying
-					? Color.FromArgb(180, 0, 180, 255)
+					? Color.FromArgb(200, 76, 175, 80)
 					: Color.FromArgb(60, 255, 255, 255);
 
 				using (Pen borderPen = new Pen(borderColor, isPlaying ? 2f : 1f))
@@ -2886,7 +2935,7 @@ namespace AirDirector.Controls
 				}
 			}
 
-			// Barra laterale sinistra
+			// ── BARRA LATERALE SINISTRA ──
 			Rectangle sideBar = new Rectangle(fullRect.X, fullRect.Y, SIDE_BAR_WIDTH, ITEM_HEIGHT);
 			using (var sideClip = GetRoundedRectPath(fullRect, CORNER_RADIUS))
 			{
@@ -2899,15 +2948,47 @@ namespace AirDirector.Controls
 				g.Clip = oldClip;
 			}
 
-			// RIGA 1: Numero + Icona + Titolo
-			int xPos = contentRect.X + CONTENT_PADDING;
-			int row1Y = contentRect.Y + 8;
-
-			using (Font numFont = new Font("Segoe UI", 9, FontStyle.Bold))
-			using (SolidBrush numBrush = new SolidBrush(Color.FromArgb(150, textColor)))
+			// ── PANNELLO NUMERO (riquadro separato) ──
+			Rectangle numPanel = new Rectangle(fullRect.X + SIDE_BAR_WIDTH, fullRect.Y, NUM_PANEL_WIDTH, ITEM_HEIGHT);
+			using (var clipPath = GetRoundedRectPath(fullRect, CORNER_RADIUS))
 			{
-				g.DrawString($"#{index + 1}", numFont, numBrush, xPos, row1Y + 2);
-				xPos += 32;
+				var oldClip = g.Clip;
+				g.SetClip(clipPath, System.Drawing.Drawing2D.CombineMode.Intersect);
+				using (SolidBrush numPanelBg = new SolidBrush(Color.FromArgb(25, 255, 255, 255)))
+				{
+					g.FillRectangle(numPanelBg, numPanel);
+				}
+				// Separatore destro
+				using (Pen sepPen = new Pen(Color.FromArgb(40, 255, 255, 255), 1))
+				{
+					g.DrawLine(sepPen, numPanel.Right, fullRect.Y + 6, numPanel.Right, fullRect.Bottom - 6);
+				}
+				g.Clip = oldClip;
+			}
+
+			using (Font numFont = new Font("Segoe UI", 10, FontStyle.Bold))
+			using (SolidBrush numBrush = new SolidBrush(Color.FromArgb(180, textColor)))
+			using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+			{
+				g.DrawString($"#{index + 1}", numFont, numBrush, numPanel, sf);
+			}
+
+			// ── PANNELLO ICONA (riquadro separato) ──
+			Rectangle iconPanel = new Rectangle(numPanel.Right, fullRect.Y, ICON_PANEL_WIDTH, ITEM_HEIGHT);
+			using (var clipPath = GetRoundedRectPath(fullRect, CORNER_RADIUS))
+			{
+				var oldClip = g.Clip;
+				g.SetClip(clipPath, System.Drawing.Drawing2D.CombineMode.Intersect);
+				using (SolidBrush iconPanelBg = new SolidBrush(Color.FromArgb(15, 255, 255, 255)))
+				{
+					g.FillRectangle(iconPanelBg, iconPanel);
+				}
+				// Separatore destro
+				using (Pen sepPen = new Pen(Color.FromArgb(40, 255, 255, 255), 1))
+				{
+					g.DrawLine(sepPen, iconPanel.Right, fullRect.Y + 6, iconPanel.Right, fullRect.Bottom - 6);
+				}
+				g.Clip = oldClip;
 			}
 
 			string icon;
@@ -2922,71 +3003,80 @@ namespace AirDirector.Controls
 			else
 				icon = "⚡";
 
-			using (Font iconFont = new Font("Segoe UI Emoji", 16, FontStyle.Regular))
+			using (Font iconFont = new Font("Segoe UI Emoji", 18, FontStyle.Regular))
 			using (SolidBrush iconBrush = new SolidBrush(textColor))
+			using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
 			{
-				g.DrawString(icon, iconFont, iconBrush, xPos, row1Y - 2);
-				xPos += 30;
+				g.DrawString(icon, iconFont, iconBrush, iconPanel, sf);
 			}
 
+			// ── CONTENUTO: Titolo (centrato verticalmente) ──
+			int contentX = contentRect.X + CONTENT_PADDING;
+			int centerY = contentRect.Y + (ITEM_HEIGHT / 2);
+
+			// Titolo centrato verticalmente
 			string titleText = string.IsNullOrEmpty(item.Artist)
 				? item.Title
 				: $"{item.Artist} - {item.Title}";
 			if (item.Year > 0)
 				titleText += $" ({item.Year})";
 
-			int titleMaxWidth = contentRect.Right - xPos - CONTENT_PADDING;
+			int titleMaxWidth = contentRect.Right - contentX - CONTENT_PADDING - 10;
 
-			using (Font titleFont = new Font("Segoe UI", 12, FontStyle.Bold))
+			using (Font titleFont = new Font("Segoe UI", 13, FontStyle.Bold))
 			using (SolidBrush titleBrush = new SolidBrush(textColor))
 			using (StringFormat titleFormat = new StringFormat
 			{
 				Trimming = StringTrimming.EllipsisCharacter,
-				FormatFlags = StringFormatFlags.NoWrap
+				FormatFlags = StringFormatFlags.NoWrap,
+				LineAlignment = StringAlignment.Center
 			})
 			{
-				RectangleF titleRect = new RectangleF(xPos, row1Y, titleMaxWidth, 22);
+				SizeF titleSize = g.MeasureString(titleText, titleFont);
+				float titleY = centerY - (titleSize.Height / 2) - 5;
+				RectangleF titleRect = new RectangleF(contentX, titleY, titleMaxWidth, titleSize.Height);
 				g.DrawString(titleText, titleFont, titleBrush, titleRect, titleFormat);
 			}
 
-			// RIGA 2: Durata + INTRO (lato destro)
-			int row2Y = contentRect.Y + 33;
-
-			string durationText = $"⏱ {FormatDuration(item.Duration)}";
-
-			using (Font durationFont = new Font("Segoe UI", 10, FontStyle.Bold))
-			using (SolidBrush durationBrush = new SolidBrush(textColor))
-			{
-				SizeF durationSize = g.MeasureString(durationText, durationFont);
-				g.DrawString(durationText, durationFont, durationBrush,
-					contentRect.Right - durationSize.Width - CONTENT_PADDING, row2Y);
-			}
-
+			// ── INTRO (9pt, alto a destra del contenuto) ──
 			if (item.Type != PlaylistItemType.ADV)
 			{
-				using (Font introFont = new Font("Segoe UI", 8, FontStyle.Regular))
+				using (Font introFont = new Font("Segoe UI", 9, FontStyle.Regular))
 				using (SolidBrush introBrush = new SolidBrush(Color.FromArgb(180, textColor)))
 				{
 					string introText = $"INTRO: {item.Intro.TotalSeconds:F1}s";
 					SizeF introSize = g.MeasureString(introText, introFont);
 					g.DrawString(introText, introFont, introBrush,
-						contentRect.Right - introSize.Width - CONTENT_PADDING, row2Y - 16);
+						contentRect.Right - introSize.Width - CONTENT_PADDING, contentRect.Y + 6);
 				}
 			}
 
-			// RIGA 3: Orario + Badge + Violazioni
-			int row3Y = contentRect.Bottom - 22;
-			int infoX = contentRect.X + CONTENT_PADDING;
+			// ── DURATA (11pt Bold, a destra, centrata verticalmente ma leggermente sotto) ──
+			string durationText = $"⏱ {FormatDuration(item.Duration)}";
 
-			using (Font timeFont = new Font("Segoe UI", 8, FontStyle.Regular))
-			using (SolidBrush timeBrush = new SolidBrush(Color.FromArgb(180, textColor)))
+			using (Font durationFont = new Font("Segoe UI", 11, FontStyle.Bold))
+			using (SolidBrush durationBrush = new SolidBrush(textColor))
 			{
-				string timeText = item.ScheduledTime.ToString("HH:mm:ss");
-				g.DrawString(timeText, timeFont, timeBrush, infoX, row3Y);
-				SizeF timeSize = g.MeasureString(timeText, timeFont);
-				infoX += (int)timeSize.Width + 4;
+				SizeF durationSize = g.MeasureString(durationText, durationFont);
+				float durationY = centerY - (durationSize.Height / 2) + 2;
+				g.DrawString(durationText, durationFont, durationBrush,
+					contentRect.Right - durationSize.Width - CONTENT_PADDING, durationY);
 			}
 
+			// ── RIGA BASSA: "OnAir: HH:mm:ss" + Badges ──
+			int row3Y = contentRect.Bottom - 22;
+			int infoX = contentX; // allineato col titolo
+
+			using (Font timeFont = new Font("Segoe UI", 9, FontStyle.Bold))
+			using (SolidBrush timeBrush = new SolidBrush(Color.FromArgb(200, textColor)))
+			{
+				string timeText = $"OnAir: {item.ScheduledTime:HH:mm:ss}";
+				g.DrawString(timeText, timeFont, timeBrush, infoX, row3Y);
+				SizeF timeSize = g.MeasureString(timeText, timeFont);
+				infoX += (int)timeSize.Width + 6;
+			}
+
+			// Badge SCHEDULED (pillola)
 			if (item.IsScheduled)
 			{
 				using (Font schedFont = new Font("Segoe UI", 7, FontStyle.Bold))
@@ -3002,11 +3092,7 @@ namespace AirDirector.Controls
 					}
 
 					using (SolidBrush badgeTextBrush = new SolidBrush(Color.White))
-					using (StringFormat sf = new StringFormat
-					{
-						Alignment = StringAlignment.Center,
-						LineAlignment = StringAlignment.Center
-					})
+					using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
 					{
 						g.DrawString(schedText, schedFont, badgeTextBrush, badgeRect, sf);
 					}
@@ -3015,6 +3101,7 @@ namespace AirDirector.Controls
 				}
 			}
 
+			// Badge violazioni (pillola arancio)
 			if (item.Type == PlaylistItemType.Music && item.OriginalMusicEntry != null)
 			{
 				var violations = GetViolations(item.OriginalMusicEntry);
@@ -3033,11 +3120,7 @@ namespace AirDirector.Controls
 						}
 
 						using (SolidBrush violTextBrush = new SolidBrush(Color.White))
-						using (StringFormat sf = new StringFormat
-						{
-							Alignment = StringAlignment.Center,
-							LineAlignment = StringAlignment.Center
-						})
+						using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
 						{
 							g.DrawString(violText, violFont, violTextBrush, violRect, sf);
 						}
@@ -3045,7 +3128,7 @@ namespace AirDirector.Controls
 				}
 			}
 
-			// BOTTONI FULL-HEIGHT
+			// ── BOTTONI FULL-HEIGHT con HOVER ──
 			if (showButtons)
 			{
 				int btnX = fullRect.Right - buttonsArea;
@@ -3059,7 +3142,12 @@ namespace AirDirector.Controls
 				{
 					Rectangle previewRect = new Rectangle(btnX + 1, fullRect.Y, BUTTON_WIDTH, ITEM_HEIGHT);
 
-					using (SolidBrush previewBg = new SolidBrush(Color.FromArgb(30, 0, 120, 255)))
+					bool isPreviewHover = (_hoverButtonIndex == index && _hoverButtonType == "preview");
+					Color previewBgColor = isPreviewHover
+						? Color.FromArgb(60, 0, 120, 255)
+						: Color.FromArgb(30, 0, 120, 255);
+
+					using (SolidBrush previewBg = new SolidBrush(previewBgColor))
 					{
 						using (var clipPath = GetRoundedRectPath(fullRect, CORNER_RADIUS))
 						{
@@ -3070,13 +3158,13 @@ namespace AirDirector.Controls
 						}
 					}
 
+					Color previewIconColor = isPreviewHover
+						? Color.FromArgb(255, 0, 180, 255)
+						: Color.FromArgb(200, 0, 150, 255);
+
 					using (Font previewFont = new Font("Segoe UI", 16, FontStyle.Bold))
-					using (SolidBrush previewTextBrush = new SolidBrush(Color.FromArgb(200, 0, 150, 255)))
-					using (StringFormat sf = new StringFormat
-					{
-						Alignment = StringAlignment.Center,
-						LineAlignment = StringAlignment.Center
-					})
+					using (SolidBrush previewTextBrush = new SolidBrush(previewIconColor))
+					using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
 					{
 						g.DrawString("▶", previewFont, previewTextBrush, previewRect, sf);
 					}
@@ -3091,7 +3179,12 @@ namespace AirDirector.Controls
 
 				Rectangle deleteRect = new Rectangle(btnX + 1, fullRect.Y, BUTTON_WIDTH - 1, ITEM_HEIGHT);
 
-				using (SolidBrush deleteBg = new SolidBrush(Color.FromArgb(30, 255, 0, 0)))
+				bool isDeleteHover = (_hoverButtonIndex == index && _hoverButtonType == "delete");
+				Color deleteBgColor = isDeleteHover
+					? Color.FromArgb(60, 255, 0, 0)
+					: Color.FromArgb(30, 255, 0, 0);
+
+				using (SolidBrush deleteBg = new SolidBrush(deleteBgColor))
 				{
 					using (var clipPath = GetRoundedRectPath(fullRect, CORNER_RADIUS))
 					{
@@ -3102,13 +3195,13 @@ namespace AirDirector.Controls
 					}
 				}
 
+				Color deleteIconColor = isDeleteHover
+					? Color.FromArgb(255, 255, 80, 80)
+					: Color.FromArgb(200, 255, 60, 60);
+
 				using (Font deleteFont = new Font("Segoe UI", 14, FontStyle.Bold))
-				using (SolidBrush deleteTextBrush = new SolidBrush(Color.FromArgb(200, 255, 60, 60)))
-				using (StringFormat sf = new StringFormat
-				{
-					Alignment = StringAlignment.Center,
-					LineAlignment = StringAlignment.Center
-				})
+				using (SolidBrush deleteTextBrush = new SolidBrush(deleteIconColor))
+				using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
 				{
 					g.DrawString("✖", deleteFont, deleteTextBrush, deleteRect, sf);
 				}
