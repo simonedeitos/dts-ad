@@ -2421,8 +2421,8 @@ namespace AirDirector.Controls
             else
             {
                 Stop();
-                ClearPlayer();
                 TrackEndedInManualMode?.Invoke(this, EventArgs.Empty);
+                ClearPlayer();
             }
         }
 
