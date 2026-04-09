@@ -2863,19 +2863,19 @@ namespace AirDirector.Controls
 
 			if (item.Type == PlaylistItemType.ADV)
 			{
-				bgColor = Color.FromArgb(60, 15, 15);
+				bgColor = Color.FromArgb(80, 25, 25);
 				textColor = Color.White;
 				sideBarColor = Color.FromArgb(220, 30, 30);
 			}
 			else if (isPlaying)
 			{
-				bgColor = Color.FromArgb(20, 20, 20);
+				bgColor = Color.FromArgb(35, 35, 35);
 				textColor = Color.White;
 				sideBarColor = Color.FromArgb(76, 175, 80); // Verde StatePlaying
 			}
 			else if (item.IsScheduled)
 			{
-				bgColor = Color.FromArgb(45, 25, 65);
+				bgColor = Color.FromArgb(60, 40, 85);
 				textColor = Color.White;
 				sideBarColor = Color.FromArgb(138, 43, 226);
 			}
@@ -2884,17 +2884,17 @@ namespace AirDirector.Controls
 				switch (item.Type)
 				{
 					case PlaylistItemType.Music:
-						bgColor = Color.FromArgb(55, 55, 25);
+						bgColor = Color.FromArgb(75, 75, 40);
 						textColor = Color.White;
 						sideBarColor = Color.FromArgb(255, 215, 0);
 						break;
 					case PlaylistItemType.Clip:
-						bgColor = Color.FromArgb(25, 40, 60);
+						bgColor = Color.FromArgb(40, 55, 80);
 						textColor = Color.White;
 						sideBarColor = Color.FromArgb(0, 180, 255);
 						break;
 					default:
-						bgColor = Color.FromArgb(40, 40, 40);
+						bgColor = Color.FromArgb(55, 55, 55);
 						textColor = Color.White;
 						sideBarColor = Color.FromArgb(100, 100, 100);
 						break;
