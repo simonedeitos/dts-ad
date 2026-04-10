@@ -2430,15 +2430,29 @@ namespace AirDirector.Forms
 
                             process.Start();
                             string stderr = process.StandardError.ReadToEnd();
-                            process.WaitForExit(60000);
+                            bool exited = process.WaitForExit(60000);
 
                             Console.WriteLine($"[MusicEditor] ffmpeg output: {stderr}");
 
-                            if (process.ExitCode == 0 && File.Exists(tempFile))
+                            if (!exited)
                             {
-                                File.Delete(_pendingSourceFile);
-                                File.Move(tempFile, _pendingSourceFile);
-                                Console.WriteLine($"[MusicEditor] ✅ Volume boost applicato con successo al salvataggio");
+                                process.Kill();
+                                if (File.Exists(tempFile)) File.Delete(tempFile);
+                                Console.WriteLine($"[MusicEditor] ❌ ffmpeg timeout al salvataggio");
+                            }
+                            else if (process.ExitCode == 0 && File.Exists(tempFile))
+                            {
+                                try
+                                {
+                                    File.Delete(_pendingSourceFile);
+                                    File.Move(tempFile, _pendingSourceFile);
+                                    Console.WriteLine($"[MusicEditor] ✅ Volume boost applicato con successo al salvataggio");
+                                }
+                                catch (Exception moveEx)
+                                {
+                                    Console.WriteLine($"[MusicEditor] ❌ Errore sostituzione file: {moveEx.Message}");
+                                    if (File.Exists(tempFile)) File.Delete(tempFile);
+                                }
                             }
                             else
                             {
