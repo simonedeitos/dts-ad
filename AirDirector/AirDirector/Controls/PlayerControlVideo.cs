@@ -70,7 +70,7 @@ namespace AirDirector.Controls
             public int FileDurationMs;
             public bool IsScheduled = false;
             public static PlayItem FromQueueItem(PlaylistQueueItem qi) => new PlayItem
-            { FilePath = qi.FilePath ?? "", Artist = qi.Artist ?? "", Title = qi.Title ?? "", Intro = qi.Intro, MarkerIN = qi.MarkerIN, MarkerINTRO = qi.MarkerINTRO, MarkerMIX = qi.MarkerMIX, MarkerOUT = qi.MarkerOUT, ItemType = qi.ItemType ?? "Music", VideoFilePath = qi.VideoFilePath ?? "", VideoSource = qi.VideoSource ?? "", NDISourceName = qi.NDISourceName ?? "", Duration = qi.Duration, FileDurationMs = qi.FileDurationMs, IsScheduled = qi.IsScheduled };
+            { FilePath = qi.FilePath ?? "", Artist = qi.Artist ?? "", Title = qi.Title ?? "", Intro = qi.Intro, MarkerIN = qi.MarkerIN, MarkerINTRO = qi.MarkerINTRO, MarkerMIX = qi.MarkerMIX, MarkerOUT = qi.MarkerOUT, ItemType = qi.ItemType ?? "Clip", VideoFilePath = qi.VideoFilePath ?? "", VideoSource = qi.VideoSource ?? "", NDISourceName = qi.NDISourceName ?? "", Duration = qi.Duration, FileDurationMs = qi.FileDurationMs, IsScheduled = qi.IsScheduled };
         }
 
         private enum DeckType { VideoClip, AudioTrack, WebStream, Buffer }
@@ -872,7 +872,7 @@ namespace AirDirector.Controls
         // PLAY
         // ═══════════════════════════════════════════════════════════
         public void LoadAndPlay(PlaylistQueueItem qi) { if (qi == null || _isDisposed) return; _commandQueue.Enqueue(() => PlayInternal(PlayItem.FromQueueItem(qi))); }
-        public void LoadTrack(string fp, string artist, string title, TimeSpan intro, int mIN, int mINTRO, int mMIX, int mOUT, string type) { _commandQueue.Enqueue(() => PlayInternal(new PlayItem { FilePath = fp ?? "", Artist = artist ?? "", Title = title ?? "", Intro = intro, MarkerIN = mIN, MarkerINTRO = mINTRO, MarkerMIX = mMIX, MarkerOUT = mOUT, ItemType = type ?? "Music" })); }
+        public void LoadTrack(string fp, string artist, string title, TimeSpan intro, int mIN, int mINTRO, int mMIX, int mOUT, string type) { _commandQueue.Enqueue(() => PlayInternal(new PlayItem { FilePath = fp ?? "", Artist = artist ?? "", Title = title ?? "", Intro = intro, MarkerIN = mIN, MarkerINTRO = mINTRO, MarkerMIX = mMIX, MarkerOUT = mOUT, ItemType = type ?? "Clip" })); }
 
         private void PlayInternal(PlayItem item)
         {
