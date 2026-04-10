@@ -4,7 +4,6 @@ using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using AirDirector.Services.Licensing;
 using AirDirector.Services.Localization;
-using AirDirector.Themes;
 
 namespace AirDirector.Forms
 {
@@ -27,14 +26,14 @@ namespace AirDirector.Forms
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            this.BackColor = AppTheme.BgLight;
+            this.BackColor = Color.FromArgb(45, 45, 48);
 
             // ===== HEADER =====
             Panel headerPanel = new Panel
             {
                 Dock = DockStyle.Top,
                 Height = 110,
-                BackColor = AppTheme.Primary
+                BackColor = Color.FromArgb(0, 120, 215)
             };
             this.Controls.Add(headerPanel);
 
@@ -42,7 +41,7 @@ namespace AirDirector.Forms
             {
                 Text = "🔐",
                 Font = new Font("Segoe UI", 30),
-                ForeColor = AppTheme.TextInverse,
+                ForeColor = Color.White,
                 Location = new Point(20, 20),
                 AutoSize = true
             };
@@ -52,7 +51,7 @@ namespace AirDirector.Forms
             {
                 Text = LanguageManager.GetString("License_Title", "Attivazione Licenza"),
                 Font = new Font("Segoe UI", 20, FontStyle.Bold),
-                ForeColor = AppTheme.TextInverse,
+                ForeColor = Color.White,
                 AutoSize = false,
                 Size = new Size(460, 42),
                 Location = new Point(90, 18),
@@ -73,7 +72,7 @@ namespace AirDirector.Forms
             headerPanel.Controls.Add(lblSubtitle);
 
             // ===== MAIN CARD =====
-            // Layout verticale: header(110) + margin(20) + card(220) + margin(20) + btnActivate(52) + margin(24) + sep(1) + margin(12) + lblOr(22) + margin(12) + btnDemo(48) + margin(14) + lblDemoInfo(22) + margin(20)
+            // Layout verticale: header(110) + margin(20) + card(240) + margin(20) + btnActivate(52) + margin(24) + sep(1) + margin(12) + btnDemo(48) + margin(14) + lblDemoInfo(22) + margin(20)
             int margin = 20;
             int cardTop = 110 + margin;
 
@@ -81,13 +80,13 @@ namespace AirDirector.Forms
             {
                 Location = new Point(margin, cardTop),
                 Size = new Size(580, 240),
-                BackColor = AppTheme.Surface,
+                BackColor = Color.FromArgb(40, 40, 40),
                 Padding = new Padding(24)
             };
             cardPanel.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (var pen = new Pen(AppTheme.BorderLight, 1))
+                using (var pen = new Pen(Color.FromArgb(70, 70, 70), 1))
                     e.Graphics.DrawRectangle(pen, 0, 0, cardPanel.Width - 1, cardPanel.Height - 1);
             };
             this.Controls.Add(cardPanel);
@@ -97,7 +96,7 @@ namespace AirDirector.Forms
             {
                 Text = LanguageManager.GetString("License_OwnerName", "Nome / Ragione Sociale"),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                ForeColor = AppTheme.TextSecondary,
+                ForeColor = Color.FromArgb(180, 180, 180),
                 Location = new Point(24, 18),
                 AutoSize = true
             };
@@ -120,7 +119,7 @@ namespace AirDirector.Forms
             {
                 Text = LanguageManager.GetString("License_Serial", "Codice Seriale"),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                ForeColor = AppTheme.TextSecondary,
+                ForeColor = Color.FromArgb(180, 180, 180),
                 Location = new Point(24, 90),
                 AutoSize = true
             };
@@ -144,7 +143,7 @@ namespace AirDirector.Forms
             {
                 Text = LanguageManager.GetString("License.Format", "Formato: ADR-XXXX-XXXX-XXXX"),
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
-                ForeColor = AppTheme.TextSecondary,
+                ForeColor = Color.FromArgb(180, 180, 180),
                 Location = new Point(24, 160),
                 AutoSize = true
             };
@@ -154,9 +153,9 @@ namespace AirDirector.Forms
             {
                 Text = "www.airdirector.app",
                 Font = new Font("Segoe UI", 9, FontStyle.Regular),
-                LinkColor = AppTheme.Primary,
-                ActiveLinkColor = AppTheme.Primary,
-                VisitedLinkColor = AppTheme.Primary,
+                LinkColor = Color.FromArgb(0, 120, 215),
+                ActiveLinkColor = Color.FromArgb(0, 120, 215),
+                VisitedLinkColor = Color.FromArgb(0, 120, 215),
                 Location = new Point(24, 182),
                 AutoSize = true
             };
@@ -176,7 +175,7 @@ namespace AirDirector.Forms
                 Font = new Font("Segoe UI", 13, FontStyle.Bold),
                 Location = new Point(margin, btnActivateTop),
                 Size = new Size(580, 52),
-                BackColor = AppTheme.Success,
+                BackColor = Color.FromArgb(40, 167, 69),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand
@@ -191,22 +190,12 @@ namespace AirDirector.Forms
             {
                 Location = new Point(margin, sepTop),
                 Size = new Size(580, 1),
-                BackColor = AppTheme.BorderLight
+                BackColor = Color.FromArgb(70, 70, 70)
             };
             this.Controls.Add(sepPanel);
 
-            Label lblOr = new Label
-            {
-                Text = LanguageManager.GetString("License.OrSeparator", "— oppure —"),
-                Font = new Font("Segoe UI", 9, FontStyle.Italic),
-                ForeColor = AppTheme.TextSecondary,
-                Location = new Point(230, sepTop + 8),
-                AutoSize = true
-            };
-            this.Controls.Add(lblOr);
-
             // ===== DEMO BUTTON =====
-            int btnDemoTop = sepTop + 32;
+            int btnDemoTop = sepTop + 12;
             Button btnDemo = new Button
             {
                 Name = "btnDemo",
@@ -214,7 +203,7 @@ namespace AirDirector.Forms
                 Font = new Font("Segoe UI", 11),
                 Location = new Point(margin, btnDemoTop),
                 Size = new Size(580, 48),
-                BackColor = AppTheme.Warning,
+                BackColor = Color.FromArgb(255, 140, 0),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand
@@ -232,7 +221,7 @@ namespace AirDirector.Forms
                        LanguageManager.GetString("License_DemoClips", "15 clips") + "  •  " +
                        LanguageManager.GetString("License_DemoEncoders", "1 encoder"),
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
-                ForeColor = AppTheme.TextSecondary,
+                ForeColor = Color.FromArgb(180, 180, 180),
                 Location = new Point(margin, demoInfoTop),
                 Size = new Size(580, 22),
                 TextAlign = ContentAlignment.MiddleCenter
