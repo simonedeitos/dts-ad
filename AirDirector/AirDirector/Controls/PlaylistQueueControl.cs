@@ -1316,7 +1316,7 @@ namespace AirDirector.Controls
 
 					scheduledItem = new PlaylistQueueItem
 					{
-						Type = PlaylistItemType.Music,
+						Type = PlaylistItemType.Other,
 						ScheduledTime = CalculateScheduledPlayTime(),
 						Artist = artist,
 						Title = title,
