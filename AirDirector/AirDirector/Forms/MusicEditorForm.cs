@@ -2409,10 +2409,11 @@ namespace AirDirector.Forms
 
                         Task.Run(() =>
                         {
+                            string tempFile = null;
                             try
                             {
                                 string ext = Path.GetExtension(sourceFile);
-                                string tempFile = Path.Combine(Path.GetDirectoryName(sourceFile),
+                                tempFile = Path.Combine(Path.GetDirectoryName(sourceFile),
                                     Path.GetFileNameWithoutExtension(sourceFile) + "_boosted" + ext);
 
                                 string volumeFilter = $"volume={dbToApply}dB";
@@ -2420,7 +2421,11 @@ namespace AirDirector.Forms
 
                                 Console.WriteLine($"[MusicEditor] 🔊 ffmpeg (deferred): {arguments}");
 
-                                var process = new Process
+                                bool exited;
+                                int exitCode;
+                                string stderr;
+
+                                using (var process = new Process
                                 {
                                     StartInfo = new ProcessStartInfo
                                     {
@@ -2428,32 +2433,46 @@ namespace AirDirector.Forms
                                         Arguments = arguments,
                                         UseShellExecute = false,
                                         CreateNoWindow = true,
-                                        RedirectStandardOutput = true,
+                                        RedirectStandardOutput = false,
                                         RedirectStandardError = true
                                     }
-                                };
-
-                                process.Start();
-                                string stderr = process.StandardError.ReadToEnd();
-                                process.WaitForExit(60000);
+                                })
+                                {
+                                    process.Start();
+                                    stderr = process.StandardError.ReadToEnd();
+                                    exited = process.WaitForExit(60000);
+                                    exitCode = exited ? process.ExitCode : -1;
+                                }
 
                                 Console.WriteLine($"[MusicEditor] ffmpeg output: {stderr}");
 
-                                if (process.ExitCode == 0 && File.Exists(tempFile))
+                                if (exited && exitCode == 0 && File.Exists(tempFile))
                                 {
-                                    File.Delete(sourceFile);
-                                    File.Move(tempFile, sourceFile);
-                                    Console.WriteLine($"[MusicEditor] ✅ Volume gain applied successfully (deferred)");
+                                    try
+                                    {
+                                        File.Delete(sourceFile);
+                                        File.Move(tempFile, sourceFile);
+                                        tempFile = null; // moved successfully, no cleanup needed
+                                        Console.WriteLine($"[MusicEditor] ✅ Volume gain applied successfully (deferred)");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"[MusicEditor] ❌ File replace error (deferred): {ex.Message}");
+                                    }
                                 }
                                 else
                                 {
-                                    if (File.Exists(tempFile)) File.Delete(tempFile);
                                     Console.WriteLine($"[MusicEditor] ❌ ffmpeg failed (deferred)");
                                 }
                             }
                             catch (Exception ex)
                             {
                                 Console.WriteLine($"[MusicEditor] ❌ ffmpeg error (deferred): {ex.Message}");
+                            }
+                            finally
+                            {
+                                if (tempFile != null && File.Exists(tempFile))
+                                    File.Delete(tempFile);
                             }
                         });
                     }
