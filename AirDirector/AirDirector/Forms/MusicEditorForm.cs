@@ -65,10 +65,6 @@ namespace AirDirector.Forms
         // ✅ VOLUME BOOST
         private float _volumeBoostDb = 0f;
 
-        // ✅ VOLUME BOOST PENDING (da applicare alla chiusura)
-        private bool _pendingVolumeBoost = false;
-        private float _pendingVolumeBoostDb = 0f;
-
         // Flag per la visualizzazione dei picchi colorati nella waveform (disattivato di default)
         private bool _showColoredPeaks = false;
 
@@ -704,7 +700,7 @@ namespace AirDirector.Forms
             }
         }
 
-        private void BtnApplyVolume_Click(object sender, EventArgs e)
+        private async void BtnApplyVolume_Click(object sender, EventArgs e)
         {
             if (_volumeBoostDb == 0)
             {
@@ -745,25 +741,106 @@ namespace AirDirector.Forms
 
             if (result != DialogResult.Yes) return;
 
-            // ✅ Memorizza il pending – ffmpeg verrà eseguito al salvataggio
-            _pendingVolumeBoost = true;
-            _pendingVolumeBoostDb = _volumeBoostDb;
+            // ✅ Ferma la riproduzione
+            _waveOut?.Stop();
+            _isPlaying = false;
+            _positionTimer.Stop();
 
-            // ✅ Aggiorna il bottone per indicare che c'è un'operazione pending
-            string dbLabel = (_pendingVolumeBoostDb >= 0 ? "+" : "") + _pendingVolumeBoostDb;
-            btnApplyVolume.Text = $"✅ {dbLabel} dB pending";
+            // ✅ Chiudi audio reader per liberare il file
+            _audioReader?.Dispose();
+            _audioReader = null;
+            _waveOut?.Dispose();
+            _waveOut = null;
 
-            // ✅ Reset slider (il boost visivo sulla waveform rimane)
-            trkVolume.Value = 0;
-            _volumeBoostDb = 0;
-            RecreateWaveformBitmapWithBoost();
-            picWaveform.Invalidate();
+            btnApplyVolume.Enabled = false;
+            btnApplyVolume.Text = "⏳...";
 
-            MessageBox.Show(
-                LanguageManager.GetString("MusicEditor.VolumePending",
-                    "Volume boost queued. The change will be applied when you save."),
-                LanguageManager.GetString("Common.Info", "Info"),
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            try
+            {
+                string ext = Path.GetExtension(sourceFile);
+                string tempFile = Path.Combine(Path.GetDirectoryName(sourceFile),
+                    Path.GetFileNameWithoutExtension(sourceFile) + "_boosted" + ext);
+
+                string volumeFilter = $"volume={_volumeBoostDb}dB";
+                string arguments = $"-i \"{sourceFile}\" -af \"{volumeFilter}\" -y \"{tempFile}\"";
+
+                Console.WriteLine($"[MusicEditor] 🔊 ffmpeg: {arguments}");
+
+                bool success = await Task.Run(() =>
+                {
+                    try
+                    {
+                        var process = new Process
+                        {
+                            StartInfo = new ProcessStartInfo
+                            {
+                                FileName = ffmpegPath,
+                                Arguments = arguments,
+                                UseShellExecute = false,
+                                CreateNoWindow = true,
+                                RedirectStandardOutput = true,
+                                RedirectStandardError = true
+                            }
+                        };
+
+                        process.Start();
+                        string stderr = process.StandardError.ReadToEnd();
+                        process.WaitForExit(60000); // timeout 60s
+
+                        Console.WriteLine($"[MusicEditor] ffmpeg output: {stderr}");
+
+                        if (process.ExitCode == 0 && File.Exists(tempFile))
+                        {
+                            // Sovrascrivi il file originale
+                            File.Delete(sourceFile);
+                            File.Move(tempFile, sourceFile);
+                            return true;
+                        }
+                        else
+                        {
+                            if (File.Exists(tempFile)) File.Delete(tempFile);
+                            return false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[MusicEditor] ❌ ffmpeg error: {ex.Message}");
+                        return false;
+                    }
+                });
+
+                if (success)
+                {
+                    // ✅ Reset slider e ricarica
+                    trkVolume.Value = 0;
+                    _volumeBoostDb = 0;
+
+                    _lastLoadedFile = ""; // forza ricaricamento waveform
+                    LoadAudioFile();
+
+                   
+                }
+                else
+                {
+                    // Ricarica comunque l'audio originale
+                    LoadAudioFile();
+
+                    MessageBox.Show(
+                        LanguageManager.GetString("MusicEditor.VolumeError", "❌ Errore durante l'applicazione del volume con ffmpeg."),
+                        LanguageManager.GetString("Common.Error", "Errore"),
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MusicEditor] ❌ Errore volume boost: {ex.Message}");
+                LoadAudioFile(); // ricarica
+            }
+            finally
+            {
+                btnApplyVolume.Enabled = true;
+                btnApplyVolume.Text = "APPLICA";
+            }
         }
 
         #endregion
@@ -2402,85 +2479,6 @@ namespace AirDirector.Forms
 
                 if (success)
                 {
-                    // ✅ APPLICA VOLUME BOOST PENDING (ffmpeg) - DOPO aver salvato i dati, PRIMA di chiudere
-                    if (_pendingVolumeBoost && _pendingVolumeBoostDb != 0)
-                    {
-                        string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
-                        string sourceFile = _musicEntry.FilePath;
-
-                        if (File.Exists(ffmpegPath) && File.Exists(sourceFile))
-                        {
-                            // ✅ Rilascia TUTTE le risorse audio prima di lanciare ffmpeg
-                            _positionTimer?.Stop();
-                            _waveOut?.Stop();
-                            _audioReader?.Dispose();
-                            _audioReader = null;
-                            _waveOut?.Dispose();
-                            _waveOut = null;
-
-                            try
-                            {
-                                string ext = Path.GetExtension(sourceFile);
-                                string tempFile = Path.Combine(Path.GetDirectoryName(sourceFile),
-                                    Path.GetFileNameWithoutExtension(sourceFile) + "_boosted" + ext);
-
-                                string volumeFilter = $"volume={_pendingVolumeBoostDb}dB";
-                                string arguments = $"-i \"{sourceFile}\" -af \"{volumeFilter}\" -y \"{tempFile}\"";
-
-                                Console.WriteLine($"[MusicEditor] 🔊 ffmpeg (on save): {arguments}");
-
-                                using (var process = new Process
-                                {
-                                    StartInfo = new ProcessStartInfo
-                                    {
-                                        FileName = ffmpegPath,
-                                        Arguments = arguments,
-                                        UseShellExecute = false,
-                                        CreateNoWindow = true,
-                                        RedirectStandardError = true
-                                    }
-                                })
-                                {
-                                    process.Start();
-                                    string stderr = process.StandardError.ReadToEnd();
-                                    bool exited = process.WaitForExit(60000);
-
-                                    Console.WriteLine($"[MusicEditor] ffmpeg output: {stderr}");
-
-                                    if (!exited)
-                                    {
-                                        process.Kill();
-                                        if (File.Exists(tempFile)) File.Delete(tempFile);
-                                        Console.WriteLine($"[MusicEditor] ❌ ffmpeg timeout al salvataggio");
-                                        MessageBox.Show(
-                                            LanguageManager.GetString("MusicEditor.VolumeError", "❌ Errore durante l'applicazione del volume con ffmpeg."),
-                                            LanguageManager.GetString("Common.Error", "Errore"),
-                                            MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                    }
-                                    else if (process.ExitCode == 0 && File.Exists(tempFile))
-                                    {
-                                        File.Delete(sourceFile);
-                                        File.Move(tempFile, sourceFile);
-                                        Console.WriteLine($"[MusicEditor] ✅ Volume boost applicato con successo al salvataggio");
-                                    }
-                                    else
-                                    {
-                                        if (File.Exists(tempFile)) File.Delete(tempFile);
-                                        Console.WriteLine($"[MusicEditor] ❌ ffmpeg fallito al salvataggio");
-                                        MessageBox.Show(
-                                            LanguageManager.GetString("MusicEditor.VolumeError", "❌ Errore durante l'applicazione del volume con ffmpeg."),
-                                            LanguageManager.GetString("Common.Error", "Errore"),
-                                            MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                    }
-                                }
-                            }
-                            catch (Exception exVol)
-                            {
-                                Console.WriteLine($"[MusicEditor] ❌ Errore volume boost al salvataggio: {exVol.Message}");
-                            }
-                        }
-                    }
-
                     this.DialogResult = DialogResult.OK;
                     this.Close();
                 }
