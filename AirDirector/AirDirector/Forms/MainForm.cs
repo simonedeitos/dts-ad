@@ -870,7 +870,15 @@ namespace AirDirector.Forms
             }
         }
 
-        private void MenuAbout_Click(object sender, EventArgs e) { MessageBox.Show(LanguageManager.GetString("MainForm.AboutText", "AirDirector v1.0.0\n\nPlayout Radiofonico e TV Professionale\n\n© 2025 AirDirector\nTutti i diritti riservati."), LanguageManager.GetString("MainForm.AboutTitle", "Informazioni su AirDirector"), MessageBoxButtons.OK, MessageBoxIcon.Information); }
+        private void MenuAbout_Click(object sender, EventArgs e)
+        {
+            string aboutText = $"AirDirector {AppVersion.DisplayVersion}\n\nProfessional Playout System\n\n© {DateTime.Now.Year} AirDirector\nAll Rights Reserved\n\nDeveloped with ❤️ for Radio & TV Broadcasting";
+            MessageBox.Show(
+                aboutText,
+                LanguageManager.GetString("MainForm.AboutTitle", "About AirDirector"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
 
         private void MenuViewReport_Click(object sender, EventArgs e)
         {

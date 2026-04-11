@@ -1,15 +1,16 @@
 ﻿using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Windows.Forms;
 using AirDirector.Themes;
-using AirDirector.Services.Localization;
 
 namespace AirDirector.Forms
 {
     public partial class SplashForm : Form
     {
-        private Label[] _statusLabels;
+        private Panel[] _cardPanels;
+        private Label[] _cardStatusLabels;
 
         private readonly (string Icon, string Name)[] _loadingModules =
         {
@@ -36,80 +37,165 @@ namespace AirDirector.Forms
             this.Region = System.Drawing.Region.FromHrgn(
                 CreateRoundRectRgn(0, 0, Width, Height, 15, 15));
 
-            // ── Header panel ──────────────────────────────────────
-            headerPanel.BackColor = Color.FromArgb(35, 35, 50);
-
+            // ── Logo text fallback ────────────────────────────────
             lblLogo.Font = new Font("Segoe UI", 36, FontStyle.Bold);
             lblLogo.ForeColor = Color.White;
             lblLogo.Text = "🎵 AirDirector";
 
+            // ── Version label ─────────────────────────────────────
             lblVersion.Font = new Font("Segoe UI", 10, FontStyle.Regular);
             lblVersion.ForeColor = Color.FromArgb(150, 180, 255);
-            lblVersion.Text =
-                $"{LanguageManager.GetString("Splash.Version", "Professional Playout System")} {AppVersion.Current}";
+            lblVersion.Text = $"Professional Playout System {AppVersion.DisplayVersion}";
 
             // ── Logo: image or text ───────────────────────────────
             LoadLogo();
 
-            // ── Status panel ──────────────────────────────────────
-            statusPanel.BackColor = Color.FromArgb(30, 30, 40);
+            // ── Background ────────────────────────────────────────
+            LoadBackground();
 
-            _statusLabels = new Label[_loadingModules.Length];
+            // ── Sliding cards ─────────────────────────────────────
+            _cardPanels = new Panel[_loadingModules.Length];
+            _cardStatusLabels = new Label[_loadingModules.Length];
+
             for (int i = 0; i < _loadingModules.Length; i++)
             {
-                int row = i / 4;
-                int col = i % 4;
-
-                _statusLabels[i] = new Label
-                {
-                    Text = $"{_loadingModules[i].Icon} {_loadingModules[i].Name}",
-                    Font = new Font("Segoe UI", 9, FontStyle.Regular),
-                    ForeColor = Color.Gray,
-                    AutoSize = false,
-                    Size = new Size(155, 30),
-                    Location = new Point(15 + col * 163, 20 + row * 40),
-                    TextAlign = ContentAlignment.MiddleLeft
-                };
-                statusPanel.Controls.Add(_statusLabels[i]);
+                int yPosition = i * 36;
+                Panel card = CreateCard(_loadingModules[i].Icon, _loadingModules[i].Name, yPosition, out Label statusLabel);
+                _cardPanels[i] = card;
+                _cardStatusLabels[i] = statusLabel;
+                cardsContainer.Controls.Add(card);
             }
 
             // ── Progress bar ──────────────────────────────────────
-            progressBar.BackColor = Color.FromArgb(50, 50, 65);
-            progressBar.ForeColor = AppTheme.LEDGreen;
+            progressBar.BackColor = Color.FromArgb(50, 50, 60);
+            progressBar.ForeColor = Color.FromArgb(0, 180, 120);
 
             // ── Percentage label ──────────────────────────────────
-            lblPercentage.Font = new Font("Segoe UI", 11, FontStyle.Bold);
+            lblPercentage.Font = new Font("Segoe UI", 10, FontStyle.Bold);
             lblPercentage.ForeColor = Color.White;
             lblPercentage.Text = "0%";
 
             // ── Copyright ─────────────────────────────────────────
             lblCopyright.Font = new Font("Segoe UI", 8, FontStyle.Regular);
-            lblCopyright.ForeColor = Color.FromArgb(100, 180, 180, 180);
-            lblCopyright.Text = LanguageManager.GetString(
-                "Splash.Copyright", "© 2025 AirDirector - All Rights Reserved");
+            lblCopyright.ForeColor = Color.FromArgb(120, 120, 130);
+            lblCopyright.Text = $"© {DateTime.Now.Year} AirDirector - All Rights Reserved";
+        }
+
+        private Panel CreateCard(string icon, string name, int yPosition, out Label statusLabel)
+        {
+            Panel card = new Panel
+            {
+                Location = new Point(700, yPosition),
+                Size = new Size(580, 32),
+                BackColor = Color.FromArgb(40, 40, 50),
+                Visible = false
+            };
+
+            card.Paint += (s, e) =>
+            {
+                Graphics g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                using (Pen pen = new Pen(Color.FromArgb(80, 80, 90), 1))
+                {
+                    g.DrawRectangle(pen, new Rectangle(0, 0, card.Width - 1, card.Height - 1));
+                }
+            };
+
+            Label lblIcon = new Label
+            {
+                Text = icon,
+                Font = new Font("Segoe UI Emoji", 14),
+                Location = new Point(8, 6),
+                Size = new Size(30, 20),
+                BackColor = Color.Transparent
+            };
+            card.Controls.Add(lblIcon);
+
+            Label lblName = new Label
+            {
+                Text = name,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(45, 8),
+                Size = new Size(400, 16),
+                BackColor = Color.Transparent
+            };
+            card.Controls.Add(lblName);
+
+            Label lblStatus = new Label
+            {
+                Text = "⚡ LOAD",
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                ForeColor = Color.Yellow,
+                Location = new Point(500, 8),
+                Size = new Size(70, 16),
+                TextAlign = ContentAlignment.MiddleRight,
+                BackColor = Color.Transparent
+            };
+            card.Controls.Add(lblStatus);
+
+            statusLabel = lblStatus;
+            return card;
         }
 
         private void LoadLogo()
         {
-            string logoPath = Path.Combine(Application.StartupPath, "Assets", "logo.png");
-
-            if (File.Exists(logoPath))
+            string[] logoPaths = new[]
             {
-                try
+                Path.Combine(Application.StartupPath, "Assets", "logo.png"),
+                Path.Combine(Application.StartupPath, "logo.png"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "logo.png")
+            };
+
+            foreach (string path in logoPaths)
+            {
+                if (File.Exists(path))
                 {
-                    pictureBoxLogo.Image = Image.FromFile(logoPath);
-                    pictureBoxLogo.Visible = true;
-                    lblLogo.Visible = false;
-                    return;
-                }
-                catch
-                {
-                    // Fall through to text fallback
+                    try
+                    {
+                        pictureBoxLogo.Image = Image.FromFile(path);
+                        pictureBoxLogo.Visible = true;
+                        lblLogo.Visible = false;
+                        return;
+                    }
+                    catch
+                    {
+                        // Try next path
+                    }
                 }
             }
 
             pictureBoxLogo.Visible = false;
             lblLogo.Visible = true;
+        }
+
+        private void LoadBackground()
+        {
+            string[] bgPaths = new[]
+            {
+                Path.Combine(Application.StartupPath, "Assets", "splash_bg.png"),
+                Path.Combine(Application.StartupPath, "splash_bg.png")
+            };
+
+            foreach (string path in bgPaths)
+            {
+                if (File.Exists(path))
+                {
+                    try
+                    {
+                        this.BackgroundImage = Image.FromFile(path);
+                        this.BackgroundImageLayout = ImageLayout.Stretch;
+                        return;
+                    }
+                    catch
+                    {
+                        // Try next path
+                    }
+                }
+            }
+
+            // Fallback: solid color already set in InitializeCustomComponents
+            this.BackColor = Color.FromArgb(25, 25, 35);
         }
 
         private void SplashForm_Load(object sender, EventArgs e)
@@ -131,32 +217,82 @@ namespace AirDirector.Forms
 
         private void StartLoadingProcess()
         {
-            System.Windows.Forms.Timer loadingTimer = new System.Windows.Forms.Timer { Interval = 450 };
+            System.Windows.Forms.Timer loadingTimer = new System.Windows.Forms.Timer { Interval = 500 };
             int stepIndex = 0;
 
             loadingTimer.Tick += (s, e) =>
             {
                 if (stepIndex < _loadingModules.Length)
                 {
-                    _statusLabels[stepIndex].ForeColor = AppTheme.LEDGreen;
-                    _statusLabels[stepIndex].Font = new Font("Segoe UI", 9, FontStyle.Bold);
+                    int currentIndex = stepIndex;
+                    AnimateCardSlideIn(currentIndex);
 
-                    int progress = (int)((stepIndex + 1) / (float)_loadingModules.Length * 100);
+                    // After 300ms mark as complete
+                    System.Windows.Forms.Timer completeTimer = new System.Windows.Forms.Timer { Interval = 300 };
+                    completeTimer.Tick += (cs, ce) =>
+                    {
+                        MarkCardAsComplete(currentIndex);
+                        completeTimer.Stop();
+                        completeTimer.Dispose();
+                    };
+                    completeTimer.Start();
+
+                    int progress = (int)((currentIndex + 1) / (float)_loadingModules.Length * 100);
                     progressBar.Value = progress;
-                    lblPercentage.Text = progress + "%";
+                    lblPercentage.Text = $"{progress}%";
 
                     stepIndex++;
                 }
                 else
                 {
                     loadingTimer.Stop();
-                    // Brief pause before closing — use a timer to avoid blocking the UI thread
-                    System.Windows.Forms.Timer closeTimer = new System.Windows.Forms.Timer { Interval = 300 };
+                    System.Windows.Forms.Timer closeTimer = new System.Windows.Forms.Timer { Interval = 500 };
                     closeTimer.Tick += (cs, ce) => { closeTimer.Stop(); this.Close(); };
                     closeTimer.Start();
                 }
             };
             loadingTimer.Start();
+        }
+
+        private void AnimateCardSlideIn(int index)
+        {
+            Panel card = _cardPanels[index];
+            card.Visible = true;
+
+            int startX = 700;
+            int finalX = 10;
+            int steps = 30;
+            int currentStep = 0;
+
+            System.Windows.Forms.Timer slideTimer = new System.Windows.Forms.Timer { Interval = 10 };
+            slideTimer.Tick += (s, ev) =>
+            {
+                if (currentStep < steps)
+                {
+                    float progress = (float)currentStep / steps;
+                    float easedProgress = 1 - (float)Math.Pow(1 - progress, 3);
+                    int currentX = (int)(startX + (finalX - startX) * easedProgress);
+                    card.Location = new Point(currentX, card.Location.Y);
+                    currentStep++;
+                }
+                else
+                {
+                    card.Location = new Point(finalX, card.Location.Y);
+                    slideTimer.Stop();
+                    slideTimer.Dispose();
+                }
+            };
+            slideTimer.Start();
+        }
+
+        private void MarkCardAsComplete(int index)
+        {
+            Panel card = _cardPanels[index];
+            Label statusLabel = _cardStatusLabels[index];
+
+            card.BackColor = Color.FromArgb(30, 100, 60);
+            statusLabel.Text = "✓ DONE";
+            statusLabel.ForeColor = Color.FromArgb(100, 255, 150);
         }
 
         [System.Runtime.InteropServices.DllImport("Gdi32.dll", EntryPoint = "CreateRoundRectRgn")]
