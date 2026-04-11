@@ -38,7 +38,7 @@ namespace AirDirector.Forms
             // Version Label
             Label lblVersion = new Label
             {
-                Text = LanguageManager.GetString("Splash.Version", "Versione 1.0.0"),
+                Text = $"{LanguageManager.GetString("Splash.Version", "Versione")} {AppVersion.Current}",
                 Font = new Font("Segoe UI", 12, FontStyle.Regular),
                 ForeColor = AppTheme.TextInverse,
                 AutoSize = false,

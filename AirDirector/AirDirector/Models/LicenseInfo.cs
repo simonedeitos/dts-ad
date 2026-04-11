@@ -24,7 +24,7 @@ namespace AirDirector.Models
             ActivatedOn = DateTime.MinValue;
             MachineID = string.Empty;
             ProductName = "AirDirector";
-            Version = "1.0.0";
+            Version = AppVersion.Current;
             IsActivated = false;
             IsDemoMode = true;
         }
@@ -98,7 +98,7 @@ namespace AirDirector.Models
                 IsDemoMode = true,
                 IsActivated = false,
                 ProductName = "AirDirector",
-                Version = "1.0.0"
+                Version = AppVersion.Current
             };
         }
 
