@@ -112,7 +112,7 @@ namespace AirDirector.Controls
 			_queueMonitorTimer.Tick += QueueMonitorTimer_Tick;
 			_queueMonitorTimer.Start();
 
-			_scheduleMonitorTimer = new System.Windows.Forms.Timer { Interval = 60000 };
+			_scheduleMonitorTimer = new System.Windows.Forms.Timer { Interval = 30000 };
 			_scheduleMonitorTimer.Tick += ScheduleMonitorTimer_Tick;
 			_scheduleMonitorTimer.Start();
 
@@ -501,7 +501,7 @@ namespace AirDirector.Controls
 			}
 		}
 
-		// Cerca schedulazioni ADV nella finestra [now, now+60s] e le attiva subito o con timer interno.
+		// Cerca schedulazioni ADV nella finestra [now, now+90s] e le attiva subito o con timer interno.
 		private void LookAheadAndExecuteADVSchedules(DateTime now)
 		{
 			try
@@ -509,7 +509,11 @@ namespace AirDirector.Controls
 				if (_cachedAdvItems.Count == 0 || _advCacheDate != now.Date)
 					LoadAdvCache();
 
-				if (_cachedAdvItems.Count == 0) return;
+				if (_cachedAdvItems.Count == 0)
+				{
+					Log($"[PlaylistADV] ⚠️ LookAhead: nessun item in cache.");
+					return;
+				}
 
 				var todaySlots = _cachedAdvItems
 					.Where(a => a.Date.Date == now.Date && a.IsActive)
@@ -517,18 +521,30 @@ namespace AirDirector.Controls
 					.Select(g => new { SlotTime = g.Key, Items = g.OrderBy(x => x.SequenceOrder).ToList() })
 					.ToList();
 
+				Log($"[PlaylistADV] LookAhead {now:HH:mm:ss}: slot oggi={todaySlots.Count}, item totali={_cachedAdvItems.Count(a => a.Date.Date == now.Date)}");
+
 				TimeSpan windowStart = now.TimeOfDay;
-				TimeSpan windowEnd = now.TimeOfDay.Add(TimeSpan.FromSeconds(60));
+				TimeSpan windowEnd = now.TimeOfDay.Add(TimeSpan.FromSeconds(90));
 
 				foreach (var slot in todaySlots)
 				{
-					if (!TimeSpan.TryParse(slot.SlotTime, out TimeSpan slotTime)) continue;
+					if (!TimeSpan.TryParse(slot.SlotTime, out TimeSpan slotTime))
+					{
+						Log($"[PlaylistADV] ⚠️ SlotTime non parsabile: '{slot.SlotTime}'");
+						continue;
+					}
 
 					bool inWindow = slotTime >= windowStart && slotTime < windowEnd;
 					if (!inWindow) continue;
 
+					Log($"[PlaylistADV]   Slot {slot.SlotTime}: in finestra ({windowStart:hh\\:mm\\:ss}–{windowEnd:hh\\:mm\\:ss}), item={slot.Items.Count}");
+
 					string advKey = $"ADV_{slot.SlotTime}_{now:yyyy-MM-dd}";
-					if (_executedSchedules.Contains(advKey)) continue;
+					if (_executedSchedules.Contains(advKey))
+					{
+						Log($"[PlaylistADV]   Slot {slot.SlotTime}: già eseguito, skip.");
+						continue;
+					}
 
 					double delayMs = (slotTime - now.TimeOfDay).TotalMilliseconds;
 
@@ -539,6 +555,7 @@ namespace AirDirector.Controls
 
 					if (delayMs <= 500)
 					{
+						Log($"[PlaylistADV] ▶ Esecuzione immediata slot {slot.SlotTime} (ritardo={delayMs:F0}ms)");
 						ExecuteADVSlot(now, capturedSlot.SlotTime, capturedSlot.Items);
 					}
 					else
@@ -797,11 +814,20 @@ namespace AirDirector.Controls
 				{
 					try
 					{
-						string line = lines[i].Trim();
+						string line = lines[i].Trim().TrimStart('\uFEFF');
+						if (string.IsNullOrEmpty(line)) continue;
 						if (line.StartsWith("\"") && line.EndsWith("\"") && line.Length >= 2)
 							line = line.Substring(1, line.Length - 2);
 						var parts = line.Split(new[] { "\";\""  }, StringSplitOptions.None);
-						if (parts.Length < 9) continue;
+						if (parts.Length < 9)
+						{
+							Log($"[PlaylistADV] ⚠️ Riga {i} saltata: solo {parts.Length} campi (attesi 9). Contenuto: '{lines[i].Trim()}'");
+							continue;
+						}
+
+						// Pulisci eventuali virgolette residue su ogni campo
+						for (int p = 0; p < parts.Length; p++)
+							parts[p] = parts[p].Trim('"').Trim();
 
 						var item = new AirDirectorPlaylistItem
 						{
@@ -823,7 +849,7 @@ namespace AirDirector.Controls
 					}
 					catch (Exception ex)
 					{
-						Log($"[PlaylistADV] ⚠️ Riga {i} saltata: {ex.Message}");
+						Log($"[PlaylistADV] ⚠️ Riga {i} saltata: {ex.Message} — Contenuto: '{lines[i].Trim()}'");
 					}
 				}
 
