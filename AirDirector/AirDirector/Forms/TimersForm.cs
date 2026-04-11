@@ -627,8 +627,11 @@ namespace AirDirector.Forms
                 {
                     try
                     {
-                        var p = lines[i].Split(',');
-                        if (p.Length < 12) continue;
+                        string line = lines[i].Trim();
+                        if (line.StartsWith("\"") && line.EndsWith("\"") && line.Length >= 2)
+                            line = line.Substring(1, line.Length - 2);
+                        var p = line.Split(new[] { "\";\""  }, StringSplitOptions.None);
+                        if (p.Length < 9) continue;
                         _cachedAdvItems.Add(new AirDirectorPlaylistItem
                         {
                             ID            = int.Parse(p[0]),
@@ -640,9 +643,9 @@ namespace AirDirector.Forms
                             Duration      = int.Parse(p[6]),
                             ClientName    = p[7],
                             SpotTitle     = p[8],
-                            CampaignName  = p[9],
-                            CategoryName  = p[10],
-                            IsActive      = bool.Parse(p[11])
+                            CampaignName  = "",
+                            CategoryName  = "",
+                            IsActive      = true
                         });
                     }
                     catch { }
