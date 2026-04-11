@@ -262,10 +262,11 @@ namespace AirDirector.Forms
 
             dgvHistory.CellFormatting += DgvHistory_CellFormatting;
 
-            // Add controls in correct order for proper docking layout (bottom-up)
-            this.Controls.Add(dgvHistory);
-            this.Controls.Add(statsPanel);
+            // Add Top/Bottom panels first, then Fill control last so WinForms docking
+            // positions panels above/below the grid correctly.
             this.Controls.Add(filterPanel);
+            this.Controls.Add(statsPanel);
+            this.Controls.Add(dgvHistory);
         }
 
         private void DgvHistory_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
