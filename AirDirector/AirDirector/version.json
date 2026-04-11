@@ -1,6 +1,6 @@
 {
   "major": 1,
   "minor": 0,
-  "patch": 2,
+  "patch": 3,
   "comment": "MODIFICA SOLO 'major' MANUALMENTE. Minor e Patch si auto-incrementano ad ogni compilazione del progetto."
 }
