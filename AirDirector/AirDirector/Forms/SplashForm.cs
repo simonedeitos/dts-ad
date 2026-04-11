@@ -11,6 +11,8 @@ namespace AirDirector.Forms
     {
         private Panel[] _cardPanels;
         private Label[] _cardStatusLabels;
+        private Image _logoImage;
+        private Image _backgroundImage;
 
         private readonly (string Icon, string Name)[] _loadingModules =
         {
@@ -153,7 +155,8 @@ namespace AirDirector.Forms
                 {
                     try
                     {
-                        pictureBoxLogo.Image = Image.FromFile(path);
+                        _logoImage = Image.FromFile(path);
+                        pictureBoxLogo.Image = _logoImage;
                         pictureBoxLogo.Visible = true;
                         lblLogo.Visible = false;
                         return;
@@ -183,7 +186,8 @@ namespace AirDirector.Forms
                 {
                     try
                     {
-                        this.BackgroundImage = Image.FromFile(path);
+                        _backgroundImage = Image.FromFile(path);
+                        this.BackgroundImage = _backgroundImage;
                         this.BackgroundImageLayout = ImageLayout.Stretch;
                         return;
                     }
@@ -261,10 +265,10 @@ namespace AirDirector.Forms
 
             int startX = 700;
             int finalX = 10;
-            int steps = 30;
+            int steps = 19; // ~300ms at 16ms interval
             int currentStep = 0;
 
-            System.Windows.Forms.Timer slideTimer = new System.Windows.Forms.Timer { Interval = 10 };
+            System.Windows.Forms.Timer slideTimer = new System.Windows.Forms.Timer { Interval = 16 };
             slideTimer.Tick += (s, ev) =>
             {
                 if (currentStep < steps)

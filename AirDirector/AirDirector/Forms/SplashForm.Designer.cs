@@ -19,6 +19,11 @@
             {
                 components.Dispose();
             }
+            if (disposing)
+            {
+                _logoImage?.Dispose();
+                _backgroundImage?.Dispose();
+            }
             base.Dispose(disposing);
         }
 
