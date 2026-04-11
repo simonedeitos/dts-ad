@@ -797,8 +797,11 @@ namespace AirDirector.Controls
 				{
 					try
 					{
-						var parts = lines[i].Split(',');
-						if (parts.Length < 12) continue;
+						string line = lines[i].Trim();
+						if (line.StartsWith("\"") && line.EndsWith("\"") && line.Length >= 2)
+							line = line.Substring(1, line.Length - 2);
+						var parts = line.Split(new[] { "\";\""  }, StringSplitOptions.None);
+						if (parts.Length < 9) continue;
 
 						var item = new AirDirectorPlaylistItem
 						{
@@ -811,9 +814,9 @@ namespace AirDirector.Controls
 							Duration = int.Parse(parts[6]),
 							ClientName = parts[7],
 							SpotTitle = parts[8],
-							CampaignName = parts[9],
-							CategoryName = parts[10],
-							IsActive = bool.Parse(parts[11])
+							CampaignName = "",
+							CategoryName = "",
+							IsActive = true
 						};
 
 						_cachedAdvItems.Add(item);
