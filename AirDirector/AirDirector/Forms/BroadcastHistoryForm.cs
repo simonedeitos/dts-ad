@@ -182,8 +182,6 @@ namespace AirDirector.Forms
             btnExport.Click += BtnExport_Click;
             filterPanel.Controls.Add(btnExport);
 
-            this.Controls.Add(filterPanel);
-
             // Stats panel (bottom)
             statsPanel = new Panel
             {
@@ -220,8 +218,6 @@ namespace AirDirector.Forms
             btnStatistics.Click += BtnStatistics_Click;
             statsPanel.Controls.Add(btnStatistics);
             statsPanel.Resize += (s, e) => btnStatistics.Location = new Point(statsPanel.Width - btnStatistics.Width - 10, 9);
-
-            this.Controls.Add(statsPanel);
 
             // DataGridView
             dgvHistory = new DataGridView
@@ -266,7 +262,10 @@ namespace AirDirector.Forms
 
             dgvHistory.CellFormatting += DgvHistory_CellFormatting;
 
+            // Add controls in correct order for proper docking layout (bottom-up)
             this.Controls.Add(dgvHistory);
+            this.Controls.Add(statsPanel);
+            this.Controls.Add(filterPanel);
         }
 
         private void DgvHistory_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
