@@ -31,6 +31,7 @@ namespace AirDirector.Controls
         private Button btnExport;
 
         private List<ReportEntry> _currentData;
+        private EventHandler _languageChangedHandler;
 
         public ReportAdvancedControl()
         {
@@ -38,7 +39,8 @@ namespace AirDirector.Controls
             InitializeCustomUI();
             ApplyLanguage();
             _currentData = new List<ReportEntry>();
-            LanguageManager.LanguageChanged += (s, e) => ApplyLanguage();
+            _languageChangedHandler = (s, e) => ApplyLanguage();
+            LanguageManager.LanguageChanged += _languageChangedHandler;
         }
 
         private void ApplyLanguage()
@@ -344,7 +346,7 @@ namespace AirDirector.Controls
         {
             if (disposing)
             {
-                LanguageManager.LanguageChanged -= (s, e) => ApplyLanguage();
+                LanguageManager.LanguageChanged -= _languageChangedHandler;
                 components?.Dispose();
             }
             base.Dispose(disposing);

@@ -373,7 +373,16 @@ namespace AirDirector.Forms
         private void BuildWeekdayDistChart()
         {
             tabWeekday.Controls.Clear();
-            string[] weekdays = { "Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab" };
+            string[] weekdays =
+            {
+                LanguageManager.GetString("MusicStatistics.Weekday.Sun", "Dom"),
+                LanguageManager.GetString("MusicStatistics.Weekday.Mon", "Lun"),
+                LanguageManager.GetString("MusicStatistics.Weekday.Tue", "Mar"),
+                LanguageManager.GetString("MusicStatistics.Weekday.Wed", "Mer"),
+                LanguageManager.GetString("MusicStatistics.Weekday.Thu", "Gio"),
+                LanguageManager.GetString("MusicStatistics.Weekday.Fri", "Ven"),
+                LanguageManager.GetString("MusicStatistics.Weekday.Sat", "Sab")
+            };
             var weekdayData = Enumerable.Range(0, 7).Select(d => new
             {
                 Day = d,
@@ -739,6 +748,9 @@ namespace AirDirector.Forms
 
         private class ChartPanel : Panel
         {
+            private const int MaxBarLabelLength = 8;
+            private const int MaxHorizontalLabelLength = 28;
+            private const int MaxLineLabelLength = 6;
             private readonly List<string> _labels;
             private readonly List<double> _values;
             private readonly string _title;
@@ -822,7 +834,7 @@ namespace AirDirector.Forms
 
                         if (i < _labels.Count)
                         {
-                            string lbl = _labels[i].Length > 8 ? _labels[i].Substring(0, 7) + "…" : _labels[i];
+                            string lbl = _labels[i].Length > MaxBarLabelLength ? _labels[i].Substring(0, MaxBarLabelLength - 1) + "…" : _labels[i];
                             var lblSize = g.MeasureString(lbl, labelFont);
                             g.DrawString(lbl, labelFont, labelBrush, x + barW / 2 - lblSize.Width / 2, topMargin + chartH + 5);
                         }
@@ -873,7 +885,7 @@ namespace AirDirector.Forms
 
                         // Label
                         string lbl = i < _labels.Count ? _labels[i] : "";
-                        if (lbl.Length > 28) lbl = lbl.Substring(0, 27) + "…";
+                        if (lbl.Length > MaxHorizontalLabelLength) lbl = lbl.Substring(0, MaxHorizontalLabelLength - 1) + "…";
                         g.DrawString(lbl, labelFont, labelBrush, margin, y + barH / 2 - 7);
 
                         // Bar
@@ -929,7 +941,7 @@ namespace AirDirector.Forms
                     {
                         if (i < _labels.Count)
                         {
-                            string lbl = _labels[i].Length > 6 ? _labels[i].Substring(0, 5) + "…" : _labels[i];
+                            string lbl = _labels[i].Length > MaxLineLabelLength ? _labels[i].Substring(0, MaxLineLabelLength - 1) + "…" : _labels[i];
                             g.DrawString(lbl, labelFont, labelBrush, points[i].X - 15, topMargin + chartH + 5);
                         }
                     }
