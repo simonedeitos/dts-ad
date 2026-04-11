@@ -38,13 +38,13 @@ namespace AirDirector.Forms
         {
             DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle9 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle7 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle10 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle8 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle9 = new DataGridViewCellStyle();
             filterPanel = new Panel();
             lblFrom = new Label();
             dtpFrom = new DateTimePicker();
@@ -127,7 +127,7 @@ namespace AirDirector.Forms
             // dtpTo
             // 
             dtpTo.Format = DateTimePickerFormat.Short;
-            dtpTo.Location = new Point(211, 13);
+            dtpTo.Location = new Point(211, 11);
             dtpTo.Name = "dtpTo";
             dtpTo.Size = new Size(110, 23);
             dtpTo.TabIndex = 3;
@@ -184,7 +184,7 @@ namespace AirDirector.Forms
             btnRefresh.FlatStyle = FlatStyle.Flat;
             btnRefresh.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             btnRefresh.ForeColor = Color.White;
-            btnRefresh.Location = new Point(776, 10);
+            btnRefresh.Location = new Point(795, 11);
             btnRefresh.Name = "btnRefresh";
             btnRefresh.Size = new Size(110, 30);
             btnRefresh.TabIndex = 8;
@@ -211,27 +211,27 @@ namespace AirDirector.Forms
             dgvHistory.AllowUserToAddRows = false;
             dgvHistory.AllowUserToDeleteRows = false;
             dgvHistory.AllowUserToResizeRows = false;
-            dataGridViewCellStyle6.BackColor = Color.FromArgb(35, 35, 35);
-            dgvHistory.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle6;
+            dataGridViewCellStyle1.BackColor = Color.FromArgb(35, 35, 35);
+            dgvHistory.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
             dgvHistory.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvHistory.BackgroundColor = Color.FromArgb(30, 30, 30);
             dgvHistory.BorderStyle = BorderStyle.None;
-            dataGridViewCellStyle7.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle7.BackColor = Color.FromArgb(50, 50, 50);
-            dataGridViewCellStyle7.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            dataGridViewCellStyle7.ForeColor = Color.White;
-            dgvHistory.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle7;
+            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle2.BackColor = Color.FromArgb(50, 50, 50);
+            dataGridViewCellStyle2.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            dataGridViewCellStyle2.ForeColor = Color.White;
+            dgvHistory.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
             dgvHistory.ColumnHeadersHeight = 40;
             dgvHistory.Columns.AddRange(new DataGridViewColumn[] { colDate, colTime, colType, colArtist, colTitle, colDuration });
-            dataGridViewCellStyle10.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle10.BackColor = Color.FromArgb(40, 40, 40);
-            dataGridViewCellStyle10.Font = new Font("Segoe UI", 10F);
-            dataGridViewCellStyle10.ForeColor = Color.White;
-            dataGridViewCellStyle10.Padding = new Padding(5);
-            dataGridViewCellStyle10.SelectionBackColor = Color.FromArgb(0, 120, 215);
-            dataGridViewCellStyle10.SelectionForeColor = Color.White;
-            dataGridViewCellStyle10.WrapMode = DataGridViewTriState.False;
-            dgvHistory.DefaultCellStyle = dataGridViewCellStyle10;
+            dataGridViewCellStyle9.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle9.BackColor = Color.FromArgb(40, 40, 40);
+            dataGridViewCellStyle9.Font = new Font("Segoe UI", 10F);
+            dataGridViewCellStyle9.ForeColor = Color.White;
+            dataGridViewCellStyle9.Padding = new Padding(5);
+            dataGridViewCellStyle9.SelectionBackColor = Color.FromArgb(0, 120, 215);
+            dataGridViewCellStyle9.SelectionForeColor = Color.White;
+            dataGridViewCellStyle9.WrapMode = DataGridViewTriState.False;
+            dgvHistory.DefaultCellStyle = dataGridViewCellStyle9;
             dgvHistory.Dock = DockStyle.Fill;
             dgvHistory.EnableHeadersVisualStyles = false;
             dgvHistory.Font = new Font("Segoe UI", 10F);
@@ -248,8 +248,8 @@ namespace AirDirector.Forms
             // 
             // colDate
             // 
-            dataGridViewCellStyle8.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            colDate.DefaultCellStyle = dataGridViewCellStyle8;
+            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colDate.DefaultCellStyle = dataGridViewCellStyle3;
             colDate.FillWeight = 12F;
             colDate.HeaderText = "📅 Data";
             colDate.Name = "colDate";
@@ -257,8 +257,8 @@ namespace AirDirector.Forms
             // 
             // colTime
             // 
-            dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            colTime.DefaultCellStyle = dataGridViewCellStyle1;
+            dataGridViewCellStyle4.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colTime.DefaultCellStyle = dataGridViewCellStyle4;
             colTime.FillWeight = 10F;
             colTime.HeaderText = "🕐 Ora";
             colTime.Name = "colTime";
@@ -266,8 +266,8 @@ namespace AirDirector.Forms
             // 
             // colType
             // 
-            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            colType.DefaultCellStyle = dataGridViewCellStyle2;
+            dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colType.DefaultCellStyle = dataGridViewCellStyle5;
             colType.FillWeight = 10F;
             colType.HeaderText = "🎵 Tipo";
             colType.Name = "colType";
@@ -275,8 +275,8 @@ namespace AirDirector.Forms
             // 
             // colArtist
             // 
-            dataGridViewCellStyle9.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            colArtist.DefaultCellStyle = dataGridViewCellStyle9;
+            dataGridViewCellStyle6.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            colArtist.DefaultCellStyle = dataGridViewCellStyle6;
             colArtist.FillWeight = 25F;
             colArtist.HeaderText = "🎤 Artista";
             colArtist.Name = "colArtist";
@@ -284,8 +284,8 @@ namespace AirDirector.Forms
             // 
             // colTitle
             // 
-            dataGridViewCellStyle4.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            colTitle.DefaultCellStyle = dataGridViewCellStyle4;
+            dataGridViewCellStyle7.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            colTitle.DefaultCellStyle = dataGridViewCellStyle7;
             colTitle.FillWeight = 25F;
             colTitle.HeaderText = "🎶 Titolo";
             colTitle.Name = "colTitle";
@@ -293,8 +293,8 @@ namespace AirDirector.Forms
             // 
             // colDuration
             // 
-            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            colDuration.DefaultCellStyle = dataGridViewCellStyle3;
+            dataGridViewCellStyle8.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colDuration.DefaultCellStyle = dataGridViewCellStyle8;
             colDuration.FillWeight = 10F;
             colDuration.HeaderText = "⏱️ Durata";
             colDuration.Name = "colDuration";
