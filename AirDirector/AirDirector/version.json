@@ -2,5 +2,5 @@
   "major": 1,
   "minor": 0,
   "patch": 0,
-  "comment": "MODIFICA SOLO 'major' MANUALMENTE. Minor e Patch si auto-incrementano ad ogni build."
+  "comment": "MODIFICA SOLO 'major' MANUALMENTE. Minor e Patch si auto-incrementano ad ogni avvio dell'applicazione."
 }
