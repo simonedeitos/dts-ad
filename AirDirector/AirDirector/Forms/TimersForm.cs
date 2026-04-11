@@ -88,6 +88,21 @@ namespace AirDirector.Forms
 
         private void OnLanguageChanged(object sender, EventArgs e) => ApplyLanguage();
 
+        protected override void WndProc(ref Message m)
+        {
+            const int WM_SYSCOMMAND = 0x0112;
+            const int SC_MINIMIZE = 0xF020;
+
+            // Impedisci la minimizzazione causata dall'owner
+            if (m.Msg == WM_SYSCOMMAND && (m.WParam.ToInt32() & 0xFFF0) == SC_MINIMIZE)
+            {
+                // Non fare nulla - impedisce la minimizzazione
+                return;
+            }
+
+            base.WndProc(ref m);
+        }
+
         private void ApplyLanguage()
         {
             this.Text = LanguageManager.GetString("TimersForm.Title", "Timers");
