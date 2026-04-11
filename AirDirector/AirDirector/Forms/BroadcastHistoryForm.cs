@@ -352,7 +352,7 @@ namespace AirDirector.Forms
                 if (TimeSpan.TryParse(entry.PlayDuration, out TimeSpan dur))
                     totalDuration += dur;
             }
-            lblTotalDuration.Text = $"Durata: {totalDuration:hh\\:mm\\:ss}";
+            lblTotalDuration.Text = $"Durata: {(int)totalDuration.TotalHours:D2}:{totalDuration.Minutes:D2}:{totalDuration.Seconds:D2}";
 
             // Top artist
             if (_filteredData.Count > 0)
