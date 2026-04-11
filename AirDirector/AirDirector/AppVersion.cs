@@ -5,7 +5,9 @@ using Newtonsoft.Json.Linq;
 namespace AirDirector
 {
     /// <summary>
-    /// Gestione centralizzata della versione dell'applicazione con auto-incremento ad ogni avvio
+    /// Gestione centralizzata della versione dell'applicazione.
+    /// La versione (Minor/Patch) viene incrementata ad ogni compilazione tramite MSBuild Target,
+    /// non ad ogni avvio dell'applicazione.
     /// </summary>
     public static class AppVersion
     {
@@ -15,7 +17,8 @@ namespace AirDirector
 
         /// <summary>
         /// Ottiene la versione corrente in formato Major.Minor.Patch.
-        /// La versione viene incrementata una sola volta per sessione (al primo accesso).
+        /// Il valore viene letto dal file version.json (copiato nella directory di output a build-time)
+        /// e memorizzato in cache al primo accesso.
         /// </summary>
         public static string Current
         {
@@ -27,7 +30,7 @@ namespace AirDirector
                     {
                         if (_cachedVersion == null)
                         {
-                            _cachedVersion = LoadAndIncrementVersion();
+                            _cachedVersion = LoadVersion();
                         }
                     }
                 }
@@ -41,12 +44,11 @@ namespace AirDirector
         public static string DisplayVersion => $"v{Current}";
 
         /// <summary>
-        /// Carica la versione dal file JSON e incrementa Minor/Patch.
-        /// Nota: la versione cresce ad ogni avvio dell'applicazione, non ad ogni compilazione.
-        /// In caso di avvii simultanei di più istanze, l'incremento potrebbe non essere univoco;
-        /// questo è accettabile per un'applicazione desktop tipicamente eseguita in una sola istanza.
+        /// Legge la versione dal file version.json nella directory di output.
+        /// L'incremento di Minor/Patch avviene a build-time tramite il target MSBuild
+        /// IncrementBuildVersion definito in AirDirector.csproj.
         /// </summary>
-        private static string LoadAndIncrementVersion()
+        private static string LoadVersion()
         {
             try
             {
@@ -62,30 +64,6 @@ namespace AirDirector
                 int major = versionData["major"]?.Value<int>() ?? 1;
                 int minor = versionData["minor"]?.Value<int>() ?? 0;
                 int patch = versionData["patch"]?.Value<int>() ?? 0;
-
-                // Incrementa Patch ad ogni avvio
-                patch++;
-
-                // Ogni 100 avvii, incrementa Minor e resetta Patch
-                if (patch >= 100)
-                {
-                    minor++;
-                    patch = 0;
-                }
-
-                // Salva i nuovi valori
-                versionData["minor"] = minor;
-                versionData["patch"] = patch;
-
-                try
-                {
-                    File.WriteAllText(VersionFilePath, versionData.ToString());
-                }
-                catch
-                {
-                    // Se non riesce a scrivere (es. permessi insufficienti o file in sola lettura),
-                    // l'applicazione continua comunque con la versione calcolata in memoria.
-                }
 
                 return $"{major}.{minor}.{patch}";
             }

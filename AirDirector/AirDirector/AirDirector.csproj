@@ -19,6 +19,51 @@
     </None>
   </ItemGroup>
 
+  <UsingTask TaskName="IncrementVersionTask" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <VersionFile ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Text.RegularExpressions" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+          if (!File.Exists(VersionFile))
+          {
+            Log.LogWarning("version.json not found at: " + VersionFile);
+            return true;
+          }
+          string json = File.ReadAllText(VersionFile);
+
+          int minor = 0;
+          int patch  = 0;
+          int major  = 1;
+
+          var mMajor = Regex.Match(json, @"""major""\s*:\s*(\d+)");
+          var mMinor = Regex.Match(json, @"""minor""\s*:\s*(\d+)");
+          var mPatch = Regex.Match(json, @"""patch""\s*:\s*(\d+)");
+
+          if (mMajor.Success) int.TryParse(mMajor.Groups[1].Value, out major);
+          if (mMinor.Success) int.TryParse(mMinor.Groups[1].Value, out minor);
+          if (mPatch.Success) int.TryParse(mPatch.Groups[1].Value, out patch);
+
+          patch++;
+          if (patch >= 100) { minor++; patch = 0; }
+
+          json = Regex.Replace(json, @"(""minor""\s*:\s*)\d+", "${1}" + minor);
+          json = Regex.Replace(json, @"(""patch""\s*:\s*)\d+",  "${1}" + patch);
+
+          File.WriteAllText(VersionFile, json);
+          Log.LogMessage(MessageImportance.High, "Version incremented to: " + major + "." + minor + "." + patch);
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="IncrementBuildVersion" BeforeTargets="BeforeBuild">
+    <IncrementVersionTask VersionFile="$(MSBuildProjectDirectory)\version.json" />
+  </Target>
+
   <ItemGroup>
     <Folder Include="Properties\" />
     <Folder Include="Resources\" />
