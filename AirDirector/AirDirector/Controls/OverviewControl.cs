@@ -954,11 +954,16 @@ namespace AirDirector.Controls
                 {
                     try
                     {
-                        string line = lines[i].Trim();
+                        string line = lines[i].Trim().TrimStart('\uFEFF');
+                        if (string.IsNullOrEmpty(line)) continue;
                         if (line.StartsWith("\"") && line.EndsWith("\"") && line.Length >= 2)
                         	line = line.Substring(1, line.Length - 2);
                         var parts = line.Split(new[] { "\";\""  }, StringSplitOptions.None);
                         if (parts.Length < 9) continue;
+
+                        // Pulisci eventuali virgolette residue su ogni campo
+                        for (int p = 0; p < parts.Length; p++)
+                            parts[p] = parts[p].Trim('"').Trim();
 
                         var item = new AirDirectorPlaylistItem
                         {
