@@ -197,7 +197,7 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
-            this.Text = "Configura Task Download";
+            this.Text = LanguageManager.GetString("TaskEditor.Title", "Configura Task Download");
             this.Size = new Size(750, 650);
             this.StartPosition = FormStartPosition.CenterParent;
             this.MinimumSize = new Size(750, 650);
