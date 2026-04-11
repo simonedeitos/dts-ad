@@ -581,7 +581,7 @@ namespace AirDirector.Forms
             // Menu order: [0]=File, [1]=Visualizza, [2]=Strumenti, [3]=Report, [4]=Aiuto
             if (menuStrip.Items[0] is ToolStripMenuItem menuFile) { menuFile.Text = LanguageManager.GetString("MainForm.MenuFile", "File"); if (menuFile.DropDownItems.Count > 0) menuFile.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuExit", "Esci"); }
             if (menuStrip.Items[1] is ToolStripMenuItem menuView) { menuView.Text = LanguageManager.GetString("MainForm.MenuView", "Visualizza"); if (menuView.DropDownItems.Count > 0) menuView.DropDownItems[0].Text = "⏱ " + LanguageManager.GetString("MainForm.MenuTimers", "Timers"); }
-            if (menuStrip.Items[2] is ToolStripMenuItem menuTools) { menuTools.Text = LanguageManager.GetString("MainForm.MenuTools", "Strumenti"); if (menuTools.DropDownItems.Count > 0) { menuTools.DropDownItems[0].Text = "🔧 " + LanguageManager.GetString("MainForm.MenuDatabaseModifications", "Modifiche Database"); if (menuTools.DropDownItems.Count > 2) menuTools.DropDownItems[2].Text = LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"); if (menuTools.DropDownItems.Count > 4) menuTools.DropDownItems[4].Text = "💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"); if (menuTools.DropDownItems.Count > 6) menuTools.DropDownItems[6].Text = LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"); } }
+            if (menuStrip.Items[2] is ToolStripMenuItem menuTools) { menuTools.Text = LanguageManager.GetString("MainForm.MenuTools", "Strumenti"); if (menuTools.DropDownItems.Count > 0) { menuTools.DropDownItems[0].Text = "🔧 " + LanguageManager.GetString("MainForm.MenuDatabaseModifications", "Modifiche Database"); if (menuTools.DropDownItems.Count > 2) menuTools.DropDownItems[2].Text = "⚙️ " + LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"); if (menuTools.DropDownItems.Count > 4) menuTools.DropDownItems[4].Text = "💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"); if (menuTools.DropDownItems.Count > 6) menuTools.DropDownItems[6].Text = "🔑 " + LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"); } }
             if (menuStrip.Items[3] is ToolStripMenuItem menuReport) { menuReport.Text = LanguageManager.GetString("MainForm.MenuReport", "Report"); if (menuReport.DropDownItems.Count > 0) menuReport.DropDownItems[0].Text = "📊 " + LanguageManager.GetString("MainForm.MenuViewReport", "Visualizza Report"); if (menuReport.DropDownItems.Count > 1) menuReport.DropDownItems[1].Text = "📻 " + LanguageManager.GetString("MainForm.MenuBroadcastHistory", "Storico Trasmesso"); if (menuReport.DropDownItems.Count > 2) menuReport.DropDownItems[2].Text = "📊 " + LanguageManager.GetString("MainForm.MenuMusicStatistics", "Statistiche Musica"); }
             if (menuStrip.Items[4] is ToolStripMenuItem menuHelp) { menuHelp.Text = LanguageManager.GetString("MainForm.MenuHelp", "Aiuto"); if (menuHelp.DropDownItems.Count > 0) menuHelp.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuAbout", "Informazioni"); }
         }
@@ -729,11 +729,11 @@ namespace AirDirector.Forms
             ToolStripMenuItem menuTools= new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuTools", "Strumenti"));
             menuTools.DropDownItems.Add("🔧 " + LanguageManager.GetString("MainForm.MenuDatabaseModifications", "Modifiche Database"), null, MenuDatabaseModifications_Click);
             menuTools.DropDownItems.Add(new ToolStripSeparator());
-            menuTools.DropDownItems.Add(LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"), null, MenuSettings_Click);
+            menuTools.DropDownItems.Add("⚙️ " + LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"), null, MenuSettings_Click);
             menuTools.DropDownItems.Add(new ToolStripSeparator());
             menuTools.DropDownItems.Add("💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"), null, MenuBackup_Click);
             menuTools.DropDownItems.Add(new ToolStripSeparator());
-            menuTools.DropDownItems.Add(LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"), null, MenuLicense_Click);
+            menuTools.DropDownItems.Add("🔑 " + LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"), null, MenuLicense_Click);
             menuStrip.Items.Add(menuTools);
             ToolStripMenuItem menuReport = new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuReport", "Report"));
             menuReport.DropDownItems.Add("📊 " + LanguageManager.GetString("MainForm.MenuViewReport", "Visualizza Report"), null, MenuViewReport_Click);
@@ -741,7 +741,7 @@ namespace AirDirector.Forms
             menuReport.DropDownItems.Add("📊 " + LanguageManager.GetString("MainForm.MenuMusicStatistics", "Statistiche Musica"), null, MenuMusicStatistics_Click);
             menuStrip.Items.Add(menuReport);
             ToolStripMenuItem menuHelp = new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuHelp", "Aiuto"));
-            menuHelp.DropDownItems.Add(LanguageManager.GetString("MainForm.MenuAbout", "Informazioni"), null, MenuAbout_Click);
+            menuHelp.DropDownItems.Add("ℹ️ " + LanguageManager.GetString("MainForm.MenuAbout", "Informazioni"), null, MenuAbout_Click);
             menuStrip.Items.Add(menuHelp);
             this.MainMenuStrip = menuStrip;
             this.Controls.Add(menuStrip);
@@ -882,7 +882,7 @@ namespace AirDirector.Forms
 
         private void MenuAbout_Click(object sender, EventArgs e)
         {
-            string aboutText = $"AirDirector {AppVersion.DisplayVersion}\n\nProfessional Playout System\n\n© {DateTime.Now.Year} AirDirector\nAll Rights Reserved\n\nDeveloped with ❤️ for Radio & TV Broadcasting";
+            string aboutText = $"AirDirector {AppVersion.DisplayVersion}\n\nProfessional Playout System\n\n© {DateTime.Now.Year} AirDirector\nAll Rights Reserved\n\nDeveloped with ❤️ for Radio & TV Broadcasting\n\nwww.airdirector.app";
             MessageBox.Show(
                 aboutText,
                 LanguageManager.GetString("MainForm.AboutTitle", "About AirDirector"),

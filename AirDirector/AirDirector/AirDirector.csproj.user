@@ -71,6 +71,9 @@
     <Compile Update="Forms\CompositionSettingsForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Forms\DatabaseModificationsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Forms\EncoderEditorForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -122,5 +125,22 @@
     <Compile Update="Forms\VideoPreviewForm.cs">
       <SubType>Form</SubType>
     </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Update="Controls\ArchiveControl.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\BatchEditForm.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\BroadcastHistoryForm.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\CGEditorForm.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\ClockEditorForm.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
   </ItemGroup>
 </Project>
