@@ -307,12 +307,21 @@ namespace AirDirector.Forms
         {
             if (_mainLayout == null) return;
 
-            float rowH = Math.Max(60f, _mainLayout.Height / 3.0f);
-            float countdown = Math.Max(12f, Math.Min(80f, rowH * 0.32f));
-            float name     = Math.Max(8f,  Math.Min(22f, rowH * 0.12f));
-            int   labelH   = Math.Max(18, Math.Min(40, (int)(rowH * 0.22f)));
+            float formW = Math.Max(352f, this.ClientSize.Width);
+            float rowH  = Math.Max(60f,  _mainLayout.Height / 3.0f);
 
-            // Scale fixed-height labels so the countdown always has room to render
+            // Full-width countdown: scale with both row height and form width
+            float countdown = Math.Max(12f, Math.Min(120f, Math.Min(rowH * 0.35f, formW * 0.22f)));
+
+            // Intro/Mix countdown: each occupies 50 % of the width — cap accordingly
+            float halfW           = formW / 2f;
+            float introMixCountdown = Math.Max(10f, Math.Min(countdown, halfW * 0.15f));
+
+            float name   = Math.Max(8f, Math.Min(30f, rowH * 0.13f));
+            float header = Math.Max(8f, Math.Min(18f, rowH * 0.10f));
+            int   labelH = Math.Max(16, Math.Min(50,  (int)(rowH * 0.22f)));
+
+            // Scale label heights
             _lblOnAirHeader.Height    = labelH;
             _lblOnAirName.Height      = labelH;
             _lblIntroHeader.Height    = labelH;
@@ -322,14 +331,23 @@ namespace AirDirector.Forms
             _lblAdHeader.Height       = labelH;
             _lblAdInfo.Height         = labelH;
 
-            ScaleCountdown(_lblIntroCountdown, countdown * 0.8f);
-            ScaleCountdown(_lblMixCountdown, countdown * 0.8f);
-            ScaleCountdown(_lblScheduleCountdown, countdown);
-            ScaleCountdown(_lblAdCountdown, countdown);
+            // Scale header label fonts (previously not scaled)
+            ScaleName(_lblOnAirHeader,    header);
+            ScaleName(_lblIntroHeader,    header);
+            ScaleName(_lblMixHeader,      header);
+            ScaleName(_lblScheduleHeader, header);
+            ScaleName(_lblAdHeader,       header);
 
-            ScaleName(_lblOnAirName, name);
+            // Scale countdown fonts
+            ScaleCountdown(_lblIntroCountdown,    introMixCountdown);
+            ScaleCountdown(_lblMixCountdown,      introMixCountdown);
+            ScaleCountdown(_lblScheduleCountdown, countdown);
+            ScaleCountdown(_lblAdCountdown,       countdown);
+
+            // Scale name/info fonts
+            ScaleName(_lblOnAirName,    name);
             ScaleName(_lblScheduleName, name);
-            ScaleName(_lblAdInfo, name);
+            ScaleName(_lblAdInfo,       name);
         }
 
         private static void ScaleCountdown(Label lbl, float size)
@@ -480,7 +498,8 @@ namespace AirDirector.Forms
                 {
                     _lblScheduleName.Text = $"{nextTime:HH:mm:ss}  –  {next.Name}";
                     int sec = (int)(nextTime - now).TotalSeconds;
-                    _lblScheduleCountdown.Text = $"{sec / 3600:00}:{(sec % 3600) / 60:00}:{sec % 60:00}";
+                    int secH = sec / 3600, secM = (sec % 3600) / 60, secS = sec % 60;
+                    _lblScheduleCountdown.Text = secH > 0 ? $"{secH:00}:{secM:00}:{secS:00}" : $"{secM:00}:{secS:00}";
 
                     if (sec <= 120)
                     {
@@ -550,7 +569,8 @@ namespace AirDirector.Forms
                     _lblAdInfo.Text = $"{nextAdDt.Value:HH:mm}  –  {spotCount} Spot  –  {totalDur / 60:00}:{totalDur % 60:00}";
 
                     int sec = (int)(nextAdDt.Value - now).TotalSeconds;
-                    _lblAdCountdown.Text = $"{sec / 3600:00}:{(sec % 3600) / 60:00}:{sec % 60:00}";
+                    int secH = sec / 3600, secM = (sec % 3600) / 60, secS = sec % 60;
+                    _lblAdCountdown.Text = secH > 0 ? $"{secH:00}:{secM:00}:{secS:00}" : $"{secM:00}:{secS:00}";
 
                     if (sec <= 120)
                     {
@@ -579,7 +599,8 @@ namespace AirDirector.Forms
         {
             if (ms <= 0) return "--:--:--";
             int s = ms / 1000;
-            return $"{s / 3600:00}:{(s % 3600) / 60:00}:{s % 60:00}";
+            int h = s / 3600, m = (s % 3600) / 60, sec = s % 60;
+            return h > 0 ? $"{h:00}:{m:00}:{sec:00}" : $"{m:00}:{sec:00}";
         }
 
         private static bool IsDayEnabled(ScheduleEntry schedule, int dow) => dow switch
