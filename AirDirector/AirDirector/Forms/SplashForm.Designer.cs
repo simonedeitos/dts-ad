@@ -29,115 +29,100 @@
 
         private void InitializeComponent()
         {
-            this.pictureBoxLogo = new System.Windows.Forms.PictureBox();
-            this.lblLogo = new System.Windows.Forms.Label();
-            this.lblVersion = new System.Windows.Forms.Label();
-            this.cardsContainer = new System.Windows.Forms.Panel();
-            this.progressBar = new System.Windows.Forms.ProgressBar();
-            this.lblPercentage = new System.Windows.Forms.Label();
-            this.lblCopyright = new System.Windows.Forms.Label();
-
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxLogo)).BeginInit();
-            this.SuspendLayout();
-
+            pictureBoxLogo = new PictureBox();
+            lblLogo = new Label();
+            lblVersion = new Label();
+            cardsContainer = new Panel();
+            progressBar = new ProgressBar();
+            lblPercentage = new Label();
+            lblCopyright = new Label();
+            ((System.ComponentModel.ISupportInitialize)pictureBoxLogo).BeginInit();
+            SuspendLayout();
             // 
             // pictureBoxLogo
             // 
-            this.pictureBoxLogo.Location = new System.Drawing.Point(250, 20);
-            this.pictureBoxLogo.Name = "pictureBoxLogo";
-            this.pictureBoxLogo.Size = new System.Drawing.Size(200, 80);
-            this.pictureBoxLogo.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
-            this.pictureBoxLogo.TabIndex = 0;
-            this.pictureBoxLogo.TabStop = false;
-            this.pictureBoxLogo.BackColor = System.Drawing.Color.Transparent;
-            this.pictureBoxLogo.Visible = false;
-
+            pictureBoxLogo.BackColor = Color.Transparent;
+            pictureBoxLogo.Location = new Point(219, 19);
+            pictureBoxLogo.Name = "pictureBoxLogo";
+            pictureBoxLogo.Size = new Size(175, 75);
+            pictureBoxLogo.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxLogo.TabIndex = 0;
+            pictureBoxLogo.TabStop = false;
+            pictureBoxLogo.Visible = false;
             // 
             // lblLogo
             // 
-            this.lblLogo.AutoSize = false;
-            this.lblLogo.Location = new System.Drawing.Point(50, 20);
-            this.lblLogo.Name = "lblLogo";
-            this.lblLogo.Size = new System.Drawing.Size(600, 80);
-            this.lblLogo.TabIndex = 1;
-            this.lblLogo.Text = "🎵 AirDirector";
-            this.lblLogo.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-
+            lblLogo.Location = new Point(44, 19);
+            lblLogo.Name = "lblLogo";
+            lblLogo.Size = new Size(525, 75);
+            lblLogo.TabIndex = 1;
+            lblLogo.Text = "🎵 AirDirector";
+            lblLogo.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // lblVersion
             // 
-            this.lblVersion.AutoSize = false;
-            this.lblVersion.Location = new System.Drawing.Point(50, 95);
-            this.lblVersion.Name = "lblVersion";
-            this.lblVersion.Size = new System.Drawing.Size(600, 25);
-            this.lblVersion.TabIndex = 2;
-            this.lblVersion.Text = "Professional Playout System";
-            this.lblVersion.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-
+            lblVersion.Location = new Point(44, 89);
+            lblVersion.Name = "lblVersion";
+            lblVersion.Size = new Size(525, 23);
+            lblVersion.TabIndex = 2;
+            lblVersion.Text = "Professional Playout System";
+            lblVersion.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // cardsContainer
             // 
-            this.cardsContainer.Location = new System.Drawing.Point(50, 130);
-            this.cardsContainer.Name = "cardsContainer";
-            this.cardsContainer.Size = new System.Drawing.Size(600, 290);
-            this.cardsContainer.TabIndex = 3;
-            this.cardsContainer.BackColor = System.Drawing.Color.Transparent;
-
+            cardsContainer.BackColor = Color.Transparent;
+            cardsContainer.Location = new Point(84, 125);
+            cardsContainer.Name = "cardsContainer";
+            cardsContainer.Size = new Size(444, 320);
+            cardsContainer.TabIndex = 3;
+            cardsContainer.Paint += cardsContainer_Paint;
             // 
             // progressBar
             // 
-            this.progressBar.Location = new System.Drawing.Point(50, 460);
-            this.progressBar.Maximum = 100;
-            this.progressBar.Minimum = 0;
-            this.progressBar.Name = "progressBar";
-            this.progressBar.Size = new System.Drawing.Size(540, 10);
-            this.progressBar.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
-            this.progressBar.TabIndex = 4;
-            this.progressBar.Value = 0;
-
+            progressBar.Location = new Point(109, 464);
+            progressBar.Name = "progressBar";
+            progressBar.Size = new Size(352, 9);
+            progressBar.Style = ProgressBarStyle.Continuous;
+            progressBar.TabIndex = 4;
             // 
             // lblPercentage
             // 
-            this.lblPercentage.AutoSize = false;
-            this.lblPercentage.Location = new System.Drawing.Point(600, 457);
-            this.lblPercentage.Name = "lblPercentage";
-            this.lblPercentage.Size = new System.Drawing.Size(50, 16);
-            this.lblPercentage.TabIndex = 5;
-            this.lblPercentage.Text = "0%";
-            this.lblPercentage.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-
+            lblPercentage.Location = new Point(467, 461);
+            lblPercentage.Name = "lblPercentage";
+            lblPercentage.Size = new Size(44, 15);
+            lblPercentage.TabIndex = 5;
+            lblPercentage.Text = "0%";
+            lblPercentage.TextAlign = ContentAlignment.MiddleRight;
             // 
             // lblCopyright
             // 
-            this.lblCopyright.AutoSize = false;
-            this.lblCopyright.Location = new System.Drawing.Point(50, 500);
-            this.lblCopyright.Name = "lblCopyright";
-            this.lblCopyright.Size = new System.Drawing.Size(600, 20);
-            this.lblCopyright.TabIndex = 6;
-            this.lblCopyright.Text = "© 2026 AirDirector - All Rights Reserved";
-            this.lblCopyright.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-
+            lblCopyright.Location = new Point(44, 499);
+            lblCopyright.Name = "lblCopyright";
+            lblCopyright.Size = new Size(525, 19);
+            lblCopyright.TabIndex = 6;
+            lblCopyright.Text = "© 2026 AirDirector - All Rights Reserved";
+            lblCopyright.TextAlign = ContentAlignment.MiddleCenter;
+            lblCopyright.Click += lblCopyright_Click;
             // 
             // SplashForm
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(700, 550);
-            this.Controls.Add(this.pictureBoxLogo);
-            this.Controls.Add(this.lblLogo);
-            this.Controls.Add(this.lblVersion);
-            this.Controls.Add(this.cardsContainer);
-            this.Controls.Add(this.progressBar);
-            this.Controls.Add(this.lblPercentage);
-            this.Controls.Add(this.lblCopyright);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
-            this.Name = "SplashForm";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "AirDirector";
-            this.Load += new System.EventHandler(this.SplashForm_Load);
-
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxLogo)).EndInit();
-            this.ResumeLayout(false);
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(612, 545);
+            Controls.Add(pictureBoxLogo);
+            Controls.Add(lblLogo);
+            Controls.Add(lblVersion);
+            Controls.Add(cardsContainer);
+            Controls.Add(progressBar);
+            Controls.Add(lblPercentage);
+            Controls.Add(lblCopyright);
+            FormBorderStyle = FormBorderStyle.None;
+            Name = "SplashForm";
+            StartPosition = FormStartPosition.CenterScreen;
+            Text = "AirDirector";
+            Load += SplashForm_Load;
+            ((System.ComponentModel.ISupportInitialize)pictureBoxLogo).EndInit();
+            ResumeLayout(false);
         }
     }
 }

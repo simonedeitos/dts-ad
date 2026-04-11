@@ -106,7 +106,7 @@ namespace AirDirector.Forms
             Label lblIcon = new Label
             {
                 Text = icon,
-                Font = new Font("Segoe UI Emoji", 14),
+                Font = new Font("Segoe UI Emoji", 10),
                 Location = new Point(8, 6),
                 Size = new Size(30, 20),
                 BackColor = Color.Transparent
@@ -303,5 +303,15 @@ namespace AirDirector.Forms
         private static extern IntPtr CreateRoundRectRgn(
             int nLeftRect, int nTopRect, int nRightRect, int nBottomRect,
             int nWidthEllipse, int nHeightEllipse);
+
+        private void lblCopyright_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void cardsContainer_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
     }
 }
