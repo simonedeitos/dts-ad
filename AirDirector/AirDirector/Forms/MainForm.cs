@@ -577,10 +577,11 @@ namespace AirDirector.Forms
 
         private void UpdateMenuBar()
         {
-            if (menuStrip == null || menuStrip.Items.Count < 3) return;
+            if (menuStrip == null || menuStrip.Items.Count < 5) return;
             if (menuStrip.Items[0] is ToolStripMenuItem menuFile) { menuFile.Text = LanguageManager.GetString("MainForm.MenuFile", "File"); if (menuFile.DropDownItems.Count > 0) menuFile.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuExit", "Esci"); }
             if (menuStrip.Items[1] is ToolStripMenuItem menuTools) { menuTools.Text = LanguageManager.GetString("MainForm.MenuTools", "Strumenti"); if (menuTools.DropDownItems.Count > 0) { menuTools.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"); if (menuTools.DropDownItems.Count > 2) menuTools.DropDownItems[2].Text = "💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"); if (menuTools.DropDownItems.Count > 4) menuTools.DropDownItems[4].Text = LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"); } }
-            if (menuStrip.Items[2] is ToolStripMenuItem menuHelp) { menuHelp.Text = LanguageManager.GetString("MainForm.MenuHelp", "Aiuto"); if (menuHelp.DropDownItems.Count > 0) menuHelp.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuAbout", "Informazioni"); }
+            if (menuStrip.Items[3] is ToolStripMenuItem menuReport) { menuReport.Text = LanguageManager.GetString("MainForm.MenuReport", "Report"); if (menuReport.DropDownItems.Count > 0) menuReport.DropDownItems[0].Text = "📊 " + LanguageManager.GetString("MainForm.MenuViewReport", "Visualizza Report"); if (menuReport.DropDownItems.Count > 1) menuReport.DropDownItems[1].Text = "📻 " + LanguageManager.GetString("MainForm.MenuBroadcastHistory", "Storico Trasmesso"); if (menuReport.DropDownItems.Count > 2) menuReport.DropDownItems[2].Text = "📊 " + LanguageManager.GetString("MainForm.MenuMusicStatistics", "Statistiche Musica"); }
+            if (menuStrip.Items[4] is ToolStripMenuItem menuHelp) { menuHelp.Text = LanguageManager.GetString("MainForm.MenuHelp", "Aiuto"); if (menuHelp.DropDownItems.Count > 0) menuHelp.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuAbout", "Informazioni"); }
         }
 
         private void UpdateTabPages()
@@ -730,6 +731,11 @@ namespace AirDirector.Forms
             menuTools.DropDownItems.Add(new ToolStripSeparator());
             menuTools.DropDownItems.Add(LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"), null, MenuLicense_Click);
             menuStrip.Items.Add(menuTools);
+            ToolStripMenuItem menuReport = new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuReport", "Report"));
+            menuReport.DropDownItems.Add("📊 " + LanguageManager.GetString("MainForm.MenuViewReport", "Visualizza Report"), null, MenuViewReport_Click);
+            menuReport.DropDownItems.Add("📻 " + LanguageManager.GetString("MainForm.MenuBroadcastHistory", "Storico Trasmesso"), null, MenuBroadcastHistory_Click);
+            menuReport.DropDownItems.Add("📊 " + LanguageManager.GetString("MainForm.MenuMusicStatistics", "Statistiche Musica"), null, MenuMusicStatistics_Click);
+            menuStrip.Items.Add(menuReport);
             ToolStripMenuItem menuHelp = new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuHelp", "Aiuto"));
             menuHelp.DropDownItems.Add(LanguageManager.GetString("MainForm.MenuAbout", "Informazioni"), null, MenuAbout_Click);
             menuStrip.Items.Add(menuHelp);
@@ -863,6 +869,37 @@ namespace AirDirector.Forms
         }
 
         private void MenuAbout_Click(object sender, EventArgs e) { MessageBox.Show(LanguageManager.GetString("MainForm.AboutText", "AirDirector v1.0.0\n\nPlayout Radiofonico e TV Professionale\n\n© 2025 AirDirector\nTutti i diritti riservati."), LanguageManager.GetString("MainForm.AboutTitle", "Informazioni su AirDirector"), MessageBoxButtons.OK, MessageBoxIcon.Information); }
+
+        private void MenuViewReport_Click(object sender, EventArgs e)
+        {
+            var form = new Form
+            {
+                Text = "📊 " + LanguageManager.GetString("MainForm.MenuViewReport", "Visualizza Report"),
+                Size = new Size(1300, 850),
+                StartPosition = FormStartPosition.CenterParent,
+                BackColor = AppTheme.BgDark
+            };
+            var ctrl = new Controls.ReportAdvancedControl { Dock = DockStyle.Fill };
+            form.Controls.Add(ctrl);
+            ctrl.LoadDefaultReport();
+            form.ShowDialog(this);
+        }
+
+        private void MenuBroadcastHistory_Click(object sender, EventArgs e)
+        {
+            using (var form = new BroadcastHistoryForm())
+            {
+                form.ShowDialog(this);
+            }
+        }
+
+        private void MenuMusicStatistics_Click(object sender, EventArgs e)
+        {
+            using (var form = new MusicStatisticsForm())
+            {
+                form.ShowDialog(this);
+            }
+        }
     }
 
     [Serializable]
