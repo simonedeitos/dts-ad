@@ -44,6 +44,9 @@
     <Compile Update="Controls\RecorderStreamControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Controls\ReportAdvancedControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Update="Controls\ReportControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -54,6 +57,9 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Forms\BatchEditForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\BroadcastHistoryForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Forms\CGEditorForm.cs">
@@ -83,7 +89,13 @@
     <Compile Update="Forms\MusicEditorForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Forms\MusicStatisticsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Forms\RecorderEditorForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\ReportExportDialog.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Forms\ScheduleEditorForm.cs">

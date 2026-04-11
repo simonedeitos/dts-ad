@@ -36,300 +36,357 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
-            this.filterPanel = new System.Windows.Forms.Panel();
-            this.lblFrom = new System.Windows.Forms.Label();
-            this.dtpFrom = new System.Windows.Forms.DateTimePicker();
-            this.lblTo = new System.Windows.Forms.Label();
-            this.dtpTo = new System.Windows.Forms.DateTimePicker();
-            this.lblType = new System.Windows.Forms.Label();
-            this.cmbType = new System.Windows.Forms.ComboBox();
-            this.lblSearch = new System.Windows.Forms.Label();
-            this.txtSearch = new System.Windows.Forms.TextBox();
-            this.btnRefresh = new System.Windows.Forms.Button();
-            this.btnExport = new System.Windows.Forms.Button();
-
-            this.dgvHistory = new System.Windows.Forms.DataGridView();
-            this.colDate = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.colTime = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.colType = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.colArtist = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.colTitle = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.colDuration = new System.Windows.Forms.DataGridViewTextBoxColumn();
-
-            this.statsPanel = new System.Windows.Forms.Panel();
-            this.lblTotal = new System.Windows.Forms.Label();
-            this.lblTotalDuration = new System.Windows.Forms.Label();
-            this.lblTopArtist = new System.Windows.Forms.Label();
-            this.lblTopTrack = new System.Windows.Forms.Label();
-            this.btnStatistics = new System.Windows.Forms.Button();
-
-            this.filterPanel.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.dgvHistory)).BeginInit();
-            this.statsPanel.SuspendLayout();
-            this.SuspendLayout();
-
-            // ── filterPanel ──────────────────────────────────────────────
-            this.filterPanel.BackColor = System.Drawing.Color.FromArgb(40, 40, 40);
-            this.filterPanel.Controls.Add(this.lblFrom);
-            this.filterPanel.Controls.Add(this.dtpFrom);
-            this.filterPanel.Controls.Add(this.lblTo);
-            this.filterPanel.Controls.Add(this.dtpTo);
-            this.filterPanel.Controls.Add(this.lblType);
-            this.filterPanel.Controls.Add(this.cmbType);
-            this.filterPanel.Controls.Add(this.lblSearch);
-            this.filterPanel.Controls.Add(this.txtSearch);
-            this.filterPanel.Controls.Add(this.btnRefresh);
-            this.filterPanel.Controls.Add(this.btnExport);
-            this.filterPanel.Dock = System.Windows.Forms.DockStyle.Top;
-            this.filterPanel.Height = 55;
-            this.filterPanel.Name = "filterPanel";
-            this.filterPanel.Padding = new System.Windows.Forms.Padding(10, 8, 10, 8);
-
+            DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle7 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle10 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle8 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle9 = new DataGridViewCellStyle();
+            filterPanel = new Panel();
+            lblFrom = new Label();
+            dtpFrom = new DateTimePicker();
+            lblTo = new Label();
+            dtpTo = new DateTimePicker();
+            lblType = new Label();
+            cmbType = new ComboBox();
+            lblSearch = new Label();
+            txtSearch = new TextBox();
+            btnRefresh = new Button();
+            btnExport = new Button();
+            dgvHistory = new DataGridView();
+            colDate = new DataGridViewTextBoxColumn();
+            colTime = new DataGridViewTextBoxColumn();
+            colType = new DataGridViewTextBoxColumn();
+            colArtist = new DataGridViewTextBoxColumn();
+            colTitle = new DataGridViewTextBoxColumn();
+            colDuration = new DataGridViewTextBoxColumn();
+            statsPanel = new Panel();
+            lblTotal = new Label();
+            lblTotalDuration = new Label();
+            lblTopArtist = new Label();
+            lblTopTrack = new Label();
+            btnStatistics = new Button();
+            filterPanel.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)dgvHistory).BeginInit();
+            statsPanel.SuspendLayout();
+            SuspendLayout();
+            // 
+            // filterPanel
+            // 
+            filterPanel.BackColor = Color.FromArgb(40, 40, 40);
+            filterPanel.Controls.Add(lblFrom);
+            filterPanel.Controls.Add(dtpFrom);
+            filterPanel.Controls.Add(lblTo);
+            filterPanel.Controls.Add(dtpTo);
+            filterPanel.Controls.Add(lblType);
+            filterPanel.Controls.Add(cmbType);
+            filterPanel.Controls.Add(lblSearch);
+            filterPanel.Controls.Add(txtSearch);
+            filterPanel.Controls.Add(btnRefresh);
+            filterPanel.Controls.Add(btnExport);
+            filterPanel.Dock = DockStyle.Top;
+            filterPanel.Location = new Point(0, 0);
+            filterPanel.Name = "filterPanel";
+            filterPanel.Padding = new Padding(10, 8, 10, 8);
+            filterPanel.Size = new Size(1253, 55);
+            filterPanel.TabIndex = 2;
+            // 
             // lblFrom
-            this.lblFrom.AutoSize = true;
-            this.lblFrom.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.lblFrom.ForeColor = System.Drawing.Color.White;
-            this.lblFrom.Location = new System.Drawing.Point(10, 17);
-            this.lblFrom.Name = "lblFrom";
-            this.lblFrom.Text = "Da:";
-
+            // 
+            lblFrom.AutoSize = true;
+            lblFrom.Font = new Font("Segoe UI", 9F);
+            lblFrom.ForeColor = Color.White;
+            lblFrom.Location = new Point(10, 17);
+            lblFrom.Name = "lblFrom";
+            lblFrom.Size = new Size(24, 15);
+            lblFrom.TabIndex = 0;
+            lblFrom.Text = "Da:";
+            // 
             // dtpFrom
-            this.dtpFrom.Format = System.Windows.Forms.DateTimePickerFormat.Short;
-            this.dtpFrom.Location = new System.Drawing.Point(40, 13);
-            this.dtpFrom.Name = "dtpFrom";
-            this.dtpFrom.Size = new System.Drawing.Size(110, 25);
-
+            // 
+            dtpFrom.Format = DateTimePickerFormat.Short;
+            dtpFrom.Location = new Point(50, 12);
+            dtpFrom.Name = "dtpFrom";
+            dtpFrom.Size = new Size(110, 23);
+            dtpFrom.TabIndex = 1;
+            // 
             // lblTo
-            this.lblTo.AutoSize = true;
-            this.lblTo.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.lblTo.ForeColor = System.Drawing.Color.White;
-            this.lblTo.Location = new System.Drawing.Point(160, 17);
-            this.lblTo.Name = "lblTo";
-            this.lblTo.Text = "A:";
-
+            // 
+            lblTo.AutoSize = true;
+            lblTo.Font = new Font("Segoe UI", 9F);
+            lblTo.ForeColor = Color.White;
+            lblTo.Location = new Point(176, 17);
+            lblTo.Name = "lblTo";
+            lblTo.Size = new Size(18, 15);
+            lblTo.TabIndex = 2;
+            lblTo.Text = "A:";
+            // 
             // dtpTo
-            this.dtpTo.Format = System.Windows.Forms.DateTimePickerFormat.Short;
-            this.dtpTo.Location = new System.Drawing.Point(185, 13);
-            this.dtpTo.Name = "dtpTo";
-            this.dtpTo.Size = new System.Drawing.Size(110, 25);
-
+            // 
+            dtpTo.Format = DateTimePickerFormat.Short;
+            dtpTo.Location = new Point(211, 13);
+            dtpTo.Name = "dtpTo";
+            dtpTo.Size = new Size(110, 23);
+            dtpTo.TabIndex = 3;
+            // 
             // lblType
-            this.lblType.AutoSize = true;
-            this.lblType.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.lblType.ForeColor = System.Drawing.Color.White;
-            this.lblType.Location = new System.Drawing.Point(305, 17);
-            this.lblType.Name = "lblType";
-            this.lblType.Text = "Tipo:";
-
+            // 
+            lblType.AutoSize = true;
+            lblType.Font = new Font("Segoe UI", 9F);
+            lblType.ForeColor = Color.White;
+            lblType.Location = new Point(351, 17);
+            lblType.Name = "lblType";
+            lblType.Size = new Size(34, 15);
+            lblType.TabIndex = 4;
+            lblType.Text = "Tipo:";
+            // 
             // cmbType
-            this.cmbType.BackColor = System.Drawing.Color.FromArgb(50, 50, 50);
-            this.cmbType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbType.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.cmbType.ForeColor = System.Drawing.Color.White;
-            this.cmbType.Items.AddRange(new object[] { "Tutti", "Music", "Clip" });
-            this.cmbType.Location = new System.Drawing.Point(345, 13);
-            this.cmbType.Name = "cmbType";
-            this.cmbType.SelectedIndex = 0;
-            this.cmbType.Size = new System.Drawing.Size(100, 25);
-
+            // 
+            cmbType.BackColor = Color.FromArgb(50, 50, 50);
+            cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbType.FlatStyle = FlatStyle.Flat;
+            cmbType.ForeColor = Color.White;
+            cmbType.Items.AddRange(new object[] { "Tutti", "Music", "Clip" });
+            cmbType.Location = new Point(397, 13);
+            cmbType.Name = "cmbType";
+            cmbType.Size = new Size(100, 23);
+            cmbType.TabIndex = 5;
+            // 
             // lblSearch
-            this.lblSearch.AutoSize = true;
-            this.lblSearch.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.lblSearch.ForeColor = System.Drawing.Color.White;
-            this.lblSearch.Location = new System.Drawing.Point(455, 17);
-            this.lblSearch.Name = "lblSearch";
-            this.lblSearch.Text = "Cerca:";
-
+            // 
+            lblSearch.AutoSize = true;
+            lblSearch.Font = new Font("Segoe UI", 9F);
+            lblSearch.ForeColor = Color.White;
+            lblSearch.Location = new Point(546, 16);
+            lblSearch.Name = "lblSearch";
+            lblSearch.Size = new Size(40, 15);
+            lblSearch.TabIndex = 6;
+            lblSearch.Text = "Cerca:";
+            lblSearch.Click += lblSearch_Click;
+            // 
             // txtSearch
-            this.txtSearch.BackColor = System.Drawing.Color.FromArgb(50, 50, 50);
-            this.txtSearch.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.txtSearch.ForeColor = System.Drawing.Color.White;
-            this.txtSearch.Location = new System.Drawing.Point(505, 13);
-            this.txtSearch.Name = "txtSearch";
-            this.txtSearch.Size = new System.Drawing.Size(150, 25);
-
+            // 
+            txtSearch.BackColor = Color.FromArgb(50, 50, 50);
+            txtSearch.BorderStyle = BorderStyle.FixedSingle;
+            txtSearch.ForeColor = Color.White;
+            txtSearch.Location = new Point(604, 12);
+            txtSearch.Name = "txtSearch";
+            txtSearch.Size = new Size(150, 23);
+            txtSearch.TabIndex = 7;
+            // 
             // btnRefresh
-            this.btnRefresh.BackColor = System.Drawing.Color.FromArgb(0, 120, 215);
-            this.btnRefresh.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnRefresh.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnRefresh.FlatAppearance.BorderSize = 0;
-            this.btnRefresh.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnRefresh.ForeColor = System.Drawing.Color.White;
-            this.btnRefresh.Location = new System.Drawing.Point(665, 11);
-            this.btnRefresh.Name = "btnRefresh";
-            this.btnRefresh.Size = new System.Drawing.Size(110, 30);
-            this.btnRefresh.Text = "🔄 Aggiorna";
-
+            // 
+            btnRefresh.BackColor = Color.FromArgb(0, 120, 215);
+            btnRefresh.Cursor = Cursors.Hand;
+            btnRefresh.FlatAppearance.BorderSize = 0;
+            btnRefresh.FlatStyle = FlatStyle.Flat;
+            btnRefresh.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            btnRefresh.ForeColor = Color.White;
+            btnRefresh.Location = new Point(776, 10);
+            btnRefresh.Name = "btnRefresh";
+            btnRefresh.Size = new Size(110, 30);
+            btnRefresh.TabIndex = 8;
+            btnRefresh.Text = "🔄 Aggiorna";
+            btnRefresh.UseVisualStyleBackColor = false;
+            // 
             // btnExport
-            this.btnExport.BackColor = System.Drawing.Color.FromArgb(0, 150, 136);
-            this.btnExport.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnExport.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnExport.FlatAppearance.BorderSize = 0;
-            this.btnExport.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnExport.ForeColor = System.Drawing.Color.White;
-            this.btnExport.Location = new System.Drawing.Point(785, 11);
-            this.btnExport.Name = "btnExport";
-            this.btnExport.Size = new System.Drawing.Size(130, 30);
-            this.btnExport.Text = "💾 Esporta CSV";
-
-            // ── dgvHistory ───────────────────────────────────────────────
-            this.dgvHistory.AllowUserToAddRows = false;
-            this.dgvHistory.AllowUserToDeleteRows = false;
-            this.dgvHistory.AllowUserToResizeRows = false;
-            this.dgvHistory.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
-            this.dgvHistory.BackgroundColor = System.Drawing.Color.FromArgb(30, 30, 30);
-            this.dgvHistory.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.dgvHistory.ColumnHeadersHeight = 40;
-            System.Windows.Forms.DataGridViewCellStyle dgvHeaderStyle = new System.Windows.Forms.DataGridViewCellStyle();
-            dgvHeaderStyle.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            dgvHeaderStyle.BackColor = System.Drawing.Color.FromArgb(50, 50, 50);
-            dgvHeaderStyle.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            dgvHeaderStyle.ForeColor = System.Drawing.Color.White;
-            this.dgvHistory.ColumnHeadersDefaultCellStyle = dgvHeaderStyle;
-            System.Windows.Forms.DataGridViewCellStyle dgvDefaultStyle = new System.Windows.Forms.DataGridViewCellStyle();
-            dgvDefaultStyle.BackColor = System.Drawing.Color.FromArgb(40, 40, 40);
-            dgvDefaultStyle.ForeColor = System.Drawing.Color.White;
-            dgvDefaultStyle.Padding = new System.Windows.Forms.Padding(5);
-            dgvDefaultStyle.SelectionBackColor = System.Drawing.Color.FromArgb(0, 120, 215);
-            dgvDefaultStyle.SelectionForeColor = System.Drawing.Color.White;
-            this.dgvHistory.DefaultCellStyle = dgvDefaultStyle;
-            System.Windows.Forms.DataGridViewCellStyle dgvAltStyle = new System.Windows.Forms.DataGridViewCellStyle();
-            dgvAltStyle.BackColor = System.Drawing.Color.FromArgb(35, 35, 35);
-            this.dgvHistory.AlternatingRowsDefaultCellStyle = dgvAltStyle;
-            this.dgvHistory.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
-                this.colDate,
-                this.colTime,
-                this.colType,
-                this.colArtist,
-                this.colTitle,
-                this.colDuration
-            });
-            this.dgvHistory.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.dgvHistory.EnableHeadersVisualStyles = false;
-            this.dgvHistory.Font = new System.Drawing.Font("Segoe UI", 10F);
-            this.dgvHistory.ForeColor = System.Drawing.Color.White;
-            this.dgvHistory.GridColor = System.Drawing.Color.FromArgb(60, 60, 60);
-            this.dgvHistory.MultiSelect = false;
-            this.dgvHistory.Name = "dgvHistory";
-            this.dgvHistory.ReadOnly = true;
-            this.dgvHistory.RowHeadersVisible = false;
-            this.dgvHistory.RowTemplate.Height = 32;
-            this.dgvHistory.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.dgvHistory.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-
+            // 
+            btnExport.BackColor = Color.FromArgb(0, 150, 136);
+            btnExport.Cursor = Cursors.Hand;
+            btnExport.FlatAppearance.BorderSize = 0;
+            btnExport.FlatStyle = FlatStyle.Flat;
+            btnExport.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            btnExport.ForeColor = Color.White;
+            btnExport.Location = new Point(950, 11);
+            btnExport.Name = "btnExport";
+            btnExport.Size = new Size(130, 30);
+            btnExport.TabIndex = 9;
+            btnExport.Text = "💾 Esporta CSV";
+            btnExport.UseVisualStyleBackColor = false;
+            // 
+            // dgvHistory
+            // 
+            dgvHistory.AllowUserToAddRows = false;
+            dgvHistory.AllowUserToDeleteRows = false;
+            dgvHistory.AllowUserToResizeRows = false;
+            dataGridViewCellStyle6.BackColor = Color.FromArgb(35, 35, 35);
+            dgvHistory.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle6;
+            dgvHistory.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dgvHistory.BackgroundColor = Color.FromArgb(30, 30, 30);
+            dgvHistory.BorderStyle = BorderStyle.None;
+            dataGridViewCellStyle7.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle7.BackColor = Color.FromArgb(50, 50, 50);
+            dataGridViewCellStyle7.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            dataGridViewCellStyle7.ForeColor = Color.White;
+            dgvHistory.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle7;
+            dgvHistory.ColumnHeadersHeight = 40;
+            dgvHistory.Columns.AddRange(new DataGridViewColumn[] { colDate, colTime, colType, colArtist, colTitle, colDuration });
+            dataGridViewCellStyle10.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle10.BackColor = Color.FromArgb(40, 40, 40);
+            dataGridViewCellStyle10.Font = new Font("Segoe UI", 10F);
+            dataGridViewCellStyle10.ForeColor = Color.White;
+            dataGridViewCellStyle10.Padding = new Padding(5);
+            dataGridViewCellStyle10.SelectionBackColor = Color.FromArgb(0, 120, 215);
+            dataGridViewCellStyle10.SelectionForeColor = Color.White;
+            dataGridViewCellStyle10.WrapMode = DataGridViewTriState.False;
+            dgvHistory.DefaultCellStyle = dataGridViewCellStyle10;
+            dgvHistory.Dock = DockStyle.Fill;
+            dgvHistory.EnableHeadersVisualStyles = false;
+            dgvHistory.Font = new Font("Segoe UI", 10F);
+            dgvHistory.GridColor = Color.FromArgb(60, 60, 60);
+            dgvHistory.Location = new Point(0, 55);
+            dgvHistory.MultiSelect = false;
+            dgvHistory.Name = "dgvHistory";
+            dgvHistory.ReadOnly = true;
+            dgvHistory.RowHeadersVisible = false;
+            dgvHistory.RowTemplate.Height = 32;
+            dgvHistory.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvHistory.Size = new Size(1253, 595);
+            dgvHistory.TabIndex = 0;
+            // 
             // colDate
-            System.Windows.Forms.DataGridViewCellStyle colCenterStyle = new System.Windows.Forms.DataGridViewCellStyle();
-            colCenterStyle.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            System.Windows.Forms.DataGridViewCellStyle colLeftStyle = new System.Windows.Forms.DataGridViewCellStyle();
-            colLeftStyle.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
-            this.colDate.DefaultCellStyle = colCenterStyle;
-            this.colDate.FillWeight = 12F;
-            this.colDate.HeaderText = "📅 Data";
-            this.colDate.Name = "colDate";
+            // 
+            dataGridViewCellStyle8.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colDate.DefaultCellStyle = dataGridViewCellStyle8;
+            colDate.FillWeight = 12F;
+            colDate.HeaderText = "📅 Data";
+            colDate.Name = "colDate";
+            colDate.ReadOnly = true;
+            // 
             // colTime
-            this.colTime.DefaultCellStyle = colCenterStyle;
-            this.colTime.FillWeight = 10F;
-            this.colTime.HeaderText = "🕐 Ora";
-            this.colTime.Name = "colTime";
+            // 
+            colTime.DefaultCellStyle = dataGridViewCellStyle3;
+            colTime.FillWeight = 10F;
+            colTime.HeaderText = "🕐 Ora";
+            colTime.Name = "colTime";
+            colTime.ReadOnly = true;
+            // 
             // colType
-            this.colType.DefaultCellStyle = colCenterStyle;
-            this.colType.FillWeight = 10F;
-            this.colType.HeaderText = "🎵 Tipo";
-            this.colType.Name = "colType";
+            // 
+            colType.DefaultCellStyle = dataGridViewCellStyle3;
+            colType.FillWeight = 10F;
+            colType.HeaderText = "🎵 Tipo";
+            colType.Name = "colType";
+            colType.ReadOnly = true;
+            // 
             // colArtist
-            this.colArtist.DefaultCellStyle = colLeftStyle;
-            this.colArtist.FillWeight = 25F;
-            this.colArtist.HeaderText = "🎤 Artista";
-            this.colArtist.Name = "colArtist";
+            // 
+            dataGridViewCellStyle9.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            colArtist.DefaultCellStyle = dataGridViewCellStyle9;
+            colArtist.FillWeight = 25F;
+            colArtist.HeaderText = "🎤 Artista";
+            colArtist.Name = "colArtist";
+            colArtist.ReadOnly = true;
+            // 
             // colTitle
-            this.colTitle.DefaultCellStyle = colLeftStyle;
-            this.colTitle.FillWeight = 25F;
-            this.colTitle.HeaderText = "🎶 Titolo";
-            this.colTitle.Name = "colTitle";
+            // 
+            colTitle.DefaultCellStyle = dataGridViewCellStyle4;
+            colTitle.FillWeight = 25F;
+            colTitle.HeaderText = "🎶 Titolo";
+            colTitle.Name = "colTitle";
+            colTitle.ReadOnly = true;
+            // 
             // colDuration
-            this.colDuration.DefaultCellStyle = colCenterStyle;
-            this.colDuration.FillWeight = 10F;
-            this.colDuration.HeaderText = "⏱️ Durata";
-            this.colDuration.Name = "colDuration";
-
-            // ── statsPanel ───────────────────────────────────────────────
-            this.statsPanel.BackColor = System.Drawing.Color.FromArgb(35, 35, 35);
-            this.statsPanel.Controls.Add(this.lblTotal);
-            this.statsPanel.Controls.Add(this.lblTotalDuration);
-            this.statsPanel.Controls.Add(this.lblTopArtist);
-            this.statsPanel.Controls.Add(this.lblTopTrack);
-            this.statsPanel.Controls.Add(this.btnStatistics);
-            this.statsPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.statsPanel.Height = 50;
-            this.statsPanel.Name = "statsPanel";
-            this.statsPanel.Padding = new System.Windows.Forms.Padding(10, 8, 10, 8);
-
+            // 
+            colDuration.DefaultCellStyle = dataGridViewCellStyle3;
+            colDuration.FillWeight = 10F;
+            colDuration.HeaderText = "⏱️ Durata";
+            colDuration.Name = "colDuration";
+            colDuration.ReadOnly = true;
+            // 
+            // statsPanel
+            // 
+            statsPanel.BackColor = Color.FromArgb(35, 35, 35);
+            statsPanel.Controls.Add(lblTotal);
+            statsPanel.Controls.Add(lblTotalDuration);
+            statsPanel.Controls.Add(lblTopArtist);
+            statsPanel.Controls.Add(lblTopTrack);
+            statsPanel.Controls.Add(btnStatistics);
+            statsPanel.Dock = DockStyle.Bottom;
+            statsPanel.Location = new Point(0, 650);
+            statsPanel.Name = "statsPanel";
+            statsPanel.Padding = new Padding(10, 8, 10, 8);
+            statsPanel.Size = new Size(1253, 50);
+            statsPanel.TabIndex = 1;
+            // 
             // lblTotal
-            this.lblTotal.AutoSize = true;
-            this.lblTotal.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.lblTotal.ForeColor = System.Drawing.Color.White;
-            this.lblTotal.Location = new System.Drawing.Point(10, 15);
-            this.lblTotal.Name = "lblTotal";
-            this.lblTotal.Text = "Totale: 0";
-
+            // 
+            lblTotal.AutoSize = true;
+            lblTotal.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            lblTotal.ForeColor = Color.White;
+            lblTotal.Location = new Point(10, 15);
+            lblTotal.Name = "lblTotal";
+            lblTotal.Size = new Size(54, 15);
+            lblTotal.TabIndex = 0;
+            lblTotal.Text = "Totale: 0";
+            // 
             // lblTotalDuration
-            this.lblTotalDuration.AutoSize = true;
-            this.lblTotalDuration.Font = new System.Drawing.Font("Segoe UI", 9F);
-            // AppTheme.LEDGreen = #00FF41
-            this.lblTotalDuration.ForeColor = System.Drawing.Color.FromArgb(0, 255, 65);
-            this.lblTotalDuration.Location = new System.Drawing.Point(110, 15);
-            this.lblTotalDuration.Name = "lblTotalDuration";
-            this.lblTotalDuration.Text = "Durata: 00:00:00";
-
+            // 
+            lblTotalDuration.AutoSize = true;
+            lblTotalDuration.Font = new Font("Segoe UI", 9F);
+            lblTotalDuration.ForeColor = Color.FromArgb(0, 255, 65);
+            lblTotalDuration.Location = new Point(110, 15);
+            lblTotalDuration.Name = "lblTotalDuration";
+            lblTotalDuration.Size = new Size(90, 15);
+            lblTotalDuration.TabIndex = 1;
+            lblTotalDuration.Text = "Durata: 00:00:00";
+            // 
             // lblTopArtist
-            this.lblTopArtist.AutoSize = true;
-            this.lblTopArtist.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.lblTopArtist.ForeColor = System.Drawing.Color.FromArgb(0, 150, 136);
-            this.lblTopArtist.Location = new System.Drawing.Point(280, 15);
-            this.lblTopArtist.Name = "lblTopArtist";
-            this.lblTopArtist.Text = "Top Artista: -";
-
+            // 
+            lblTopArtist.AutoSize = true;
+            lblTopArtist.Font = new Font("Segoe UI", 9F);
+            lblTopArtist.ForeColor = Color.FromArgb(0, 150, 136);
+            lblTopArtist.Location = new Point(280, 15);
+            lblTopArtist.Name = "lblTopArtist";
+            lblTopArtist.Size = new Size(75, 15);
+            lblTopArtist.TabIndex = 2;
+            lblTopArtist.Text = "Top Artista: -";
+            // 
             // lblTopTrack
-            this.lblTopTrack.AutoSize = true;
-            this.lblTopTrack.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.lblTopTrack.ForeColor = System.Drawing.Color.FromArgb(0, 150, 136);
-            this.lblTopTrack.Location = new System.Drawing.Point(500, 15);
-            this.lblTopTrack.Name = "lblTopTrack";
-            this.lblTopTrack.Text = "Top Brano: -";
-
+            // 
+            lblTopTrack.AutoSize = true;
+            lblTopTrack.Font = new Font("Segoe UI", 9F);
+            lblTopTrack.ForeColor = Color.FromArgb(0, 150, 136);
+            lblTopTrack.Location = new Point(500, 15);
+            lblTopTrack.Name = "lblTopTrack";
+            lblTopTrack.Size = new Size(72, 15);
+            lblTopTrack.TabIndex = 3;
+            lblTopTrack.Text = "Top Brano: -";
+            // 
             // btnStatistics
-            this.btnStatistics.Anchor = System.Windows.Forms.AnchorStyles.Right | System.Windows.Forms.AnchorStyles.Top;
-            this.btnStatistics.BackColor = System.Drawing.Color.FromArgb(40, 167, 69);
-            this.btnStatistics.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnStatistics.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnStatistics.FlatAppearance.BorderSize = 0;
-            this.btnStatistics.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnStatistics.ForeColor = System.Drawing.Color.White;
-            this.btnStatistics.Location = new System.Drawing.Point(960, 9);
-            this.btnStatistics.Name = "btnStatistics";
-            this.btnStatistics.Size = new System.Drawing.Size(130, 32);
-            this.btnStatistics.Text = "📊 Statistiche";
-
-            // ── Form ─────────────────────────────────────────────────────
-            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackColor = System.Drawing.Color.FromArgb(28, 28, 28);
-            this.ClientSize = new System.Drawing.Size(1100, 700);
-            // Add controls: Fill first, then Bottom, then Top (WinForms docking order)
-            this.Controls.Add(this.dgvHistory);
-            this.Controls.Add(this.statsPanel);
-            this.Controls.Add(this.filterPanel);
-            this.ForeColor = System.Drawing.Color.White;
-            this.MinimumSize = new System.Drawing.Size(900, 600);
-            this.Name = "BroadcastHistoryForm";
-            this.Text = "Broadcast History";
-
-            this.filterPanel.ResumeLayout(false);
-            this.filterPanel.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.dgvHistory)).EndInit();
-            this.statsPanel.ResumeLayout(false);
-            this.statsPanel.PerformLayout();
-            this.ResumeLayout(false);
+            // 
+            btnStatistics.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnStatistics.BackColor = Color.FromArgb(40, 167, 69);
+            btnStatistics.Cursor = Cursors.Hand;
+            btnStatistics.FlatAppearance.BorderSize = 0;
+            btnStatistics.FlatStyle = FlatStyle.Flat;
+            btnStatistics.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            btnStatistics.ForeColor = Color.White;
+            btnStatistics.Location = new Point(2013, 9);
+            btnStatistics.Name = "btnStatistics";
+            btnStatistics.Size = new Size(130, 32);
+            btnStatistics.TabIndex = 4;
+            btnStatistics.Text = "📊 Statistiche";
+            btnStatistics.UseVisualStyleBackColor = false;
+            // 
+            // BroadcastHistoryForm
+            // 
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            BackColor = Color.FromArgb(28, 28, 28);
+            ClientSize = new Size(1253, 700);
+            Controls.Add(dgvHistory);
+            Controls.Add(statsPanel);
+            Controls.Add(filterPanel);
+            ForeColor = Color.White;
+            MinimumSize = new Size(900, 600);
+            Name = "BroadcastHistoryForm";
+            Text = "Broadcast History";
+            filterPanel.ResumeLayout(false);
+            filterPanel.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)dgvHistory).EndInit();
+            statsPanel.ResumeLayout(false);
+            statsPanel.PerformLayout();
+            ResumeLayout(false);
         }
     }
 }
