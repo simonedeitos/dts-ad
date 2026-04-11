@@ -16,8 +16,9 @@ namespace AirDirector
             Application.SetCompatibleTextRenderingDefault(false);
 
             // Inizializza sistema multilingua
+            LanguageManager.Initialize();
 
-            // ← AGGIUNGI: Inizializza database
+            // Inizializza database
             DbcManager.Initialize();
 
             // Mostra splash screen
