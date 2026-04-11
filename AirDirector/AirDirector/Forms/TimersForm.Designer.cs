@@ -24,11 +24,10 @@ namespace AirDirector.Forms
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(690, 641);
+            ClientSize = new Size(690, 740);
             MinimumSize = new Size(352, 284);
             Name = "TimersForm";
             StartPosition = FormStartPosition.CenterParent;
-            ShowInTaskbar = true;
             ResumeLayout(false);
         }
     }
