@@ -215,9 +215,5 @@ namespace AirDirector.Forms
             base.Dispose(disposing);
         }
 
-        private void lblSearch_Click(object sender, EventArgs e)
-        {
-
-        }
     }
 }

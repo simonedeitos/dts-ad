@@ -36,6 +36,10 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
+            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle7 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle10 = new DataGridViewCellStyle();
@@ -161,7 +165,6 @@ namespace AirDirector.Forms
             lblSearch.Size = new Size(40, 15);
             lblSearch.TabIndex = 6;
             lblSearch.Text = "Cerca:";
-            lblSearch.Click += lblSearch_Click;
             // 
             // txtSearch
             // 
@@ -254,7 +257,8 @@ namespace AirDirector.Forms
             // 
             // colTime
             // 
-            colTime.DefaultCellStyle = dataGridViewCellStyle3;
+            dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colTime.DefaultCellStyle = dataGridViewCellStyle1;
             colTime.FillWeight = 10F;
             colTime.HeaderText = "🕐 Ora";
             colTime.Name = "colTime";
@@ -262,7 +266,8 @@ namespace AirDirector.Forms
             // 
             // colType
             // 
-            colType.DefaultCellStyle = dataGridViewCellStyle3;
+            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colType.DefaultCellStyle = dataGridViewCellStyle2;
             colType.FillWeight = 10F;
             colType.HeaderText = "🎵 Tipo";
             colType.Name = "colType";
@@ -279,6 +284,7 @@ namespace AirDirector.Forms
             // 
             // colTitle
             // 
+            dataGridViewCellStyle4.Alignment = DataGridViewContentAlignment.MiddleLeft;
             colTitle.DefaultCellStyle = dataGridViewCellStyle4;
             colTitle.FillWeight = 25F;
             colTitle.HeaderText = "🎶 Titolo";
@@ -287,6 +293,7 @@ namespace AirDirector.Forms
             // 
             // colDuration
             // 
+            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleCenter;
             colDuration.DefaultCellStyle = dataGridViewCellStyle3;
             colDuration.FillWeight = 10F;
             colDuration.HeaderText = "⏱️ Durata";
