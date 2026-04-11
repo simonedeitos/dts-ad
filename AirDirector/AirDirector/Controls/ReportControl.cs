@@ -104,13 +104,9 @@ namespace AirDirector.Controls
             RepositionExportButton();
             headerPanel.Resize += (s, e) => RepositionExportButton();
 
-            this.Controls.Add(headerPanel);
-
             dgvReport = new DataGridView
             {
-                Location = new Point(0, 70),
-                Size = new Size(this.Width, this.Height - 70),
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                Dock = DockStyle.Fill,
                 BackgroundColor = Color.FromArgb(30, 30, 30),
                 ForeColor = Color.White,
                 GridColor = Color.FromArgb(60, 60, 60),
@@ -192,12 +188,10 @@ namespace AirDirector.Controls
                 DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter }
             });
 
+            // Add Fill control first, then Top-docked panel last so WinForms docking
+            // positions the header above the grid correctly.
             this.Controls.Add(dgvReport);
-
-            this.Resize += (s, e) =>
-            {
-                dgvReport.Size = new Size(this.Width, this.Height - 70);
-            };
+            this.Controls.Add(headerPanel);
         }
 
         private void RepositionExportButton()
