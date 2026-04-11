@@ -280,7 +280,7 @@ namespace AirDirector.Services.Licensing
                     ActivatedOn = DateTime.Now,
                     MachineID   = hwId,
                     ProductName = "AirDirector",
-                    Version     = "1.0.0",
+                    Version     = AppVersion.Current,
                     IsActivated = true,
                     IsDemoMode  = false
                 };
