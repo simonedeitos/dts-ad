@@ -2503,6 +2503,10 @@ namespace AirDirector.Controls
                 int savedScrollIndex = dgvArchive.FirstDisplayedScrollingRowIndex;
                 var savedSelectedIds = new List<int>();
 
+                // ✅ Salva stato ordinamento corrente
+                DataGridViewColumn savedSortColumn = dgvArchive.SortedColumn;
+                SortOrder savedSortOrder = dgvArchive.SortOrder;
+
                 foreach (DataGridViewRow row in dgvArchive.SelectedRows)
                 {
                     if (row.Tag is MusicEntry me)
@@ -2539,6 +2543,15 @@ namespace AirDirector.Controls
                 }
 
                 ApplyFilters();
+
+                // ✅ Ripristina ordinamento colonna
+                if (savedSortColumn != null && savedSortOrder != SortOrder.None)
+                {
+                    System.ComponentModel.ListSortDirection direction = savedSortOrder == SortOrder.Ascending
+                        ? System.ComponentModel.ListSortDirection.Ascending
+                        : System.ComponentModel.ListSortDirection.Descending;
+                    dgvArchive.Sort(savedSortColumn, direction);
+                }
 
                 // ✅ Ripristina posizione scroll
                 if (savedScrollIndex >= 0 && savedScrollIndex < dgvArchive.Rows.Count)
