@@ -117,8 +117,6 @@ namespace AirDirector.Controls
             headerPanel.Controls.Add(btnExport);
             headerPanel.Resize += (s, e) => btnExport.Location = new Point(headerPanel.Width - btnExport.Width - 15, 10);
 
-            this.Controls.Add(headerPanel);
-
             // Filter panel
             filterPanel = new Panel
             {
@@ -242,8 +240,6 @@ namespace AirDirector.Controls
             btnLast30Days.Click += (s, e) => { dtpFromDate.Value = DateTime.Today.AddDays(-30); dtpToDate.Value = DateTime.Today; LoadReport(); };
             filterPanel.Controls.Add(btnLast30Days);
 
-            this.Controls.Add(filterPanel);
-
             // DataGridView
             dgvReport = new DataGridView
             {
@@ -286,7 +282,10 @@ namespace AirDirector.Controls
             dgvReport.Columns.Add(new DataGridViewTextBoxColumn { Name = "Type", HeaderText = "🎵 Tipo", FillWeight = 10, DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter } });
             dgvReport.Columns.Add(new DataGridViewTextBoxColumn { Name = "PlayDuration", HeaderText = "⏱️ Durata", FillWeight = 10, DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter } });
 
+            // Add controls in correct order for proper docking layout (bottom-up)
             this.Controls.Add(dgvReport);
+            this.Controls.Add(filterPanel);
+            this.Controls.Add(headerPanel);
         }
 
         private void LoadReport()
