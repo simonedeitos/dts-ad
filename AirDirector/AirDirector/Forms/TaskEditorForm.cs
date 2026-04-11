@@ -37,6 +37,7 @@ namespace AirDirector.Forms
         private DateTimePicker dtpTime;
         private ListBox listTimes;
         private CheckBox chkEnableComposition;
+        private CheckBox chkBoostDownloadVolume;
 
         private Label lblName;
         private Label lblHttpUrl;
@@ -137,6 +138,9 @@ namespace AirDirector.Forms
 
             if (lblLocal != null)
                 lblLocal.Text = LanguageManager.GetString("TaskEditor.Path", "Percorso:");
+
+            if (chkBoostDownloadVolume != null)
+                chkBoostDownloadVolume.Text = LanguageManager.GetString("Composition.BoostVolume", "Aumenta volume (-0.5db)");
 
             if (gbDays != null)
                 gbDays.Text = LanguageManager.GetString("TaskEditor.DownloadDays", "Giorni di Download");
@@ -409,6 +413,15 @@ namespace AirDirector.Forms
             };
             btnBrowseLocal.Click += BtnBrowseLocalPath_Click;
             gbLocal.Controls.Add(btnBrowseLocal);
+
+            chkBoostDownloadVolume = new CheckBox
+            {
+                Text = LanguageManager.GetString("Composition.BoostVolume", "Aumenta volume (-0.5db)"),
+                Location = new Point(15, yPos + 80),
+                Size = new Size(400, 23),
+                Font = new Font("Segoe UI", 10)
+            };
+            contentPanel.Controls.Add(chkBoostDownloadVolume);
         }
 
         private void CreateScheduleTab()
@@ -584,6 +597,7 @@ namespace AirDirector.Forms
             txtFtpPassword.Text = Task.FtpPassword;
 
             txtLocalPath.Text = Task.LocalFilePath;
+            chkBoostDownloadVolume.Checked = Task.BoostDownloadVolume;
 
             chkMonday.Checked = Task.Monday;
             chkTuesday.Checked = Task.Tuesday;
@@ -765,6 +779,7 @@ namespace AirDirector.Forms
             Task.FtpUsername = txtFtpUsername.Text;
             Task.FtpPassword = txtFtpPassword.Text;
             Task.LocalFilePath = txtLocalPath.Text;
+            Task.BoostDownloadVolume = chkBoostDownloadVolume.Checked;
             Task.Monday = chkMonday.Checked;
             Task.Tuesday = chkTuesday.Checked;
             Task.Wednesday = chkWednesday.Checked;

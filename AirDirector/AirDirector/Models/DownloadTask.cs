@@ -44,6 +44,7 @@ namespace AirDirector.Models
         public string CloserFilePath { get; set; }
         public string OutputFilePath { get; set; }
         public bool BoostVolume { get; set; }
+        public bool BoostDownloadVolume { get; set; }
 
         public DownloadTask()
         {
@@ -76,6 +77,7 @@ namespace AirDirector.Models
             CloserFilePath = "";
             OutputFilePath = "";
             BoostVolume = false;
+            BoostDownloadVolume = false;
         }
 
         public void CopyFrom(DownloadTask source)
@@ -109,6 +111,7 @@ namespace AirDirector.Models
             CloserFilePath = source.CloserFilePath;
             OutputFilePath = source.OutputFilePath;
             BoostVolume = source.BoostVolume;
+            BoostDownloadVolume = source.BoostDownloadVolume;
         }
 
         // Converte il task in formato CSV per Downloader.dbc
@@ -126,7 +129,8 @@ namespace AirDirector.Models
                    $"{(CompositionEnabled ? "1" : "0")},{(UseOpener ? "1" : "0")},{EscapeCsv(OpenerFilePath)}," +
                    $"{EscapeCsv(MainFilePath)},{(UseBackground ? "1" : "0")},{EscapeCsv(BackgroundFilePath)}," +
                    $"{BackgroundVolume},{(UseCloser ? "1" : "0")},{EscapeCsv(CloserFilePath)}," +
-                   $"{EscapeCsv(OutputFilePath)},{(BoostVolume ? "1" : "0")}";
+                   $"{EscapeCsv(OutputFilePath)},{(BoostVolume ? "1" : "0")}," +
+                   $"{(BoostDownloadVolume ? "1" : "0")}";
         }
 
         // Crea un task da una riga CSV
@@ -165,7 +169,8 @@ namespace AirDirector.Models
                 UseCloser = parts[25] == "1",
                 CloserFilePath = parts[26],
                 OutputFilePath = parts[27],
-                BoostVolume = parts.Length > 28 && parts[28] == "1"
+                BoostVolume = parts.Length > 28 && parts[28] == "1",
+                BoostDownloadVolume = parts.Length > 29 && parts[29] == "1"
             };
 
             return task;
