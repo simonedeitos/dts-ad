@@ -838,10 +838,15 @@ namespace AirDirector.Forms
                 _timersForm = new TimersForm();
                 _timersForm.SetReferences(playlistQueue, playerControl, playerControlVideo);
                 _timersForm.Show(this);
+                _timersForm.Owner = null;  // ← AGGIUNGI QUESTA RIGA
             }
             else
             {
-                if (!_timersForm.Visible) _timersForm.Show(this);
+                if (!_timersForm.Visible)
+                {
+                    _timersForm.Show(this);
+                    _timersForm.Owner = null;  // ← AGGIUNGI QUESTA RIGA
+                }
                 _timersForm.BringToFront();
             }
         }
