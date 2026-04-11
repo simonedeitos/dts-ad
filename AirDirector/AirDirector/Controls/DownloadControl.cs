@@ -27,6 +27,7 @@ namespace AirDirector.Controls
         private readonly Dictionary<string, DateTime> _lastExecuted = new Dictionary<string, DateTime>();
         private bool _isProcessing = false;
         private bool _logVisible = true;
+        private const float BoostVolumeFactor = 1.059f;
 
         private FlowLayoutPanel flowTasks;
         private TextBox txtLog;
@@ -1313,6 +1314,12 @@ namespace AirDirector.Controls
                     }
 
                     string ext = Path.GetExtension(filePath).ToLower();
+                    if (ext != ".mp3" && ext != ".wma")
+                    {
+                        LogMessage(string.Format(LanguageManager.GetString("Download.VolumeBoostUnsupported", "⚠️ Formato non supportato per amplificazione volume: {0}"), ext));
+                        return;
+                    }
+
                     string tempWavFile = Path.Combine(
                         Path.GetDirectoryName(filePath),
                         Path.GetFileNameWithoutExtension(filePath) + "_boost_temp.wav"
@@ -1325,7 +1332,7 @@ namespace AirDirector.Controls
                     using (var reader = new AudioFileReader(filePath))
                     {
                         var volumeProvider = new VolumeSampleProvider(reader);
-                        volumeProvider.Volume = 1.059f;
+                        volumeProvider.Volume = BoostVolumeFactor;
                         WaveFileWriter.CreateWaveFile16(tempWavFile, volumeProvider);
                     }
 
@@ -1341,7 +1348,7 @@ namespace AirDirector.Controls
                         }
                     }
 
-                    try { File.Delete(tempWavFile); } catch { }
+                    try { File.Delete(tempWavFile); } catch { } // pulizia file temporaneo: fallimento ignorabile
 
                     try
                     {
@@ -1354,7 +1361,7 @@ namespace AirDirector.Controls
                             LanguageManager.GetString("Download.FileInUseSkip",
                                 "⚠️ File in uso da un altro processo, conversione MP3 saltata: {0}"),
                             filePath));
-                        try { File.Delete(tempOutFile); } catch { }
+                        try { File.Delete(tempOutFile); } catch { } // pulizia file temporaneo: fallimento ignorabile
                         return;
                     }
 
@@ -1529,7 +1536,7 @@ namespace AirDirector.Controls
 
                     if (task.BoostVolume)
                     {
-                        float volumeFactor = 1.059f;
+                        float volumeFactor = BoostVolumeFactor;
                         var volumeProvider = new VolumeSampleProvider(concatenatedProvider);
                         volumeProvider.Volume = volumeFactor;
                         finalProvider = volumeProvider;
