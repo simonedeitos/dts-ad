@@ -239,7 +239,7 @@ namespace AirDirector.Controls
 
             string icon = schedule.Type == "PlayClock" ? "🕐" :
                          schedule.Type == "PlayAudio" ? "🎵" :
-                         schedule.Type == "PlayMiniPLS" ? "📋" :
+                         (schedule.Type == "PlayMiniPLS" || schedule.Type == "PlayPlaylist") ? "📋" :
                          schedule.Type == "TimeSignal" ? "⏰" :
                          schedule.Type == "URLStreaming" ? "🌐" : "📄";
 
@@ -247,6 +247,8 @@ namespace AirDirector.Controls
             if (schedule.Type == "PlayClock")
                 target = schedule.ClockName;
             else if (schedule.Type == "PlayAudio")
+                target = System.IO.Path.GetFileNameWithoutExtension(schedule.AudioFilePath);
+            else if (schedule.Type == "PlayPlaylist")
                 target = System.IO.Path.GetFileNameWithoutExtension(schedule.AudioFilePath);
             else if (schedule.Type == "PlayMiniPLS")
                 target = $"MiniPLS #{schedule.MiniPLSID}";

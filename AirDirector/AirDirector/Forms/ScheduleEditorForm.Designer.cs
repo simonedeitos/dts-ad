@@ -17,7 +17,7 @@ namespace AirDirector.Forms
         private ComboBox cmbClock;
         private TextBox txtAudioFile;
         private Button btnBrowseAudio;
-        private NumericUpDown numMiniPLSID;
+        private ComboBox cmbPlaylist;
         private TextBox txtStreamURL;
         private MaskedTextBox txtStreamDuration;
 
@@ -61,7 +61,7 @@ namespace AirDirector.Forms
             txtAudioFile = new TextBox();
             btnBrowseAudio = new Button();
             radMiniPLS = new RadioButton();
-            numMiniPLSID = new NumericUpDown();
+            cmbPlaylist = new ComboBox();
             radTimeSignal = new RadioButton();
             radURLStreaming = new RadioButton();
             lblStreamURL = new Label();
@@ -89,7 +89,6 @@ namespace AirDirector.Forms
             btnSave = new Button();
             btnCancel = new Button();
             grpAction.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)numMiniPLSID).BeginInit();
             grpDays.SuspendLayout();
             grpTimes.SuspendLayout();
             SuspendLayout();
@@ -120,7 +119,7 @@ namespace AirDirector.Forms
             grpAction.Controls.Add(txtAudioFile);
             grpAction.Controls.Add(btnBrowseAudio);
             grpAction.Controls.Add(radMiniPLS);
-            grpAction.Controls.Add(numMiniPLSID);
+            grpAction.Controls.Add(cmbPlaylist);
             grpAction.Controls.Add(radTimeSignal);
             grpAction.Controls.Add(radURLStreaming);
             grpAction.Controls.Add(lblStreamURL);
@@ -193,17 +192,15 @@ namespace AirDirector.Forms
             radMiniPLS.Text = "📋 Riproduci Mini Playlist";
             radMiniPLS.CheckedChanged += RadAction_CheckedChanged;
             // 
-            // numMiniPLSID
+            // cmbPlaylist
             // 
-            numMiniPLSID.Enabled = false;
-            numMiniPLSID.Font = new Font("Segoe UI", 9F);
-            numMiniPLSID.Location = new Point(201, 85);
-            numMiniPLSID.Maximum = new decimal(new int[] { 9999, 0, 0, 0 });
-            numMiniPLSID.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            numMiniPLSID.Name = "numMiniPLSID";
-            numMiniPLSID.Size = new Size(44, 23);
-            numMiniPLSID.TabIndex = 6;
-            numMiniPLSID.Value = new decimal(new int[] { 1, 0, 0, 0 });
+            cmbPlaylist.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbPlaylist.Enabled = false;
+            cmbPlaylist.Font = new Font("Segoe UI", 9F);
+            cmbPlaylist.Location = new Point(201, 85);
+            cmbPlaylist.Name = "cmbPlaylist";
+            cmbPlaylist.Size = new Size(419, 23);
+            cmbPlaylist.TabIndex = 6;
             // 
             // radTimeSignal
             // 
@@ -531,7 +528,6 @@ namespace AirDirector.Forms
             Text = "📅 Schedulazione";
             grpAction.ResumeLayout(false);
             grpAction.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)numMiniPLSID).EndInit();
             grpDays.ResumeLayout(false);
             grpTimes.ResumeLayout(false);
             ResumeLayout(false);

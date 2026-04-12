@@ -1038,6 +1038,29 @@ namespace AirDirector.Controls
                         }
                         break;
 
+                    case "PlayPlaylist":
+                        if (!string.IsNullOrEmpty(schedule.AudioFilePath))
+                        {
+                            Log($"[ExecuteSchedule] 📋 Playlist: {schedule.AudioFilePath}");
+                            try
+                            {
+                                var playlist = AirPlaylist.Load(schedule.AudioFilePath);
+                                if (playlist != null)
+                                {
+                                    LoadPlaylistOnAir(playlist, true);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Log($"[ExecuteSchedule] ⚠️ Errore caricamento playlist: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            Log($"[ExecuteSchedule] ⚠️ AudioFilePath vuoto per PlayPlaylist!");
+                        }
+                        break;
+
                     case "TimeSignal":
                         Log($"[ExecuteSchedule] ? Segnale Orario");
                         InsertTimeSignal(schedule.Name);
