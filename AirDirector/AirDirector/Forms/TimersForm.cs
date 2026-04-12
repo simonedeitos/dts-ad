@@ -668,7 +668,7 @@ namespace AirDirector.Forms
                 }
                 else
                 {
-                    _lblAdInfo.Text = LanguageManager.GetString("TimersForm.NoAd", "Nessuna pubblicità programmata");
+                    _lblAdInfo.Text = LanguageManager.GetString("TimersForm.NoAd", "----------");
                     _lblAdCountdown.Text = "--:--:--";
                     _lblAdCountdown.ForeColor = Color.White;
                 }
