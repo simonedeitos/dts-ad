@@ -432,8 +432,8 @@ namespace AirDirector.Forms
         {
             if (_playlistQueue == null)
             {
-                _lblOnAirArtist.Text = "--";
-                _lblOnAirTitle.Text = "--";
+                _lblOnAirArtist.Text = "";
+                _lblOnAirTitle.Text = "";
                 SetNoIntro();
                 SetNoMix();
                 UpdateProgress(0, 0, 0);
@@ -443,8 +443,8 @@ namespace AirDirector.Forms
             var current = _playlistQueue.GetCurrentPlayingItem();
             if (current == null)
             {
-                _lblOnAirArtist.Text = "--";
-                _lblOnAirTitle.Text = LanguageManager.GetString("TimersForm.NoOnAir", "Nessun elemento in onda");
+                _lblOnAirArtist.Text = "";
+                _lblOnAirTitle.Text = "";
                 SetNoIntro();
                 SetNoMix();
                 UpdateProgress(0, 0, 0);
@@ -458,12 +458,18 @@ namespace AirDirector.Forms
                 ? (_playerControlVideo?.CurrentPositionMs ?? 0)
                 : (_playerControl?.CurrentPositionMs ?? 0);
 
-            // INTRO countdown
+            // INTRO countdown — relativo al MarkerIN (INTRO-IN)
             int introMarker = _isRadioTVMode
                 ? (_playerControlVideo?.CurrentMarkerINTRO ?? 0)
                 : (_playerControl?.CurrentMarkerINTRO ?? 0);
 
-            if (introMarker > 0 && posMs < introMarker)
+            int markerIN = _isRadioTVMode
+                ? (_playerControlVideo?.CurrentMarkerIN ?? 0)
+                : (_playerControl?.CurrentMarkerIN ?? 0);
+
+            int effectiveIntro = introMarker - markerIN; // INTRO-IN
+
+            if (effectiveIntro > 0 && posMs < introMarker)
             {
                 _lblIntroCountdown.Text = FormatMs(introMarker - posMs);
                 _lblIntroCountdown.ForeColor = Color.White;
