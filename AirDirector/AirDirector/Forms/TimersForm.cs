@@ -42,9 +42,7 @@ namespace AirDirector.Forms
         private TableLayoutPanel _onAirGrid;
         private Label _lblOnAirArtist;
         private Label _lblOnAirTitle;
-        private Label _lblIntroHeader;
         private Label _lblIntroCountdown;
-        private Label _lblMixHeader;
         private Label _lblMixCountdown;
         private Panel _pnlProgressBar;
         private float _trackProgress = 0f;
@@ -106,10 +104,10 @@ namespace AirDirector.Forms
         private void ApplyLanguage()
         {
             this.Text = LanguageManager.GetString("TimersForm.Title", "Timers");
-            _lblIntroHeader.Text = LanguageManager.GetString("TimersForm.Intro", "INTRO");
-            _lblMixHeader.Text = LanguageManager.GetString("TimersForm.Countdown", "COUNTDOWN");
             _lblScheduleHeader.Text = LanguageManager.GetString("TimersForm.NextSchedule", "📅 PROSSIMA SCHEDULAZIONE");
             _lblAdHeader.Text = LanguageManager.GetString("TimersForm.NextAd", "📢 PROSSIMA PUBBLICITÀ");
+            _lblIntroCountdown.Parent?.Invalidate();
+            _lblMixCountdown.Parent?.Invalidate();
         }
 
         // ─── UI Construction ────────────────────────────────────────────────────
@@ -145,8 +143,8 @@ namespace AirDirector.Forms
                 ColumnCount = 2,
                 BackColor = Color.Transparent
             };
-            _onAirGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65f));
-            _onAirGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35f));
+            _onAirGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60f));
+            _onAirGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40f));
             _onAirGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 40f));
             _onAirGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 40f));
             _onAirGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 20f));
@@ -155,40 +153,30 @@ namespace AirDirector.Forms
             _lblOnAirArtist = new Label
             {
                 Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleLeft,
-                ForeColor = Color.FromArgb(255, 215, 0),
+                TextAlign = ContentAlignment.MiddleCenter,
+                ForeColor = Color.White,
                 Font = new Font("Segoe UI", 18f, FontStyle.Bold),
                 AutoEllipsis = true,
                 BackColor = Color.Transparent,
                 Text = "--",
-                Padding = new Padding(8, 0, 0, 0)
+                Padding = Padding.Empty
             };
 
             // Titolo (col 0, row 1)
             _lblOnAirTitle = new Label
             {
                 Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 16f, FontStyle.Bold),
                 AutoEllipsis = true,
                 BackColor = Color.Transparent,
                 Text = "--",
-                Padding = new Padding(8, 0, 0, 0)
+                Padding = Padding.Empty
             };
 
-            // Intro panel (col 1, row 0)
+            // Intro panel (col 1, row 0) — header drawn via Paint, countdown fills all space
             Panel pnlIntro = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(60, 0, 0) };
-            _lblIntroHeader = new Label
-            {
-                Dock = DockStyle.Top,
-                TextAlign = ContentAlignment.MiddleCenter,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 8f, FontStyle.Bold),
-                Height = 20,
-                BackColor = Color.Transparent,
-                Text = "INTRO"
-            };
             _lblIntroCountdown = new Label
             {
                 Dock = DockStyle.Fill,
@@ -196,23 +184,14 @@ namespace AirDirector.Forms
                 ForeColor = Color.White,
                 BackColor = Color.Transparent,
                 Font = new Font(_countdownFontFamily, 28f, FontStyle.Bold),
-                Text = "--:--"
+                Text = "--:--",
+                Padding = new Padding(0, 14, 0, 0)
             };
             pnlIntro.Controls.Add(_lblIntroCountdown);
-            pnlIntro.Controls.Add(_lblIntroHeader);
+            pnlIntro.Paint += (s, ev) => DrawPanelHeader(ev.Graphics, pnlIntro, LanguageManager.GetString("TimersForm.Intro", "INTRO"));
 
-            // Mix/Countdown panel (col 1, row 1)
+            // Mix/Countdown panel (col 1, row 1) — header drawn via Paint, countdown fills all space
             Panel pnlMix = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(25, 25, 30) };
-            _lblMixHeader = new Label
-            {
-                Dock = DockStyle.Top,
-                TextAlign = ContentAlignment.MiddleCenter,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 8f, FontStyle.Bold),
-                Height = 20,
-                BackColor = Color.Transparent,
-                Text = "COUNTDOWN"
-            };
             _lblMixCountdown = new Label
             {
                 Dock = DockStyle.Fill,
@@ -220,10 +199,11 @@ namespace AirDirector.Forms
                 ForeColor = Color.Red,
                 BackColor = Color.Transparent,
                 Font = new Font(_countdownFontFamily, 28f, FontStyle.Bold),
-                Text = "--:--"
+                Text = "--:--",
+                Padding = new Padding(0, 14, 0, 0)
             };
             pnlMix.Controls.Add(_lblMixCountdown);
-            pnlMix.Controls.Add(_lblMixHeader);
+            pnlMix.Paint += (s, ev) => DrawPanelHeader(ev.Graphics, pnlMix, LanguageManager.GetString("TimersForm.Countdown", "COUNTDOWN"));
 
             // Progress bar (row 2, colspan 2)
             _pnlProgressBar = new Panel
@@ -344,20 +324,18 @@ namespace AirDirector.Forms
 
             float countdown = Math.Max(12f, Math.Min(120f, Math.Min(rowH * 0.35f, formW * 0.22f)));
 
-            // Intro/Mix countdown: right column occupies ~35% of width
-            float rightW = formW * 0.35f;
-            float introMixCountdown = Math.Max(10f, Math.Min(countdown, rightW * 0.22f));
+            // Intro/Mix countdown: right column occupies ~40% of width, each panel gets ~40% of row height
+            float rightW = formW * 0.40f;
+            float counterH = rowH * 0.40f;
+            float introMixCountdown = Math.Max(10f, Math.Min(
+                rightW * 0.18f,
+                counterH * 0.45f
+            ));
 
             float artistSize = Math.Max(10f, Math.Min(36f, rowH * 0.16f));
             float titleSize  = Math.Max(9f,  Math.Min(30f, rowH * 0.14f));
             float header = Math.Max(8f, Math.Min(18f, rowH * 0.10f));
             int   labelH = Math.Max(16, Math.Min(50,  (int)(rowH * 0.22f)));
-
-            // Scale header labels
-            _lblIntroHeader.Height = Math.Max(14, (int)(rowH * 0.10f));
-            ScaleName(_lblIntroHeader, header);
-            _lblMixHeader.Height = Math.Max(14, (int)(rowH * 0.10f));
-            ScaleName(_lblMixHeader, header);
 
             _lblScheduleHeader.Height = labelH;
             _lblScheduleName.Height   = labelH;
@@ -366,6 +344,11 @@ namespace AirDirector.Forms
 
             ScaleName(_lblScheduleHeader, header);
             ScaleName(_lblAdHeader,       header);
+
+            // Dynamic padding for intro/mix countdown to leave room for paint header
+            int headerPad = Math.Max(10, (int)(rowH * 0.06f));
+            _lblIntroCountdown.Padding = new Padding(0, headerPad, 0, 0);
+            _lblMixCountdown.Padding   = new Padding(0, headerPad, 0, 0);
 
             // Scale countdown fonts
             ScaleCountdown(_lblIntroCountdown,    introMixCountdown);
@@ -381,6 +364,10 @@ namespace AirDirector.Forms
             float name = Math.Max(8f, Math.Min(30f, rowH * 0.13f));
             ScaleName(_lblScheduleName, name);
             ScaleName(_lblAdInfo,       name);
+
+            // Invalidate intro/mix panels to redraw paint header
+            _lblIntroCountdown.Parent?.Invalidate();
+            _lblMixCountdown.Parent?.Invalidate();
         }
 
         private static void ScaleCountdown(Label lbl, float size)
@@ -403,6 +390,19 @@ namespace AirDirector.Forms
                 old.Dispose();
             }
             catch { }
+        }
+
+        private void DrawPanelHeader(Graphics g, Panel panel, string text)
+        {
+            float headerFontSize = Math.Max(7f, Math.Min(12f, panel.Height * 0.12f));
+            using (var font = new Font("Segoe UI", headerFontSize, FontStyle.Bold))
+            using (var brush = new SolidBrush(Color.FromArgb(200, 255, 255, 255)))
+            {
+                var size = g.MeasureString(text, font);
+                float x = (panel.Width - size.Width) / 2f;
+                float y = 2f;
+                g.DrawString(text, font, brush, x, y);
+            }
         }
 
         // ─── Timer Tick ─────────────────────────────────────────────────────────
