@@ -21,6 +21,7 @@ namespace AirDirector.Forms
             ("📅", "Schedules"),
             ("📺", "ADV"),
             ("⏰", "Clocks"),
+            ("📋", "Playlists"),
             ("📡", "Encoders"),
             ("⏺️", "Recorders"),
             ("📊", "Reports")
