@@ -309,6 +309,7 @@ namespace AirDirector.Forms
                 RowTemplate = { Height = 26 },
                 AllowDrop = true
             };
+            _dgvEditor.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(50, 50, 50);
             _dgvEditor.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             _dgvEditor.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
             _dgvEditor.DefaultCellStyle.BackColor = Color.FromArgb(35, 35, 35);
