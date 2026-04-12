@@ -1194,7 +1194,7 @@ namespace AirDirector.Controls
                 lblRemaining.ForeColor = AppTheme.LEDRed;
             }
 
-            TimeSpan introRemaining = _introTime - _currentPosition;
+            TimeSpan introRemaining = _introTime - (_currentPosition - TimeSpan.FromMilliseconds(_markerIN));
             if (introRemaining.TotalSeconds > 0)
             {
                 lblIntro.Text = introRemaining.ToString(@"mm\:ss");
@@ -1665,8 +1665,8 @@ namespace AirDirector.Controls
                     int introX = 0, mixX = width;
                     if (_totalDuration.TotalMilliseconds > 0)
                     {
-                        if (_introTime.TotalMilliseconds > 0)
-                            introX = (int)((_introTime.TotalMilliseconds / _totalDuration.TotalMilliseconds) * width);
+                        if (_markerINTRO > 0)
+                            introX = (int)((_markerINTRO / _totalDuration.TotalMilliseconds) * width);
                         if (_markerMIX > 0)
                             mixX = (int)((_markerMIX / _totalDuration.TotalMilliseconds) * width);
                     }
