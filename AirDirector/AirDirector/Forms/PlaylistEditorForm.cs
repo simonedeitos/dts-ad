@@ -590,11 +590,11 @@ namespace AirDirector.Forms
             page.Controls.Add(_chkRuleYearFilter);
             y += 34;
 
-            Label lblFrom = new Label { Text = LanguageManager.GetString("PlaylistEditor.YearFrom", "Da:"), ForeColor = Color.White, Left = 40, Top = y + 3, Width = 40, Height = 22, Font = new Font("Segoe UI", 10) };
+            Label lblFrom = new Label { Text = LanguageManager.GetString("PlaylistEditor.YearFrom", "Da:"), ForeColor = Color.White, Left = 20, Top = y + 3, Width = 60, Height = 22, Font = new Font("Segoe UI", 10) };
             _numRuleYearFrom = new NumericUpDown { Left = 86, Top = y, Width = 90, Minimum = 1900, Maximum = DateTime.Now.Year, Value = 2000, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
             _numRuleYearFrom.ValueChanged += (s, e) => UpdateRuleFoundCount();
-            Label lblTo = new Label { Text = LanguageManager.GetString("PlaylistEditor.YearTo", "A:"), ForeColor = Color.White, Left = 200, Top = y + 3, Width = 35, Height = 22, Font = new Font("Segoe UI", 10) };
-            _numRuleYearTo = new NumericUpDown { Left = 240, Top = y, Width = 90, Minimum = 1900, Maximum = DateTime.Now.Year, Value = DateTime.Now.Year, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
+            Label lblTo = new Label { Text = LanguageManager.GetString("PlaylistEditor.YearTo", "A:"), ForeColor = Color.White, Left = 180, Top = y + 3, Width = 60, Height = 22, Font = new Font("Segoe UI", 10) };
+            _numRuleYearTo = new NumericUpDown { Left = 250, Top = y, Width = 90, Minimum = 1900, Maximum = DateTime.Now.Year, Value = DateTime.Now.Year, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
             _numRuleYearTo.ValueChanged += (s, e) => UpdateRuleFoundCount();
             page.Controls.AddRange(new Control[] { lblFrom, _numRuleYearFrom, lblTo, _numRuleYearTo });
             y += 40;
