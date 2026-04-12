@@ -1050,13 +1050,15 @@ namespace AirDirector.Controls
                 AudioFileReader activeAudio = _isPlayerAActive ? _audioFileA : _audioFileB;
 
                 _totalDuration = activeAudio.TotalTime;
-                _introTime = item.Intro;
                 _currentPosition = activeAudio.CurrentTime;
 
                 _markerIN = item.MarkerIN;
                 _markerINTRO = item.MarkerINTRO;
                 _markerMIX = item.MarkerMIX > 0 ? item.MarkerMIX : (int)_totalDuration.TotalMilliseconds;
                 _markerOUT = item.MarkerOUT > 0 ? item.MarkerOUT : (int)_totalDuration.TotalMilliseconds;
+                _introTime = item.Intro;
+                if (_introTime.TotalMilliseconds <= 0 && _markerINTRO > 0)
+                    _introTime = TimeSpan.FromMilliseconds(Math.Max(0, _markerINTRO - _markerIN));
                 _mixRequested = false;
 
                 Log($"[LoadTrackInfo] 🎵 File: {item.Artist} - {item.Title}");
@@ -1764,31 +1766,104 @@ namespace AirDirector.Controls
             int width = waveformPanel.Width;
             int height = waveformPanel.Height;
 
-            Bitmap bitmapToDraw = null;
+            g.Clear(Color.Black);
 
-            lock (_waveformLock)
-            {
-                if (_waveformBitmap != null && !IsImageDisposed(_waveformBitmap))
-                {
-                    bitmapToDraw = _waveformBitmap;
-                }
-            }
+            float tm = (float)_totalDuration.TotalMilliseconds;
 
-            if (bitmapToDraw != null)
+            float[] peaks = _waveformData;
+            if (peaks != null && peaks.Length > 0 && tm > 0)
             {
-                try
+                // Posizione cursore
+                float pr = Math.Max(0f, Math.Min(1f, (float)_currentPosition.TotalMilliseconds / tm));
+                int cx = (int)(pr * (width - 1));
+
+                // Posizioni marker
+                int markerInX = _markerIN > 0 ? (int)((float)_markerIN / tm * (width - 1)) : 0;
+                int markerMixMs = _autoMode && _markerMIX > 0 ? _markerMIX :
+                                  (_markerOUT > 0 ? _markerOUT : (int)tm);
+                int markerMixX = (int)((float)markerMixMs / tm * (width - 1));
+                int introX = _markerINTRO > 0 ? (int)(Math.Min(1f, (float)_markerINTRO / tm) * (width - 1)) : 0;
+
+                int cy = height / 2;
+
+                // Background zona rossa tra MarkerIN e INTRO
+                if (introX > markerInX)
+                    using (var b = new SolidBrush(Color.FromArgb(25, 255, 0, 0)))
+                        g.FillRectangle(b, markerInX, 0, introX - markerInX, height);
+
+                // Waveform in tempo reale con colori dinamici
+                int nb = peaks.Length;
+                float bw = (float)(width - 1) / nb;
+                for (int i = 0; i < nb; i++)
                 {
-                    g.DrawImage(bitmapToDraw, 0, 0);
+                    float pv = peaks[i];
+                    float boosted = (float)Math.Pow(pv, 0.6);
+                    int bh = Math.Max(1, (int)(boosted * height * 0.95f));
+                    int bx = (int)(i * bw);
+
+                    Color bc;
+                    if (bx < markerInX || bx > markerMixX)
+                        bc = bx < cx ? Color.FromArgb(50, 50, 50) : Color.FromArgb(60, 60, 60);
+                    else if (bx < introX)
+                        bc = bx < cx ? Color.FromArgb(70, 70, 70) : Color.FromArgb(255, 80, 80);
+                    else if (bx < cx)
+                        bc = Color.FromArgb(70, 70, 70);
+                    else
+                        bc = Color.FromArgb(0, 200, 0);
+
+                    int barWidth = Math.Max(1, (int)Math.Ceiling(bw));
+                    if (bx >= width) break;
+                    if (bx + barWidth > width) barWidth = width - bx;
+                    if (barWidth <= 0) continue;
+
+                    using (var br = new SolidBrush(bc))
+                        g.FillRectangle(br, bx, cy - bh / 2, barWidth, bh);
                 }
-                catch (ArgumentException)
+
+                // Progress bar in basso
+                if (cx > 0)
+                    using (var b = new SolidBrush(Color.FromArgb(70, 70, 70)))
+                        g.FillRectangle(b, 0, height - 3, cx, 3);
+                if (cx < width - 1)
+                    using (var b = new SolidBrush(Color.FromArgb(0, 255, 0)))
+                        g.FillRectangle(b, cx, height - 3, width - cx, 3);
+
+                // Marker IN (linea ciano)
+                if (markerInX > 0 && markerInX < width)
+                    using (var pn = new Pen(Color.FromArgb(200, 0, 200, 255), 2))
+                        g.DrawLine(pn, markerInX, 0, markerInX, height);
+
+                // Marker MIX (linea arancione) - solo in AUTO mode
+                if (_autoMode && _markerMIX > 0 && markerMixX > 0 && markerMixX < width)
+                    using (var pn = new Pen(Color.FromArgb(200, 255, 128, 0), 2))
+                        g.DrawLine(pn, markerMixX, 0, markerMixX, height);
+
+                // Marker OUT (linea arancione chiara) - se diverso da MIX e non a fine file
+                if (_markerOUT > 0 && _markerOUT < (int)tm)
                 {
-                    g.Clear(Color.Black);
+                    int markerOutX = (int)((float)_markerOUT / tm * (width - 1));
+                    if (markerOutX > 0 && markerOutX < width && (!_autoMode || _markerOUT != _markerMIX))
+                        using (var pn = new Pen(Color.FromArgb(150, 255, 128, 0), 1))
+                            g.DrawLine(pn, markerOutX, 0, markerOutX, height);
                 }
+
+                // Marker INTRO (linea gialla)
+                if (introX > 0 && introX < width)
+                    using (var pn = new Pen(Color.FromArgb(200, 255, 255, 0), 1))
+                        g.DrawLine(pn, introX, 0, introX, height);
+
+                // Cursore di riproduzione (linea rossa)
+                if (_isPlaying && cx > 0)
+                    using (var pn = new Pen(Color.Red, 2))
+                        g.DrawLine(pn, cx, 0, cx, height);
+
+                // Linea centrale semitrasparente
+                using (var pn = new Pen(Color.FromArgb(25, 255, 255, 255), 1))
+                    g.DrawLine(pn, 0, cy, width, cy);
             }
             else
             {
-                g.Clear(Color.Black);
-
+                // Nessuna waveform disponibile: mostra testo informativo
                 if (_isLoadingWaveform)
                 {
                     using (Font font = new Font("Segoe UI", 10, FontStyle.Bold))
@@ -1815,22 +1890,7 @@ namespace AirDirector.Controls
                 }
             }
 
-            if (_totalDuration.TotalSeconds > 0)
-            {
-                int progressWidth = (int)((_currentPosition.TotalSeconds / _totalDuration.TotalSeconds) * width);
-
-                using (SolidBrush progressBrush = new SolidBrush(Color.FromArgb(200, 255, 0, 0)))
-                    g.FillRectangle(progressBrush, 0, 0, progressWidth, 5);
-            }
-
-            if (_totalDuration.TotalSeconds > 0 && _isPlaying)
-            {
-                int cursorX = (int)((_currentPosition.TotalSeconds / _totalDuration.TotalSeconds) * width);
-
-                using (Pen cursorPen = new Pen(Color.Red, 3))
-                    g.DrawLine(cursorPen, cursorX, 0, cursorX, height);
-            }
-
+            // Tooltip cursore (Ctrl+hover per seek)
             if (_isHoveringWaveform && ModifierKeys.HasFlag(Keys.Control) && _hoverX > 0 && _totalDuration.TotalSeconds > 0 && !_isStreamingURL)
             {
                 using (Pen previewPen = new Pen(Color.FromArgb(150, 255, 255, 255), 2))
@@ -2491,13 +2551,15 @@ namespace AirDirector.Controls
                     AudioFileReader activeAudio = _isPlayerAActive ? _audioFileA : _audioFileB;
 
                     _totalDuration = activeAudio.TotalTime;
-                    _introTime = intro;
                     _currentPosition = TimeSpan.Zero;
 
                     _markerIN = markerIN;
                     _markerINTRO = markerINTRO;
                     _markerMIX = markerMIX > 0 ? markerMIX : (int)_totalDuration.TotalMilliseconds;
                     _markerOUT = markerOUT > 0 ? markerOUT : (int)_totalDuration.TotalMilliseconds;
+                    _introTime = intro;
+                    if (_introTime.TotalMilliseconds <= 0 && _markerINTRO > 0)
+                        _introTime = TimeSpan.FromMilliseconds(Math.Max(0, _markerINTRO - _markerIN));
                     _mixRequested = false;
                 }
 
