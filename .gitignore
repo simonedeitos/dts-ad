@@ -4,3 +4,4 @@ obj/
 .vs/
 AirDirector/AirDirector/version.json
 AirDirector/AirDirector/AirDirector.csproj.user
+AirDirector/AirDirector/version.json
