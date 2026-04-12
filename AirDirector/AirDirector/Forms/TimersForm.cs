@@ -597,7 +597,7 @@ namespace AirDirector.Forms
                 }
                 else
                 {
-                    _lblScheduleName.Text = LanguageManager.GetString("TimersForm.NoSchedule", "Nessuna schedulazione prevista");
+                    _lblScheduleName.Text = LanguageManager.GetString("TimersForm.NoSchedule", "----------");
                     _lblScheduleCountdown.Text = "--:--:--";
                     _lblScheduleCountdown.ForeColor = Color.White;
                 }
@@ -617,7 +617,7 @@ namespace AirDirector.Forms
 
                 if (_cachedAdvItems.Count == 0)
                 {
-                    _lblAdInfo.Text = LanguageManager.GetString("TimersForm.NoAd", "Nessuna pubblicità programmata");
+                    _lblAdInfo.Text = LanguageManager.GetString("TimersForm.NoAd", "----------");
                     _lblAdCountdown.Text = "--:--:--";
                     _lblAdCountdown.ForeColor = Color.White;
                     return;
