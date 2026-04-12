@@ -791,7 +791,7 @@ namespace AirDirector.Forms
                 MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
             if (result != DialogResult.Yes) return;
             _playlist.Items.Clear();
-            _hasUnsavedChanges = false;
+            MarkChanged();
             RefreshEditorGrid();
         }
 
