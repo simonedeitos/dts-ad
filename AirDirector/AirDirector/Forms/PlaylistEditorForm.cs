@@ -62,6 +62,7 @@ namespace AirDirector.Forms
         private Button _btnDeletePlaylist;
 
         // Rules tab
+        private ComboBox _cmbRuleSource;
         private RadioButton _radRuleCategory;
         private RadioButton _radRuleGenre;
         private RadioButton _radRuleCategoryGenre;
@@ -540,6 +541,16 @@ namespace AirDirector.Forms
             { BackColor = Color.FromArgb(28, 28, 28), Padding = new Padding(6) };
 
             int y = 8;
+
+            // Source selection (Music or Clips)
+            Label lblSource = new Label { Text = LanguageManager.GetString("PlaylistEditor.RuleSource", "Sorgente:"), ForeColor = Color.White, Left = 10, Top = y + 3, Width = 80, Height = 22, Font = new Font("Segoe UI", 10) };
+            _cmbRuleSource = new ComboBox { Left = 95, Top = y, Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
+            _cmbRuleSource.Items.Add("🎵 " + LanguageManager.GetString("PlaylistEditor.RuleSourceMusic", "Music"));
+            _cmbRuleSource.Items.Add("🔔 " + LanguageManager.GetString("PlaylistEditor.RuleSourceClips", "Clips"));
+            _cmbRuleSource.SelectedIndex = 0;
+            _cmbRuleSource.SelectedIndexChanged += (s, e) => OnRuleSourceChanged();
+            page.Controls.AddRange(new Control[] { lblSource, _cmbRuleSource });
+            y += 40;
 
             // Source type
             _radRuleCategory = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleCategory", "Categoria"), ForeColor = Color.White, Left = 10, Top = y, AutoSize = true, Checked = true, Font = new Font("Segoe UI", 10) };
@@ -1347,6 +1358,46 @@ namespace AirDirector.Forms
         // RULES TAB
         // ══════════════════════════════════════════════════════════════════
 
+        private void OnRuleSourceChanged()
+        {
+            bool isClips = _cmbRuleSource?.SelectedIndex == 1;
+
+            // Repopulate category combo
+            if (_cmbRuleCategory != null)
+            {
+                _cmbRuleCategory.Items.Clear();
+                _cmbRuleCategory.Items.Add("-- " + LanguageManager.GetString("PlaylistEditor.SelectCategory", "Seleziona") + " --");
+                var categories = isClips ? _clipCategories : _musicCategories;
+                foreach (var c in categories) _cmbRuleCategory.Items.Add(c);
+                _cmbRuleCategory.SelectedIndex = 0;
+            }
+
+            // Repopulate genre combo
+            if (_cmbRuleGenre != null)
+            {
+                _cmbRuleGenre.Items.Clear();
+                _cmbRuleGenre.Items.Add("-- " + LanguageManager.GetString("PlaylistEditor.SelectGenre", "Seleziona") + " --");
+                var genres = isClips ? _clipGenres : _musicGenres;
+                foreach (var g in genres) _cmbRuleGenre.Items.Add(g);
+                _cmbRuleGenre.SelectedIndex = 0;
+            }
+
+            // Disable year filter for Clips (they don't have Year field)
+            if (isClips)
+            {
+                if (_chkRuleYearFilter != null) { _chkRuleYearFilter.Checked = false; _chkRuleYearFilter.Enabled = false; }
+                if (_numRuleYearFrom != null) _numRuleYearFrom.Enabled = false;
+                if (_numRuleYearTo != null) _numRuleYearTo.Enabled = false;
+            }
+            else
+            {
+                if (_chkRuleYearFilter != null) _chkRuleYearFilter.Enabled = true;
+                UpdateRuleControls(); // re-enables year fields based on checkbox state
+            }
+
+            UpdateRuleFoundCount();
+        }
+
         private void UpdateRuleControls()
         {
             if (_cmbRuleCategory == null || _cmbRuleGenre == null) return;
@@ -1365,15 +1416,31 @@ namespace AirDirector.Forms
             if (_lblRuleFoundTracks == null) return;
             try
             {
-                var filtered = FilterMusicForRule();
-                int count = filtered.Count;
+                bool isClips = _cmbRuleSource?.SelectedIndex == 1;
+                int count;
+                double avgMs;
+
+                if (isClips)
+                {
+                    var filtered = FilterClipsForRule();
+                    count = filtered.Count;
+                    if (count > 0)
+                        avgMs = filtered.Average(c => { int effMs = c.MarkerMIX > c.MarkerIN ? c.MarkerMIX - c.MarkerIN : c.Duration; return (double)effMs; });
+                    else
+                        avgMs = 0;
+                }
+                else
+                {
+                    var filtered = FilterMusicForRule();
+                    count = filtered.Count;
+                    if (count > 0)
+                        avgMs = filtered.Average(m => { int effMs = m.MarkerMIX > m.MarkerIN ? m.MarkerMIX - m.MarkerIN : m.Duration; return (double)effMs; });
+                    else
+                        avgMs = 0;
+                }
+
                 if (count > 0)
                 {
-                    double avgMs = filtered.Average(m =>
-                    {
-                        int effMs = m.MarkerMIX > m.MarkerIN ? m.MarkerMIX - m.MarkerIN : m.Duration;
-                        return (double)effMs;
-                    });
                     TimeSpan avgTime = TimeSpan.FromMilliseconds(avgMs);
                     _lblRuleFoundTracks.Text = string.Format(
                         LanguageManager.GetString("PlaylistEditor.FoundTracks", "📊 Trovati: {0} brani - Durata media: {1}"),
@@ -1391,6 +1458,31 @@ namespace AirDirector.Forms
             {
                 _lblRuleFoundTracks.Text = "";
             }
+        }
+
+        private List<ClipEntry> FilterClipsForRule()
+        {
+            var filtered = _allClipEntries.AsEnumerable();
+            bool catFilter = _radRuleCategory?.Checked == true || _radRuleCategoryGenre?.Checked == true;
+            bool genFilter = _radRuleGenre?.Checked == true || _radRuleCategoryGenre?.Checked == true;
+
+            if (catFilter && _cmbRuleCategory?.SelectedIndex > 0)
+            {
+                string selCat = _cmbRuleCategory.SelectedItem.ToString();
+                filtered = filtered.Where(c =>
+                    !string.IsNullOrEmpty(c.Categories) &&
+                    c.Categories.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Any(cat => cat.Trim().Equals(selCat, StringComparison.OrdinalIgnoreCase)));
+            }
+            if (genFilter && _cmbRuleGenre?.SelectedIndex > 0)
+            {
+                string selGen = _cmbRuleGenre.SelectedItem.ToString();
+                filtered = filtered.Where(c =>
+                    !string.IsNullOrEmpty(c.Genre) &&
+                    c.Genre.Trim().Equals(selGen, StringComparison.OrdinalIgnoreCase));
+            }
+            // No year filter for clips
+            return filtered.ToList();
         }
 
         private List<MusicEntry> FilterMusicForRule()
@@ -1425,6 +1517,7 @@ namespace AirDirector.Forms
 
         private void BtnAddRule_Click(object sender, EventArgs e)
         {
+            bool isClips = _cmbRuleSource?.SelectedIndex == 1;
             bool isCategory = _radRuleCategory?.Checked == true;
             bool isGenre = _radRuleGenre?.Checked == true;
             bool isBoth = _radRuleCategoryGenre?.Checked == true;
@@ -1443,34 +1536,42 @@ namespace AirDirector.Forms
                 return;
             }
 
-            // Calculate average duration
-            var filtered = FilterMusicForRule();
+            // Calculate average duration from the correct source
             int avgDurSec = 0;
-            if (filtered.Count > 0)
+            if (isClips)
             {
-                double avgMs = filtered.Average(m =>
+                var filtered = FilterClipsForRule();
+                if (filtered.Count > 0)
                 {
-                    int effMs = m.MarkerMIX > m.MarkerIN ? m.MarkerMIX - m.MarkerIN : m.Duration;
-                    return (double)effMs;
-                });
-                avgDurSec = (int)(avgMs / 1000.0);
+                    double avgMs = filtered.Average(c => { int effMs = c.MarkerMIX > c.MarkerIN ? c.MarkerMIX - c.MarkerIN : c.Duration; return (double)effMs; });
+                    avgDurSec = (int)(avgMs / 1000.0);
+                }
+            }
+            else
+            {
+                var filtered = FilterMusicForRule();
+                if (filtered.Count > 0)
+                {
+                    double avgMs = filtered.Average(m => { int effMs = m.MarkerMIX > m.MarkerIN ? m.MarkerMIX - m.MarkerIN : m.Duration; return (double)effMs; });
+                    avgDurSec = (int)(avgMs / 1000.0);
+                }
             }
 
             AirPlaylistItemType itemType;
             string displayName;
             if (isBoth)
             {
-                itemType = AirPlaylistItemType.Category;
+                itemType = isClips ? AirPlaylistItemType.Clip : AirPlaylistItemType.Category;
                 displayName = $"{catName} / {genName}";
             }
             else if (isGenre)
             {
-                itemType = AirPlaylistItemType.Genre;
+                itemType = isClips ? AirPlaylistItemType.Clip : AirPlaylistItemType.Genre;
                 displayName = genName;
             }
             else
             {
-                itemType = AirPlaylistItemType.Category;
+                itemType = isClips ? AirPlaylistItemType.Clip : AirPlaylistItemType.Category;
                 displayName = catName;
             }
 
@@ -1479,7 +1580,7 @@ namespace AirDirector.Forms
                 Type = itemType,
                 CategoryName = displayName,
                 DurationSeconds = avgDurSec,
-                YearFilterEnabled = _chkRuleYearFilter?.Checked == true,
+                YearFilterEnabled = !isClips && (_chkRuleYearFilter?.Checked == true),
                 YearFrom = (int)(_numRuleYearFrom?.Value ?? 1900),
                 YearTo = (int)(_numRuleYearTo?.Value ?? DateTime.Now.Year)
             };
