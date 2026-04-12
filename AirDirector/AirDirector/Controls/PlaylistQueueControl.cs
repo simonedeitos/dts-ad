@@ -3443,20 +3443,14 @@ namespace AirDirector.Controls
 				// Determina l'indice di inserimento: subito dopo l'elemento in play
 				int insertIndex = _currentPlayingIndex >= 0 ? _currentPlayingIndex + 1 : 0;
 
-				// Rimuovi dalla queue tutti gli elementi NON in play, NON schedulati, NON ADV entro 10 minuti
-				DateTime now = DateTime.Now;
-				DateTime protectionLimit = now.AddMinutes(10);
-
+				// Rimuovi dalla queue tutti gli elementi NON in play, NON schedulati e NON ADV
 				for (int i = _items.Count - 1; i >= 0; i--)
 				{
 					if (i == _currentPlayingIndex)
 						continue;
 
 					var item = _items[i];
-					bool isProtected = item.IsScheduled ||
-						(item.Type == PlaylistItemType.ADV &&
-						 item.ScheduledTime > now &&
-						 item.ScheduledTime <= protectionLimit);
+					bool isProtected = item.IsScheduled || item.Type == PlaylistItemType.ADV;
 
 					if (!isProtected)
 					{
@@ -3468,17 +3462,23 @@ namespace AirDirector.Controls
 					}
 				}
 
-				// Avanza insertIndex oltre eventuali elementi schedulati/ADV consecutivi rimasti
-				if (_currentPlayingIndex >= 0)
+				// Ricalcola insertIndex: inizia dall'elemento dopo quello in play, poi salta tutti gli scheduled/ADV consecutivi
+				int startScan = _currentPlayingIndex >= 0 ? _currentPlayingIndex + 1 : 0;
+				insertIndex = startScan;
+				for (int i = startScan; i < _items.Count; i++)
 				{
-					insertIndex = _currentPlayingIndex + 1;
-					for (int i = insertIndex; i < _items.Count; i++)
-					{
-						if (_items[i].IsScheduled || _items[i].Type == PlaylistItemType.ADV)
-							insertIndex = i + 1;
-						else
-							break;
-					}
+					if (_items[i].IsScheduled || _items[i].Type == PlaylistItemType.ADV)
+						insertIndex = i + 1;
+					else
+						break;
+				}
+
+				// Log diagnostico per identificare la posizione di inserimento
+				Log($"[LoadPlaylistOnAir] _currentPlayingIndex={_currentPlayingIndex}, elementi rimasti dopo pulizia={_items.Count}, insertIndex={insertIndex}");
+				for (int i = 0; i < _items.Count; i++)
+				{
+					var dbgItem = _items[i];
+					Log($"[LoadPlaylistOnAir]   [{i}] Type={dbgItem.Type}, IsScheduled={dbgItem.IsScheduled}, Title='{dbgItem.Title}'");
 				}
 
 				// Inserisci gli elementi della playlist a partire da insertIndex
