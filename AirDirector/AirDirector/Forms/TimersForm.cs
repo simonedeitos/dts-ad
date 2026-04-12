@@ -106,8 +106,8 @@ namespace AirDirector.Forms
         private void ApplyLanguage()
         {
             this.Text = LanguageManager.GetString("TimersForm.Title", "Timers");
-            if (_lblIntroHeader != null) _lblIntroHeader.Text = LanguageManager.GetString("TimersForm.Intro", "INTRO");
-            if (_lblMixHeader != null) _lblMixHeader.Text = LanguageManager.GetString("TimersForm.Countdown", "COUNTDOWN");
+            _lblIntroHeader.Text = LanguageManager.GetString("TimersForm.Intro", "INTRO");
+            _lblMixHeader.Text = LanguageManager.GetString("TimersForm.Countdown", "COUNTDOWN");
             _lblScheduleHeader.Text = LanguageManager.GetString("TimersForm.NextSchedule", "📅 PROSSIMA SCHEDULAZIONE");
             _lblAdHeader.Text = LanguageManager.GetString("TimersForm.NextAd", "📢 PROSSIMA PUBBLICITÀ");
         }
@@ -354,8 +354,10 @@ namespace AirDirector.Forms
             int   labelH = Math.Max(16, Math.Min(50,  (int)(rowH * 0.22f)));
 
             // Scale header labels
-            if (_lblIntroHeader != null) { _lblIntroHeader.Height = Math.Max(14, (int)(rowH * 0.10f)); ScaleName(_lblIntroHeader, header); }
-            if (_lblMixHeader != null)   { _lblMixHeader.Height   = Math.Max(14, (int)(rowH * 0.10f)); ScaleName(_lblMixHeader,   header); }
+            _lblIntroHeader.Height = Math.Max(14, (int)(rowH * 0.10f));
+            ScaleName(_lblIntroHeader, header);
+            _lblMixHeader.Height = Math.Max(14, (int)(rowH * 0.10f));
+            ScaleName(_lblMixHeader, header);
 
             _lblScheduleHeader.Height = labelH;
             _lblScheduleName.Height   = labelH;
@@ -372,8 +374,8 @@ namespace AirDirector.Forms
             ScaleCountdown(_lblAdCountdown,       countdown);
 
             // Scale artist/title
-            if (_lblOnAirArtist != null) ScaleName(_lblOnAirArtist, artistSize);
-            if (_lblOnAirTitle  != null) ScaleName(_lblOnAirTitle,  titleSize);
+            ScaleName(_lblOnAirArtist, artistSize);
+            ScaleName(_lblOnAirTitle,  titleSize);
 
             // Scale schedule/ad name/info
             float name = Math.Max(8f, Math.Min(30f, rowH * 0.13f));
