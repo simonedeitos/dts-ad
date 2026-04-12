@@ -577,13 +577,14 @@ namespace AirDirector.Forms
 
         private void UpdateMenuBar()
         {
-            if (menuStrip == null || menuStrip.Items.Count < 5) return;
-            // Menu order: [0]=File, [1]=Visualizza, [2]=Strumenti, [3]=Report, [4]=Aiuto
+            if (menuStrip == null || menuStrip.Items.Count < 6) return;
+            // Menu order: [0]=File, [1]=Visualizza, [2]=Playlist, [3]=Strumenti, [4]=Report, [5]=Aiuto
             if (menuStrip.Items[0] is ToolStripMenuItem menuFile) { menuFile.Text = LanguageManager.GetString("MainForm.MenuFile", "File"); if (menuFile.DropDownItems.Count > 0) menuFile.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuExit", "Esci"); }
             if (menuStrip.Items[1] is ToolStripMenuItem menuView) { menuView.Text = LanguageManager.GetString("MainForm.MenuView", "Visualizza"); if (menuView.DropDownItems.Count > 0) menuView.DropDownItems[0].Text = "⏱ " + LanguageManager.GetString("MainForm.MenuTimers", "Timers"); }
-            if (menuStrip.Items[2] is ToolStripMenuItem menuTools) { menuTools.Text = LanguageManager.GetString("MainForm.MenuTools", "Strumenti"); if (menuTools.DropDownItems.Count > 0) { menuTools.DropDownItems[0].Text = "🔧 " + LanguageManager.GetString("MainForm.MenuDatabaseModifications", "Modifiche Database"); if (menuTools.DropDownItems.Count > 2) menuTools.DropDownItems[2].Text = "⚙️ " + LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"); if (menuTools.DropDownItems.Count > 4) menuTools.DropDownItems[4].Text = "💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"); if (menuTools.DropDownItems.Count > 6) menuTools.DropDownItems[6].Text = "🔑 " + LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"); } }
-            if (menuStrip.Items[3] is ToolStripMenuItem menuReport) { menuReport.Text = LanguageManager.GetString("MainForm.MenuReport", "Report"); if (menuReport.DropDownItems.Count > 0) menuReport.DropDownItems[0].Text = "📊 " + LanguageManager.GetString("MainForm.MenuViewReport", "Visualizza Report"); if (menuReport.DropDownItems.Count > 1) menuReport.DropDownItems[1].Text = "📻 " + LanguageManager.GetString("MainForm.MenuBroadcastHistory", "Storico Trasmesso"); if (menuReport.DropDownItems.Count > 2) menuReport.DropDownItems[2].Text = "📊 " + LanguageManager.GetString("MainForm.MenuMusicStatistics", "Statistiche Musica"); }
-            if (menuStrip.Items[4] is ToolStripMenuItem menuHelp) { menuHelp.Text = LanguageManager.GetString("MainForm.MenuHelp", "Aiuto"); if (menuHelp.DropDownItems.Count > 0) menuHelp.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuAbout", "Informazioni"); }
+            if (menuStrip.Items[2] is ToolStripMenuItem menuPlaylist) { menuPlaylist.Text = LanguageManager.GetString("MainForm.MenuPlaylist", "Playlist"); if (menuPlaylist.DropDownItems.Count > 0) menuPlaylist.DropDownItems[0].Text = "🎶 " + LanguageManager.GetString("MainForm.OpenPlaylistEditor", "Editor Playlist"); }
+            if (menuStrip.Items[3] is ToolStripMenuItem menuTools) { menuTools.Text = LanguageManager.GetString("MainForm.MenuTools", "Strumenti"); if (menuTools.DropDownItems.Count > 0) { menuTools.DropDownItems[0].Text = "🔧 " + LanguageManager.GetString("MainForm.MenuDatabaseModifications", "Modifiche Database"); if (menuTools.DropDownItems.Count > 2) menuTools.DropDownItems[2].Text = "⚙️ " + LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"); if (menuTools.DropDownItems.Count > 4) menuTools.DropDownItems[4].Text = "💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"); if (menuTools.DropDownItems.Count > 6) menuTools.DropDownItems[6].Text = "🔑 " + LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"); } }
+            if (menuStrip.Items[4] is ToolStripMenuItem menuReport) { menuReport.Text = LanguageManager.GetString("MainForm.MenuReport", "Report"); if (menuReport.DropDownItems.Count > 0) menuReport.DropDownItems[0].Text = "📊 " + LanguageManager.GetString("MainForm.MenuViewReport", "Visualizza Report"); if (menuReport.DropDownItems.Count > 1) menuReport.DropDownItems[1].Text = "📻 " + LanguageManager.GetString("MainForm.MenuBroadcastHistory", "Storico Trasmesso"); if (menuReport.DropDownItems.Count > 2) menuReport.DropDownItems[2].Text = "📊 " + LanguageManager.GetString("MainForm.MenuMusicStatistics", "Statistiche Musica"); }
+            if (menuStrip.Items[5] is ToolStripMenuItem menuHelp) { menuHelp.Text = LanguageManager.GetString("MainForm.MenuHelp", "Aiuto"); if (menuHelp.DropDownItems.Count > 0) menuHelp.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuAbout", "Informazioni"); }
         }
 
         private void UpdateTabPages()
@@ -726,6 +727,9 @@ namespace AirDirector.Forms
             ToolStripMenuItem menuView = new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuView", "Visualizza"));
             menuView.DropDownItems.Add("⏱ " + LanguageManager.GetString("MainForm.MenuTimers", "Timers"), null, MenuTimers_Click);
             menuStrip.Items.Add(menuView);
+            ToolStripMenuItem menuPlaylist = new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuPlaylist", "Playlist"));
+            menuPlaylist.DropDownItems.Add("🎶 " + LanguageManager.GetString("MainForm.OpenPlaylistEditor", "Editor Playlist"), null, MenuPlaylist_Click);
+            menuStrip.Items.Add(menuPlaylist);
             ToolStripMenuItem menuTools= new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuTools", "Strumenti"));
             menuTools.DropDownItems.Add("🔧 " + LanguageManager.GetString("MainForm.MenuDatabaseModifications", "Modifiche Database"), null, MenuDatabaseModifications_Click);
             menuTools.DropDownItems.Add(new ToolStripSeparator());
@@ -748,6 +752,14 @@ namespace AirDirector.Forms
         }
 
         private void MenuBackup_Click(object sender, EventArgs e) { var result = MessageBox.Show(LanguageManager.GetString("MainForm.ConfirmBackup", "Vuoi creare un backup manuale del database?"), LanguageManager.GetString("MainForm.BackupDatabase", "Backup Database"), MessageBoxButtons.YesNo, MessageBoxIcon.Question); if (result == DialogResult.Yes) PerformDailyBackup(); }
+
+        private void MenuPlaylist_Click(object sender, EventArgs e)
+        {
+            using (var form = new PlaylistEditorForm())
+            {
+                form.ShowDialog(this);
+            }
+        }
 
         private void MenuDatabaseModifications_Click(object sender, EventArgs e)
         {
