@@ -3468,6 +3468,19 @@ namespace AirDirector.Controls
 					}
 				}
 
+				// Avanza insertIndex oltre eventuali elementi schedulati/ADV consecutivi rimasti
+				if (_currentPlayingIndex >= 0)
+				{
+					insertIndex = _currentPlayingIndex + 1;
+					for (int i = insertIndex; i < _items.Count; i++)
+					{
+						if (_items[i].IsScheduled || _items[i].Type == PlaylistItemType.ADV)
+							insertIndex = i + 1;
+						else
+							break;
+					}
+				}
+
 				// Inserisci gli elementi della playlist a partire da insertIndex
 				int currentInsert = insertIndex;
 				foreach (var pItem in playlist.Items)
