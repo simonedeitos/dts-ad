@@ -79,6 +79,10 @@ namespace AirDirector.Forms
         private Point _archiveDragStart;
         private const int ArchiveDragThreshold = 5;
 
+        // ── Clipboard ────────────────────────────────────────────────────────
+        private List<AirPlaylistItem> _clipboardItems = new List<AirPlaylistItem>();
+        private bool _isCutOperation = false;
+
         // ────────────────────────────────────────────────────────────────────
         public PlaylistEditorForm()
         {
@@ -296,7 +300,7 @@ namespace AirDirector.Forms
                 RowHeadersVisible = false,
                 AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false,
-                MultiSelect = false,
+                MultiSelect = true,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 ReadOnly = true,
                 BorderStyle = BorderStyle.None,
@@ -331,6 +335,21 @@ namespace AirDirector.Forms
             _dgvEditor.DragDrop += DgvEditor_DragDrop;
             _dgvEditor.DragOver += DgvEditor_DragOver;
 
+            // Context menu
+            var contextMenu = new ContextMenuStrip();
+            contextMenu.Items.Add(LanguageManager.GetString("PlaylistEditor.Copy", "📋 Copia"), null, (s, e) => CopySelectedItems());
+            contextMenu.Items.Add(LanguageManager.GetString("PlaylistEditor.Cut", "✂️ Taglia"), null, (s, e) => CutSelectedItems());
+            contextMenu.Items.Add(LanguageManager.GetString("PlaylistEditor.Paste", "📌 Incolla"), null, (s, e) => PasteItems());
+            _dgvEditor.ContextMenuStrip = contextMenu;
+
+            // Keyboard shortcuts
+            _dgvEditor.KeyDown += (s, e) =>
+            {
+                if (e.Control && e.KeyCode == Keys.C) { CopySelectedItems(); e.Handled = true; }
+                else if (e.Control && e.KeyCode == Keys.X) { CutSelectedItems(); e.Handled = true; }
+                else if (e.Control && e.KeyCode == Keys.V) { PasteItems(); e.Handled = true; }
+            };
+
             // Bottom toolbar
             Panel bottomBar = new Panel { Height = 36, Dock = DockStyle.Bottom, BackColor = Color.Transparent };
 
@@ -355,11 +374,11 @@ namespace AirDirector.Forms
             bottomBar.Controls.AddRange(new Control[] { _btnMoveUp, _btnMoveDown, _btnRemove, _lblTotalDuration });
             bottomBar.Controls[3].Left = 292;
 
-            // Add in correct docking order: Bottom first, then Top controls, then Fill last
-            parent.Controls.Add(bottomBar);
-            parent.Controls.Add(rowName);
-            parent.Controls.Add(toolbar);
-            parent.Controls.Add(_dgvEditor);
+            // Add in correct WinForms docking order: Fill first (processed last), then Bottom, then Top
+            parent.Controls.Add(_dgvEditor);   // Dock=Fill — added first = processed last = fills remaining space
+            parent.Controls.Add(bottomBar);    // Dock=Bottom
+            parent.Controls.Add(toolbar);      // Dock=Top
+            parent.Controls.Add(rowName);      // Dock=Top
         }
 
         // ── RIGHT PANEL ───────────────────────────────────────────────────
@@ -430,11 +449,11 @@ namespace AirDirector.Forms
             _btnAddMusic.Height = 30;
             _btnAddMusic.Click += (s, e) => AddSelectedMusicToPlaylist();
 
-            // Correct WinForms docking order: Bottom first, then Top controls, then Fill last
+            // Add in correct WinForms docking order: Fill first (processed last), then Bottom, then Top
+            page.Controls.Add(_dgvMusic);          // Dock=Fill
             page.Controls.Add(_btnAddMusic);       // Dock=Bottom
-            page.Controls.Add(filterRow);          // Dock=Top
             page.Controls.Add(_txtMusicSearch);    // Dock=Top
-            page.Controls.Add(_dgvMusic);          // Dock=Fill (must be last)
+            page.Controls.Add(filterRow);          // Dock=Top
 
             ApplyMusicFilter();
             return page;
@@ -480,11 +499,11 @@ namespace AirDirector.Forms
             _btnAddClip.Height = 30;
             _btnAddClip.Click += (s, e) => AddSelectedClipToPlaylist();
 
-            // Correct WinForms docking order: Bottom first, then Top controls, then Fill last
+            // Add in correct WinForms docking order: Fill first (processed last), then Bottom, then Top
+            page.Controls.Add(_dgvClips);          // Dock=Fill
             page.Controls.Add(_btnAddClip);        // Dock=Bottom
-            page.Controls.Add(filterRow);          // Dock=Top
             page.Controls.Add(_txtClipSearch);     // Dock=Top
-            page.Controls.Add(_dgvClips);          // Dock=Fill (must be last)
+            page.Controls.Add(filterRow);          // Dock=Top
 
             ApplyClipFilter();
             return page;
@@ -507,9 +526,9 @@ namespace AirDirector.Forms
             _btnDeletePlaylist.Height = 30;
             _btnDeletePlaylist.Click += BtnDeletePlaylist_Click;
 
-            // Correct WinForms docking order: Bottom first, then Fill last
+            // Add in correct WinForms docking order: Fill first (processed last), then Bottom
+            page.Controls.Add(_dgvPlaylists);       // Dock=Fill
             page.Controls.Add(_btnDeletePlaylist);  // Dock=Bottom
-            page.Controls.Add(_dgvPlaylists);       // Dock=Fill (must be last)
 
             RefreshPlaylistList();
             return page;
@@ -843,33 +862,114 @@ namespace AirDirector.Forms
 
         private void BtnMoveUp_Click(object sender, EventArgs e)
         {
-            int idx = GetSelectedEditorRow();
-            if (idx <= 0) return;
-            var tmp = _playlist.Items[idx - 1];
-            _playlist.Items[idx - 1] = _playlist.Items[idx];
-            _playlist.Items[idx] = tmp;
+            if (_dgvEditor.SelectedRows.Count == 0) return;
+            var indices = _dgvEditor.SelectedRows.Cast<DataGridViewRow>()
+                .Select(r => r.Index).OrderBy(i => i).ToList();
+            if (indices[0] <= 0) return;
+            foreach (int idx in indices)
+            {
+                var tmp = _playlist.Items[idx - 1];
+                _playlist.Items[idx - 1] = _playlist.Items[idx];
+                _playlist.Items[idx] = tmp;
+            }
             MarkChanged();
             RefreshEditorGrid();
-            if (idx - 1 < _dgvEditor.Rows.Count) _dgvEditor.Rows[idx - 1].Selected = true;
+            foreach (int idx in indices)
+                if (idx - 1 < _dgvEditor.Rows.Count) _dgvEditor.Rows[idx - 1].Selected = true;
         }
 
         private void BtnMoveDown_Click(object sender, EventArgs e)
         {
-            int idx = GetSelectedEditorRow();
-            if (idx < 0 || idx >= _playlist.Items.Count - 1) return;
-            var tmp = _playlist.Items[idx + 1];
-            _playlist.Items[idx + 1] = _playlist.Items[idx];
-            _playlist.Items[idx] = tmp;
+            if (_dgvEditor.SelectedRows.Count == 0) return;
+            var indices = _dgvEditor.SelectedRows.Cast<DataGridViewRow>()
+                .Select(r => r.Index).OrderByDescending(i => i).ToList();
+            if (indices[0] >= _playlist.Items.Count - 1) return;
+            foreach (int idx in indices)
+            {
+                var tmp = _playlist.Items[idx + 1];
+                _playlist.Items[idx + 1] = _playlist.Items[idx];
+                _playlist.Items[idx] = tmp;
+            }
             MarkChanged();
             RefreshEditorGrid();
-            if (idx + 1 < _dgvEditor.Rows.Count) _dgvEditor.Rows[idx + 1].Selected = true;
+            foreach (int idx in indices)
+                if (idx + 1 < _dgvEditor.Rows.Count) _dgvEditor.Rows[idx + 1].Selected = true;
         }
 
         private void BtnRemove_Click(object sender, EventArgs e)
         {
-            int idx = GetSelectedEditorRow();
-            if (idx < 0 || idx >= _playlist.Items.Count) return;
-            _playlist.Items.RemoveAt(idx);
+            if (_dgvEditor.SelectedRows.Count == 0) return;
+            var items = _dgvEditor.SelectedRows.Cast<DataGridViewRow>()
+                .Select(r => r.Tag as AirPlaylistItem).Where(item => item != null).ToList();
+            foreach (var item in items)
+                _playlist.Items.Remove(item);
+            MarkChanged();
+            RefreshEditorGrid();
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // CLIPBOARD — COPY / CUT / PASTE
+        // ══════════════════════════════════════════════════════════════════
+
+        private void CopySelectedItems()
+        {
+            if (_dgvEditor.SelectedRows.Count == 0) return;
+            _clipboardItems.Clear();
+            _isCutOperation = false;
+            foreach (DataGridViewRow row in _dgvEditor.SelectedRows)
+            {
+                var item = row.Tag as AirPlaylistItem;
+                if (item != null) _clipboardItems.Add(item);
+            }
+            _clipboardItems = _clipboardItems.OrderBy(item => _playlist.Items.IndexOf(item)).ToList();
+        }
+
+        private void CutSelectedItems()
+        {
+            if (_dgvEditor.SelectedRows.Count == 0) return;
+            _clipboardItems.Clear();
+            _isCutOperation = true;
+            foreach (DataGridViewRow row in _dgvEditor.SelectedRows)
+            {
+                var item = row.Tag as AirPlaylistItem;
+                if (item != null) _clipboardItems.Add(item);
+            }
+            _clipboardItems = _clipboardItems.OrderBy(item => _playlist.Items.IndexOf(item)).ToList();
+            foreach (var item in _clipboardItems)
+                _playlist.Items.Remove(item);
+            MarkChanged();
+            RefreshEditorGrid();
+        }
+
+        private void PasteItems()
+        {
+            if (_clipboardItems.Count == 0) return;
+            int insertIndex = _dgvEditor.SelectedRows.Count > 0
+                ? _dgvEditor.SelectedRows.Cast<DataGridViewRow>().Min(r => r.Index) + 1
+                : _playlist.Items.Count;
+
+            foreach (var item in _clipboardItems)
+            {
+                var newItem = new AirPlaylistItem
+                {
+                    Type = item.Type,
+                    FilePath = item.FilePath,
+                    Artist = item.Artist,
+                    Title = item.Title,
+                    DurationSeconds = item.DurationSeconds,
+                    MarkerIN = item.MarkerIN,
+                    MarkerMIX = item.MarkerMIX,
+                    CategoryName = item.CategoryName,
+                    YearFilterEnabled = item.YearFilterEnabled,
+                    YearFrom = item.YearFrom,
+                    YearTo = item.YearTo
+                };
+                _playlist.Items.Insert(insertIndex++, newItem);
+            }
+
+            if (_isCutOperation)
+                _clipboardItems.Clear();
+
             MarkChanged();
             RefreshEditorGrid();
         }
