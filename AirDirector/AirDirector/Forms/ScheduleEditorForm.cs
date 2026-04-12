@@ -1,4 +1,5 @@
-﻿using AirDirector.Services.Database;
+﻿using AirDirector.Models;
+using AirDirector.Services.Database;
 using AirDirector.Services.Localization;
 using AirDirector.Themes;
 using System;
@@ -7,7 +8,6 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-using System.Xml.Linq;
 
 namespace AirDirector.Forms
 {
@@ -16,6 +16,7 @@ namespace AirDirector.Forms
         private ScheduleEntry _schedule;
         private List<ClockEntry> _clocks;
         private bool _isNewSchedule;
+        private List<string> _playlistFiles = new List<string>();
 
         public ScheduleEditorForm(ScheduleEntry schedule, List<ClockEntry> clocks)
         {
@@ -77,7 +78,7 @@ namespace AirDirector.Forms
                 radAudio.Text = "🎵 " + LanguageManager.GetString("ScheduleEditor.PlayAudio", "Riproduci Audio");
 
             if (radMiniPLS != null)
-                radMiniPLS.Text = "📋 " + LanguageManager.GetString("ScheduleEditor.PlayMiniPlaylist", "Riproduci Mini Playlist");
+                radMiniPLS.Text = "📋 " + LanguageManager.GetString("ScheduleEditor.PlayPlaylist", "Carica Playlist (subito in onda)");
 
             if (radTimeSignal != null)
                 radTimeSignal.Text = "⏰ " + LanguageManager.GetString("ScheduleEditor.TimeSignal", "Segnale Orario");
@@ -170,7 +171,7 @@ namespace AirDirector.Forms
                 radClock.Checked = true;
             else if (_schedule.Type == "PlayAudio")
                 radAudio.Checked = true;
-            else if (_schedule.Type == "PlayMiniPLS")
+            else if (_schedule.Type == "PlayMiniPLS" || _schedule.Type == "PlayPlaylist")
                 radMiniPLS.Checked = true;
             else if (_schedule.Type == "TimeSignal")
                 radTimeSignal.Checked = true;
@@ -178,7 +179,45 @@ namespace AirDirector.Forms
                 radURLStreaming.Checked = true;
 
             txtAudioFile.Text = _schedule.AudioFilePath;
-            numMiniPLSID.Value = _schedule.MiniPLSID > 0 ? _schedule.MiniPLSID : 1;
+
+            // Populate playlist dropdown
+            _playlistFiles.Clear();
+            cmbPlaylist.Items.Clear();
+            try
+            {
+                string folder = Path.Combine(DbcManager.GetDatabasePath(), "Playlist");
+                if (Directory.Exists(folder))
+                {
+                    var files = Directory.GetFiles(folder, "*.airpls").OrderBy(f => f);
+                    foreach (string filePath in files)
+                    {
+                        try
+                        {
+                            var pl = AirPlaylist.Load(filePath);
+                            string name = pl?.Name ?? Path.GetFileNameWithoutExtension(filePath);
+                            _playlistFiles.Add(filePath);
+                            cmbPlaylist.Items.Add(name);
+                        }
+                        catch
+                        {
+                            // Skip broken files
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore if folder not accessible
+            }
+
+            // Select current playlist if editing
+            if ((_schedule.Type == "PlayPlaylist" || _schedule.Type == "PlayMiniPLS") &&
+                !string.IsNullOrEmpty(_schedule.AudioFilePath))
+            {
+                int idx = _playlistFiles.IndexOf(_schedule.AudioFilePath);
+                if (idx >= 0)
+                    cmbPlaylist.SelectedIndex = idx;
+            }
 
             if (!string.IsNullOrEmpty(_schedule.ClockName) && _schedule.Type == "URLStreaming")
             {
@@ -218,7 +257,7 @@ namespace AirDirector.Forms
             cmbClock.Enabled = radClock.Checked;
             txtAudioFile.Enabled = radAudio.Checked;
             btnBrowseAudio.Enabled = radAudio.Checked;
-            numMiniPLSID.Enabled = radMiniPLS.Checked;
+            cmbPlaylist.Enabled = radMiniPLS.Checked;
             txtStreamURL.Enabled = radURLStreaming.Checked;
             txtStreamDuration.Enabled = radURLStreaming.Checked;
             lblStreamURL.Enabled = radURLStreaming.Checked;
@@ -366,6 +405,16 @@ namespace AirDirector.Forms
                 return;
             }
 
+            if (radMiniPLS.Checked && cmbPlaylist.SelectedIndex < 0)
+            {
+                MessageBox.Show(
+                    LanguageManager.GetString("ScheduleEditor.ErrorNoPlaylist", "❌ Devi selezionare una Playlist"),
+                    LanguageManager.GetString("Common.Error", "Errore"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+
             if (radURLStreaming.Checked && string.IsNullOrWhiteSpace(txtStreamURL.Text))
             {
                 MessageBox.Show(
@@ -408,10 +457,10 @@ namespace AirDirector.Forms
             }
             else if (radMiniPLS.Checked)
             {
-                _schedule.Type = "PlayMiniPLS";
+                _schedule.Type = "PlayPlaylist";
                 _schedule.ClockName = "";
-                _schedule.AudioFilePath = "";
-                _schedule.MiniPLSID = (int)numMiniPLSID.Value;
+                _schedule.AudioFilePath = cmbPlaylist.SelectedIndex >= 0 ? _playlistFiles[cmbPlaylist.SelectedIndex] : "";
+                _schedule.MiniPLSID = 0;
             }
             else if (radTimeSignal.Checked)
             {
