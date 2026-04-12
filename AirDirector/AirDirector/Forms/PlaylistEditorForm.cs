@@ -178,23 +178,28 @@ namespace AirDirector.Forms
                 Padding = new Padding(15, 0, 0, 0)
             };
             headerPanel.Controls.Add(_lblHeader);
-            this.Controls.Add(headerPanel);
-
             // ── Main SplitContainer ────────────────────────────────────────
             SplitContainer mainSplit = new SplitContainer
             {
                 Dock = DockStyle.Fill,
-                SplitterDistance = 770,
+                Orientation = Orientation.Vertical,
                 BackColor = Color.FromArgb(25, 25, 25),
                 Panel1MinSize = 400,
-                Panel2MinSize = 300
+                Panel2MinSize = 300,
+                FixedPanel = FixedPanel.None
             };
 
             BuildLeftPanel(mainSplit.Panel1);
             BuildRightPanel(mainSplit.Panel2);
 
             this.Controls.Add(mainSplit);
-            mainSplit.BringToFront();
+            this.Controls.Add(headerPanel);
+
+            this.Load += (s, e) =>
+            {
+                try { mainSplit.SplitterDistance = (int)(mainSplit.Width * 0.55); }
+                catch (InvalidOperationException) { }
+            };
         }
 
         // ── LEFT PANEL ────────────────────────────────────────────────────
