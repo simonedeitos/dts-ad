@@ -76,6 +76,8 @@ namespace AirDirector.Forms
         // ── Drag & Drop ──────────────────────────────────────────────────────
         private int _dragSourceRow = -1;
         private int _dragTargetRow = -1;
+        private Point _archiveDragStart;
+        private const int ArchiveDragThreshold = 5;
 
         // ────────────────────────────────────────────────────────────────────
         public PlaylistEditorForm()
@@ -264,10 +266,10 @@ namespace AirDirector.Forms
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 BorderStyle = BorderStyle.FixedSingle
             };
+            _txtStartTime.Text = "000000"; // Set before hooking TextChanged to avoid triggering unnecessary refresh during init
             _txtStartTime.TextChanged += TxtStartTime_TextChanged;
 
             rowName.Controls.AddRange(new Control[] { lblName, _txtPlaylistName, lblStart, _txtStartTime });
-            parent.Controls.Add(rowName);
 
             // Toolbar
             Panel toolbar = new Panel { Height = 40, Dock = DockStyle.Top, BackColor = Color.Transparent };
@@ -283,7 +285,6 @@ namespace AirDirector.Forms
             _btnClear.Left = _btnNew.Right + 6; _btnClear.Top = 4; _btnClear.Click += BtnClear_Click;
 
             toolbar.Controls.AddRange(new Control[] { _btnSave, _btnNew, _btnClear });
-            parent.Controls.Add(toolbar);
 
             // DataGridView
             _dgvEditor = new DataGridView
@@ -330,8 +331,6 @@ namespace AirDirector.Forms
             _dgvEditor.DragDrop += DgvEditor_DragDrop;
             _dgvEditor.DragOver += DgvEditor_DragOver;
 
-            parent.Controls.Add(_dgvEditor);
-
             // Bottom toolbar
             Panel bottomBar = new Panel { Height = 36, Dock = DockStyle.Bottom, BackColor = Color.Transparent };
 
@@ -355,7 +354,12 @@ namespace AirDirector.Forms
 
             bottomBar.Controls.AddRange(new Control[] { _btnMoveUp, _btnMoveDown, _btnRemove, _lblTotalDuration });
             bottomBar.Controls[3].Left = 292;
+
+            // Add in correct docking order: Bottom first, then Top controls, then Fill last
             parent.Controls.Add(bottomBar);
+            parent.Controls.Add(rowName);
+            parent.Controls.Add(toolbar);
+            parent.Controls.Add(_dgvEditor);
         }
 
         // ── RIGHT PANEL ───────────────────────────────────────────────────
@@ -413,12 +417,14 @@ namespace AirDirector.Forms
 
             // DataGridView
             _dgvMusic = CreateArchiveDgv();
-            _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Artist", HeaderText = "Artista", Width = 120 });
+            _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Artist", HeaderText = "Artista", Width = 180 });
             _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Title", HeaderText = "Titolo", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
             _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Genre", HeaderText = "Genere", Width = 80 });
             _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Duration", HeaderText = "Durata", Width = 60 });
             _dgvMusic.Dock = DockStyle.Fill;
             _dgvMusic.DoubleClick += (s, e) => AddSelectedMusicToPlaylist();
+            _dgvMusic.MouseDown += DgvMusic_MouseDown;
+            _dgvMusic.MouseMove += DgvMusic_MouseMove;
             page.Controls.Add(_dgvMusic);
 
             // Add button
@@ -466,6 +472,8 @@ namespace AirDirector.Forms
             _dgvClips.Columns.Add(new DataGridViewTextBoxColumn { Name = "Duration", HeaderText = "Durata", Width = 60 });
             _dgvClips.Dock = DockStyle.Fill;
             _dgvClips.DoubleClick += (s, e) => AddSelectedClipToPlaylist();
+            _dgvClips.MouseDown += DgvClips_MouseDown;
+            _dgvClips.MouseMove += DgvClips_MouseMove;
             page.Controls.Add(_dgvClips);
 
             _btnAddClip = CreateButton(LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "➤ Aggiungi"), Color.FromArgb(33, 150, 83));
@@ -509,49 +517,49 @@ namespace AirDirector.Forms
             int y = 8;
 
             // Source type
-            _radRuleCategory = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleCategory", "Categoria"), ForeColor = Color.White, Left = 10, Top = y, AutoSize = true, Checked = true };
-            _radRuleGenre = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleGenre", "Genere"), ForeColor = Color.White, Left = 120, Top = y, AutoSize = true };
-            _radRuleCategoryGenre = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleCategoryGenre", "Categoria + Genere"), ForeColor = Color.White, Left = 200, Top = y, AutoSize = true };
+            _radRuleCategory = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleCategory", "Categoria"), ForeColor = Color.White, Left = 10, Top = y, AutoSize = true, Checked = true, Font = new Font("Segoe UI", 10) };
+            _radRuleGenre = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleGenre", "Genere"), ForeColor = Color.White, Left = 120, Top = y, AutoSize = true, Font = new Font("Segoe UI", 10) };
+            _radRuleCategoryGenre = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleCategoryGenre", "Categoria + Genere"), ForeColor = Color.White, Left = 200, Top = y, AutoSize = true, Font = new Font("Segoe UI", 10) };
             _radRuleCategory.CheckedChanged += (s, e) => UpdateRuleControls();
             _radRuleGenre.CheckedChanged += (s, e) => UpdateRuleControls();
             _radRuleCategoryGenre.CheckedChanged += (s, e) => UpdateRuleControls();
             page.Controls.AddRange(new Control[] { _radRuleCategory, _radRuleGenre, _radRuleCategoryGenre });
-            y += 32;
+            y += 38;
 
             // Category combo
-            Label lblCat = new Label { Text = LanguageManager.GetString("PlaylistEditor.FilterCategory", "Categoria:"), ForeColor = Color.White, Left = 10, Top = y + 3, Width = 80, Height = 22 };
-            _cmbRuleCategory = new ComboBox { Left = 95, Top = y, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White };
+            Label lblCat = new Label { Text = LanguageManager.GetString("PlaylistEditor.FilterCategory", "Categoria:"), ForeColor = Color.White, Left = 10, Top = y + 3, Width = 80, Height = 22, Font = new Font("Segoe UI", 10) };
+            _cmbRuleCategory = new ComboBox { Left = 95, Top = y, Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
             _cmbRuleCategory.Items.Add("-- " + LanguageManager.GetString("PlaylistEditor.SelectCategory", "Seleziona") + " --");
             foreach (var c in _musicCategories) _cmbRuleCategory.Items.Add(c);
             _cmbRuleCategory.SelectedIndex = 0;
             _cmbRuleCategory.SelectedIndexChanged += (s, e) => UpdateRuleFoundCount();
             page.Controls.AddRange(new Control[] { lblCat, _cmbRuleCategory });
-            y += 34;
+            y += 40;
 
             // Genre combo
-            Label lblGen = new Label { Text = LanguageManager.GetString("PlaylistEditor.FilterGenre", "Genere:"), ForeColor = Color.White, Left = 10, Top = y + 3, Width = 80, Height = 22 };
-            _cmbRuleGenre = new ComboBox { Left = 95, Top = y, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White };
+            Label lblGen = new Label { Text = LanguageManager.GetString("PlaylistEditor.FilterGenre", "Genere:"), ForeColor = Color.White, Left = 10, Top = y + 3, Width = 80, Height = 22, Font = new Font("Segoe UI", 10) };
+            _cmbRuleGenre = new ComboBox { Left = 95, Top = y, Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
             _cmbRuleGenre.Items.Add("-- " + LanguageManager.GetString("PlaylistEditor.SelectGenre", "Seleziona") + " --");
             foreach (var g in _musicGenres) _cmbRuleGenre.Items.Add(g);
             _cmbRuleGenre.SelectedIndex = 0;
             _cmbRuleGenre.SelectedIndexChanged += (s, e) => UpdateRuleFoundCount();
             page.Controls.AddRange(new Control[] { lblGen, _cmbRuleGenre });
-            y += 34;
+            y += 40;
 
             // Year filter
-            _chkRuleYearFilter = new CheckBox { Text = LanguageManager.GetString("PlaylistEditor.YearFilter", "Filtro Anni:"), ForeColor = Color.White, Left = 10, Top = y, AutoSize = true };
+            _chkRuleYearFilter = new CheckBox { Text = LanguageManager.GetString("PlaylistEditor.YearFilter", "Filtro Anni:"), ForeColor = Color.White, Left = 10, Top = y, AutoSize = true, Font = new Font("Segoe UI", 10) };
             _chkRuleYearFilter.CheckedChanged += (s, e) => { UpdateRuleControls(); UpdateRuleFoundCount(); };
             page.Controls.Add(_chkRuleYearFilter);
-            y += 28;
+            y += 34;
 
-            Label lblFrom = new Label { Text = LanguageManager.GetString("PlaylistEditor.YearFrom", "Da:"), ForeColor = Color.White, Left = 20, Top = y + 3, Width = 28, Height = 22 };
-            _numRuleYearFrom = new NumericUpDown { Left = 52, Top = y, Width = 80, Minimum = 1900, Maximum = DateTime.Now.Year, Value = 2000, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White };
+            Label lblFrom = new Label { Text = LanguageManager.GetString("PlaylistEditor.YearFrom", "Da:"), ForeColor = Color.White, Left = 20, Top = y + 3, Width = 28, Height = 22, Font = new Font("Segoe UI", 10) };
+            _numRuleYearFrom = new NumericUpDown { Left = 52, Top = y, Width = 80, Minimum = 1900, Maximum = DateTime.Now.Year, Value = 2000, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
             _numRuleYearFrom.ValueChanged += (s, e) => UpdateRuleFoundCount();
-            Label lblTo = new Label { Text = LanguageManager.GetString("PlaylistEditor.YearTo", "A:"), ForeColor = Color.White, Left = 140, Top = y + 3, Width = 20, Height = 22 };
-            _numRuleYearTo = new NumericUpDown { Left = 162, Top = y, Width = 80, Minimum = 1900, Maximum = DateTime.Now.Year, Value = DateTime.Now.Year, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White };
+            Label lblTo = new Label { Text = LanguageManager.GetString("PlaylistEditor.YearTo", "A:"), ForeColor = Color.White, Left = 140, Top = y + 3, Width = 20, Height = 22, Font = new Font("Segoe UI", 10) };
+            _numRuleYearTo = new NumericUpDown { Left = 162, Top = y, Width = 80, Minimum = 1900, Maximum = DateTime.Now.Year, Value = DateTime.Now.Year, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
             _numRuleYearTo.ValueChanged += (s, e) => UpdateRuleFoundCount();
             page.Controls.AddRange(new Control[] { lblFrom, _numRuleYearFrom, lblTo, _numRuleYearTo });
-            y += 34;
+            y += 40;
 
             // Found count
             _lblRuleFoundTracks = new Label
@@ -560,16 +568,16 @@ namespace AirDirector.Forms
                 ForeColor = Color.FromArgb(0, 200, 130),
                 Left = 10,
                 Top = y,
-                Width = 350,
-                Height = 40,
-                Font = new Font("Segoe UI", 9)
+                Width = 400,
+                Height = 44,
+                Font = new Font("Segoe UI", 10)
             };
             page.Controls.Add(_lblRuleFoundTracks);
-            y += 48;
+            y += 54;
 
             // Add rule button
             _btnAddRule = CreateButton(LanguageManager.GetString("PlaylistEditor.AddRuleToPlaylist", "➤ Aggiungi Regola"), Color.FromArgb(33, 150, 83));
-            _btnAddRule.Left = 10; _btnAddRule.Top = y; _btnAddRule.Width = 180;
+            _btnAddRule.Left = 10; _btnAddRule.Top = y; _btnAddRule.Width = 220; _btnAddRule.Height = 34;
             _btnAddRule.Click += BtnAddRule_Click;
             page.Controls.Add(_btnAddRule);
 
@@ -624,13 +632,13 @@ namespace AirDirector.Forms
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 ReadOnly = true,
                 BorderStyle = BorderStyle.None,
-                Font = new Font("Segoe UI", 9),
-                ColumnHeadersHeight = 28,
-                RowTemplate = { Height = 24 }
+                Font = new Font("Segoe UI", 10),
+                ColumnHeadersHeight = 34,
+                RowTemplate = { Height = 30 }
             };
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(50, 50, 50);
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10, FontStyle.Bold);
             dgv.DefaultCellStyle.BackColor = Color.FromArgb(35, 35, 35);
             dgv.DefaultCellStyle.ForeColor = Color.White;
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(33, 150, 243);
@@ -883,12 +891,20 @@ namespace AirDirector.Forms
         {
             if (e.Data.GetDataPresent(typeof(int)))
                 e.Effect = DragDropEffects.Move;
+            else if (e.Data.GetDataPresent(typeof(DragDropData)))
+                e.Effect = DragDropEffects.Copy;
+            else
+                e.Effect = DragDropEffects.None;
         }
 
         private void DgvEditor_DragOver(object sender, DragEventArgs e)
         {
-            if (!e.Data.GetDataPresent(typeof(int))) return;
-            e.Effect = DragDropEffects.Move;
+            if (e.Data.GetDataPresent(typeof(int)))
+                e.Effect = DragDropEffects.Move;
+            else if (e.Data.GetDataPresent(typeof(DragDropData)))
+                e.Effect = DragDropEffects.Copy;
+            else
+                return;
             Point pt = _dgvEditor.PointToClient(new Point(e.X, e.Y));
             var hit = _dgvEditor.HitTest(pt.X, pt.Y);
             _dragTargetRow = hit.RowIndex;
@@ -896,21 +912,112 @@ namespace AirDirector.Forms
 
         private void DgvEditor_DragDrop(object sender, DragEventArgs e)
         {
-            if (!e.Data.GetDataPresent(typeof(int))) return;
-            int sourceRow = (int)e.Data.GetData(typeof(int));
             Point pt = _dgvEditor.PointToClient(new Point(e.X, e.Y));
             var hit = _dgvEditor.HitTest(pt.X, pt.Y);
             int targetRow = hit.RowIndex;
 
-            if (sourceRow < 0 || targetRow < 0 || sourceRow == targetRow) return;
-            if (sourceRow >= _playlist.Items.Count || targetRow >= _playlist.Items.Count) return;
+            if (e.Data.GetDataPresent(typeof(int)))
+            {
+                int sourceRow = (int)e.Data.GetData(typeof(int));
+                if (sourceRow < 0 || targetRow < 0 || sourceRow == targetRow) return;
+                if (sourceRow >= _playlist.Items.Count || targetRow >= _playlist.Items.Count) return;
 
-            var item = _playlist.Items[sourceRow];
-            _playlist.Items.RemoveAt(sourceRow);
-            _playlist.Items.Insert(targetRow, item);
-            MarkChanged();
-            RefreshEditorGrid();
-            if (targetRow < _dgvEditor.Rows.Count) _dgvEditor.Rows[targetRow].Selected = true;
+                var item = _playlist.Items[sourceRow];
+                _playlist.Items.RemoveAt(sourceRow);
+                _playlist.Items.Insert(targetRow, item);
+                MarkChanged();
+                RefreshEditorGrid();
+                if (targetRow < _dgvEditor.Rows.Count) _dgvEditor.Rows[targetRow].Selected = true;
+            }
+            else if (e.Data.GetDataPresent(typeof(DragDropData)))
+            {
+                var data = e.Data.GetData(typeof(DragDropData)) as DragDropData;
+                if (data == null) return;
+
+                AirPlaylistItem item = null;
+                if (data.EntryType == "MusicEntry" && data.EntryData is MusicEntry music)
+                {
+                    int markerMix = music.MarkerMIX;
+                    int markerIn = music.MarkerIN;
+                    int durationSec = markerMix > markerIn ? (markerMix - markerIn) / 1000 : music.Duration / 1000;
+                    item = new AirPlaylistItem
+                    {
+                        Type = AirPlaylistItemType.Track,
+                        FilePath = music.FilePath,
+                        Artist = music.Artist ?? "",
+                        Title = music.Title ?? "",
+                        DurationSeconds = durationSec,
+                        MarkerIN = markerIn,
+                        MarkerMIX = markerMix
+                    };
+                }
+                else if (data.EntryType == "ClipEntry" && data.EntryData is ClipEntry clip)
+                {
+                    int markerMix = clip.MarkerMIX;
+                    int markerIn = clip.MarkerIN;
+                    int durationSec = markerMix > markerIn ? (markerMix - markerIn) / 1000 : clip.Duration / 1000;
+                    item = new AirPlaylistItem
+                    {
+                        Type = AirPlaylistItemType.Clip,
+                        FilePath = clip.FilePath,
+                        Title = clip.Title ?? "",
+                        DurationSeconds = durationSec,
+                        MarkerIN = markerIn,
+                        MarkerMIX = markerMix
+                    };
+                }
+
+                if (item == null) return;
+
+                if (targetRow >= 0 && targetRow < _playlist.Items.Count)
+                    _playlist.Items.Insert(targetRow, item);
+                else
+                    _playlist.Items.Add(item);
+
+                MarkChanged();
+                RefreshEditorGrid();
+                int insertedRow = (targetRow >= 0 && targetRow < _dgvEditor.Rows.Count) ? targetRow : _dgvEditor.Rows.Count - 1;
+                if (insertedRow >= 0 && insertedRow < _dgvEditor.Rows.Count)
+                    _dgvEditor.Rows[insertedRow].Selected = true;
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // DRAG & DROP FROM ARCHIVE GRIDS
+        // ══════════════════════════════════════════════════════════════════
+
+        private void DgvMusic_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+                _archiveDragStart = e.Location;
+        }
+
+        private void DgvMusic_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left) return;
+            if (Math.Abs(e.X - _archiveDragStart.X) < ArchiveDragThreshold && Math.Abs(e.Y - _archiveDragStart.Y) < ArchiveDragThreshold) return;
+            if (_dgvMusic.SelectedRows.Count == 0) return;
+            var entry = _dgvMusic.SelectedRows[0].Tag as MusicEntry;
+            if (entry == null) return;
+            var data = new DragDropData { EntryType = "MusicEntry", EntryData = entry };
+            _dgvMusic.DoDragDrop(data, DragDropEffects.Copy);
+        }
+
+        private void DgvClips_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+                _archiveDragStart = e.Location;
+        }
+
+        private void DgvClips_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left) return;
+            if (Math.Abs(e.X - _archiveDragStart.X) < ArchiveDragThreshold && Math.Abs(e.Y - _archiveDragStart.Y) < ArchiveDragThreshold) return;
+            if (_dgvClips.SelectedRows.Count == 0) return;
+            var entry = _dgvClips.SelectedRows[0].Tag as ClipEntry;
+            if (entry == null) return;
+            var data = new DragDropData { EntryType = "ClipEntry", EntryData = entry };
+            _dgvClips.DoDragDrop(data, DragDropEffects.Copy);
         }
 
         // ══════════════════════════════════════════════════════════════════
