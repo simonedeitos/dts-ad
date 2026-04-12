@@ -437,10 +437,10 @@ namespace AirDirector.Forms
 
             // DataGridView
             _dgvMusic = CreateArchiveDgv();
-            _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Artist", HeaderText = "Artista", Width = 180 });
-            _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Title", HeaderText = "Titolo", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
-            _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Genre", HeaderText = "Genere", Width = 80 });
-            _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Duration", HeaderText = "Durata", Width = 60 });
+            _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Artist", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnArtist", "Artista"), Width = 180 });
+            _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Title", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnTitle", "Titolo"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+            _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Genre", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnGenre", "Genere"), Width = 80 });
+            _dgvMusic.Columns.Add(new DataGridViewTextBoxColumn { Name = "Duration", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnDuration", "Durata"), Width = 60 });
             _dgvMusic.Dock = DockStyle.Fill;
             _dgvMusic.DoubleClick += (s, e) => AddSelectedMusicToPlaylist();
             _dgvMusic.MouseDown += DgvMusic_MouseDown;
@@ -489,9 +489,9 @@ namespace AirDirector.Forms
             filterRow.Controls.AddRange(new Control[] { lblCat, _cmbClipCategory, lblGen, _cmbClipGenre });
 
             _dgvClips = CreateArchiveDgv();
-            _dgvClips.Columns.Add(new DataGridViewTextBoxColumn { Name = "Title", HeaderText = "Titolo", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
-            _dgvClips.Columns.Add(new DataGridViewTextBoxColumn { Name = "Genre", HeaderText = "Genere", Width = 80 });
-            _dgvClips.Columns.Add(new DataGridViewTextBoxColumn { Name = "Duration", HeaderText = "Durata", Width = 60 });
+            _dgvClips.Columns.Add(new DataGridViewTextBoxColumn { Name = "Title", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnTitle", "Titolo"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+            _dgvClips.Columns.Add(new DataGridViewTextBoxColumn { Name = "Genre", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnGenre", "Genere"), Width = 80 });
+            _dgvClips.Columns.Add(new DataGridViewTextBoxColumn { Name = "Duration", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnDuration", "Durata"), Width = 60 });
             _dgvClips.Dock = DockStyle.Fill;
             _dgvClips.DoubleClick += (s, e) => AddSelectedClipToPlaylist();
             _dgvClips.MouseDown += DgvClips_MouseDown;
@@ -518,9 +518,9 @@ namespace AirDirector.Forms
             { BackColor = Color.FromArgb(28, 28, 28), Padding = new Padding(6) };
 
             _dgvPlaylists = CreateArchiveDgv();
-            _dgvPlaylists.Columns.Add(new DataGridViewTextBoxColumn { Name = "Name", HeaderText = "Nome", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
-            _dgvPlaylists.Columns.Add(new DataGridViewTextBoxColumn { Name = "Modified", HeaderText = "Modificato", Width = 130 });
-            _dgvPlaylists.Columns.Add(new DataGridViewTextBoxColumn { Name = "Items", HeaderText = "Elementi", Width = 70 });
+            _dgvPlaylists.Columns.Add(new DataGridViewTextBoxColumn { Name = "Name", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnPlaylistName", "Nome"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+            _dgvPlaylists.Columns.Add(new DataGridViewTextBoxColumn { Name = "Modified", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnPlaylistModified", "Modificato"), Width = 130 });
+            _dgvPlaylists.Columns.Add(new DataGridViewTextBoxColumn { Name = "Items", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnPlaylistItems", "Elementi"), Width = 70 });
             _dgvPlaylists.Dock = DockStyle.Fill;
             _dgvPlaylists.DoubleClick += (s, e) => OpenSelectedPlaylist();
 
@@ -709,6 +709,36 @@ namespace AirDirector.Forms
                 _tabArchive.TabPages[1].Text = LanguageManager.GetString("PlaylistEditor.TabClips", "🔔 Clips");
                 _tabArchive.TabPages[2].Text = LanguageManager.GetString("PlaylistEditor.TabPlaylists", "📋 Playlist");
                 _tabArchive.TabPages[3].Text = LanguageManager.GetString("PlaylistEditor.TabRules", "🔧 Regole");
+            }
+            // Music archive columns
+            if (_dgvMusic != null && _dgvMusic.Columns.Count >= 4)
+            {
+                _dgvMusic.Columns["Artist"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnArtist", "Artista");
+                _dgvMusic.Columns["Title"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnTitle", "Titolo");
+                _dgvMusic.Columns["Genre"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnGenre", "Genere");
+                _dgvMusic.Columns["Duration"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnDuration", "Durata");
+            }
+            // Clips archive columns
+            if (_dgvClips != null && _dgvClips.Columns.Count >= 3)
+            {
+                _dgvClips.Columns["Title"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnTitle", "Titolo");
+                _dgvClips.Columns["Genre"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnGenre", "Genere");
+                _dgvClips.Columns["Duration"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnDuration", "Durata");
+            }
+            // Playlists archive columns
+            if (_dgvPlaylists != null && _dgvPlaylists.Columns.Count >= 3)
+            {
+                _dgvPlaylists.Columns["Name"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnPlaylistName", "Nome");
+                _dgvPlaylists.Columns["Modified"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnPlaylistModified", "Modificato");
+                _dgvPlaylists.Columns["Items"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnPlaylistItems", "Elementi");
+            }
+            // Editor columns
+            if (_dgvEditor != null && _dgvEditor.Columns.Count >= 5)
+            {
+                _dgvEditor.Columns["colTime"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnTime", "Orario");
+                _dgvEditor.Columns["colType"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnType", "Tipo");
+                _dgvEditor.Columns["colElement"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnElement", "Elemento");
+                _dgvEditor.Columns["colDuration"].HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnDuration", "Durata");
             }
             UpdateTotalDurationLabel();
         }
