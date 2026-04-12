@@ -55,6 +55,7 @@ namespace AirDirector.Forms
             lblName = new Label();
             txtName = new TextBox();
             grpAction = new GroupBox();
+            txtStreamURL = new TextBox();
             radClock = new RadioButton();
             cmbClock = new ComboBox();
             radAudio = new RadioButton();
@@ -65,7 +66,6 @@ namespace AirDirector.Forms
             radTimeSignal = new RadioButton();
             radURLStreaming = new RadioButton();
             lblStreamURL = new Label();
-            txtStreamURL = new TextBox();
             lblStreamDuration = new Label();
             txtStreamDuration = new MaskedTextBox();
             lblVideoBuffer = new Label();
@@ -133,6 +133,15 @@ namespace AirDirector.Forms
             grpAction.TabStop = false;
             grpAction.Text = "Tipo Azione";
             // 
+            // txtStreamURL
+            // 
+            txtStreamURL.Enabled = false;
+            txtStreamURL.Font = new Font("Segoe UI", 9F);
+            txtStreamURL.Location = new Point(170, 145);
+            txtStreamURL.Name = "txtStreamURL";
+            txtStreamURL.Size = new Size(393, 23);
+            txtStreamURL.TabIndex = 10;
+            // 
             // radClock
             // 
             radClock.Checked = true;
@@ -148,9 +157,9 @@ namespace AirDirector.Forms
             // 
             cmbClock.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbClock.Font = new Font("Segoe UI", 9F);
-            cmbClock.Location = new Point(170, 23);
+            cmbClock.Location = new Point(255, 23);
             cmbClock.Name = "cmbClock";
-            cmbClock.Size = new Size(450, 23);
+            cmbClock.Size = new Size(308, 23);
             cmbClock.TabIndex = 1;
             // 
             // radAudio
@@ -166,9 +175,9 @@ namespace AirDirector.Forms
             // 
             txtAudioFile.Enabled = false;
             txtAudioFile.Font = new Font("Segoe UI", 9F);
-            txtAudioFile.Location = new Point(170, 53);
+            txtAudioFile.Location = new Point(171, 53);
             txtAudioFile.Name = "txtAudioFile";
-            txtAudioFile.Size = new Size(395, 23);
+            txtAudioFile.Size = new Size(394, 23);
             txtAudioFile.TabIndex = 3;
             // 
             // btnBrowseAudio
@@ -176,9 +185,9 @@ namespace AirDirector.Forms
             btnBrowseAudio.Cursor = Cursors.Hand;
             btnBrowseAudio.Enabled = false;
             btnBrowseAudio.FlatStyle = FlatStyle.Flat;
-            btnBrowseAudio.Location = new Point(585, 53);
+            btnBrowseAudio.Location = new Point(575, 52);
             btnBrowseAudio.Name = "btnBrowseAudio";
-            btnBrowseAudio.Size = new Size(45, 27);
+            btnBrowseAudio.Size = new Size(31, 23);
             btnBrowseAudio.TabIndex = 4;
             btnBrowseAudio.Text = "📁";
             btnBrowseAudio.Click += BtnBrowseAudio_Click;
@@ -187,7 +196,7 @@ namespace AirDirector.Forms
             // 
             radMiniPLS.Location = new Point(10, 85);
             radMiniPLS.Name = "radMiniPLS";
-            radMiniPLS.Size = new Size(185, 25);
+            radMiniPLS.Size = new Size(245, 25);
             radMiniPLS.TabIndex = 5;
             radMiniPLS.Text = "📋 Riproduci Mini Playlist";
             radMiniPLS.CheckedChanged += RadAction_CheckedChanged;
@@ -197,9 +206,9 @@ namespace AirDirector.Forms
             cmbPlaylist.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbPlaylist.Enabled = false;
             cmbPlaylist.Font = new Font("Segoe UI", 9F);
-            cmbPlaylist.Location = new Point(201, 85);
+            cmbPlaylist.Location = new Point(255, 85);
             cmbPlaylist.Name = "cmbPlaylist";
-            cmbPlaylist.Size = new Size(419, 23);
+            cmbPlaylist.Size = new Size(310, 23);
             cmbPlaylist.TabIndex = 6;
             // 
             // radTimeSignal
@@ -230,15 +239,6 @@ namespace AirDirector.Forms
             lblStreamURL.TabIndex = 9;
             lblStreamURL.Text = "URL:";
             lblStreamURL.Visible = false;
-            // 
-            // txtStreamURL
-            // 
-            txtStreamURL.Enabled = false;
-            txtStreamURL.Font = new Font("Segoe UI", 9F);
-            txtStreamURL.Location = new Point(170, 145);
-            txtStreamURL.Name = "txtStreamURL";
-            txtStreamURL.Size = new Size(393, 23);
-            txtStreamURL.TabIndex = 10;
             // 
             // lblStreamDuration
             // 
@@ -276,16 +276,16 @@ namespace AirDirector.Forms
             txtVideoBufferPath.Font = new Font("Segoe UI", 9F);
             txtVideoBufferPath.Location = new Point(180, 250);
             txtVideoBufferPath.Name = "txtVideoBufferPath";
-            txtVideoBufferPath.Size = new Size(415, 23);
+            txtVideoBufferPath.Size = new Size(405, 23);
             txtVideoBufferPath.TabIndex = 21;
             // 
             // btnBrowseVideoBuffer
             // 
             btnBrowseVideoBuffer.Cursor = Cursors.Hand;
             btnBrowseVideoBuffer.FlatStyle = FlatStyle.Flat;
-            btnBrowseVideoBuffer.Location = new Point(605, 249);
+            btnBrowseVideoBuffer.Location = new Point(594, 249);
             btnBrowseVideoBuffer.Name = "btnBrowseVideoBuffer";
-            btnBrowseVideoBuffer.Size = new Size(45, 27);
+            btnBrowseVideoBuffer.Size = new Size(32, 24);
             btnBrowseVideoBuffer.TabIndex = 22;
             btnBrowseVideoBuffer.Text = "📁";
             btnBrowseVideoBuffer.Click += BtnBrowseVideoBuffer_Click;
