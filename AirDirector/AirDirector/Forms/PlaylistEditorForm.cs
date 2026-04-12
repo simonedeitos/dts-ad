@@ -540,9 +540,9 @@ namespace AirDirector.Forms
         private TabPage BuildRulesTab()
         {
             TabPage page = new TabPage(LanguageManager.GetString("PlaylistEditor.TabRules", "🔧 Regole"))
-            { BackColor = Color.FromArgb(28, 28, 28), Padding = new Padding(16, 14, 6, 6) };
+            { BackColor = Color.FromArgb(28, 28, 28), Padding = new Padding(20, 20, 6, 6) };
 
-            int y = 14;
+            int y = 20;
 
             // Source selection (Music or Clips)
             Label lblSource = new Label { Text = LanguageManager.GetString("PlaylistEditor.RuleSource", "Sorgente:"), ForeColor = Color.White, Left = 16, Top = y + 3, Width = 80, Height = 22, Font = new Font("Segoe UI", 10) };
@@ -749,11 +749,18 @@ namespace AirDirector.Forms
                 {
                     _dgvEditor.Rows[rowIdx].DefaultCellStyle.ForeColor = Color.FromArgb(0, 180, 255); // Azure - Clip
                 }
-                // Category/Genre rules keep default white color
+                else if (item.Type == AirPlaylistItemType.Category || item.Type == AirPlaylistItemType.Genre)
+                {
+                    if (item.RuleSourceType == "Clips")
+                        _dgvEditor.Rows[rowIdx].DefaultCellStyle.ForeColor = Color.FromArgb(0, 180, 255); // Azure - Clips rule
+                    else
+                        _dgvEditor.Rows[rowIdx].DefaultCellStyle.ForeColor = Color.FromArgb(255, 215, 0); // Gold - Music rule
+                }
             }
 
             _dgvEditor.ResumeLayout();
             UpdateTotalDurationLabel();
+            _dgvEditor.ClearSelection();
         }
 
         private void UpdateTotalDurationLabel()

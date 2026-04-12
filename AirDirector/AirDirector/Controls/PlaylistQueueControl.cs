@@ -3523,6 +3523,33 @@ namespace AirDirector.Controls
 
 					case AirPlaylistItemType.Clip:
 					{
+						// Check if this is a Clips RULE (no direct file, has rule metadata)
+						if (string.IsNullOrEmpty(pItem.FilePath) && pItem.RuleSourceType == "Clips")
+						{
+							string catName = pItem.RuleCategoryName;
+							string genName = pItem.RuleGenreName;
+							bool hasCat = !string.IsNullOrEmpty(catName);
+							bool hasGen = !string.IsNullOrEmpty(genName);
+
+							if (hasCat && hasGen)
+							{
+								string combined = catName + " + " + genName;
+								return GetRandomClipByCategoryAndGenre(combined);
+							}
+							else if (hasGen)
+							{
+								return GetRandomClipByGenre(genName);
+							}
+							else if (hasCat)
+							{
+								return GetRandomItemByCategory(catName, "Clip", false, 0, 0);
+							}
+
+							Log($"[ConvertPlaylistItem] Clip rule senza filtri validi");
+							return null;
+						}
+
+						// Direct clip file
 						var allClips = DbcManager.LoadFromCsv<ClipEntry>("Clips.dbc");
 						var entry = allClips.FirstOrDefault(c =>
 							string.Equals(c.FilePath, pItem.FilePath, StringComparison.OrdinalIgnoreCase));
@@ -3536,18 +3563,27 @@ namespace AirDirector.Controls
 					case AirPlaylistItemType.Category:
 					{
 						string categoryName = pItem.CategoryName ?? "";
+						bool isClipsRule = pItem.RuleSourceType == "Clips";
+
 						if (categoryName.Contains(" / "))
 						{
 							// Regola combinata Categoria+Genere
 							string combined = categoryName.Replace(" / ", " + ");
+							if (isClipsRule)
+								return GetRandomClipByCategoryAndGenre(combined);
 							return GetRandomMusicByCategoryAndGenre(combined, pItem.YearFilterEnabled, pItem.YearFrom, pItem.YearTo);
 						}
-						return GetRandomItemByCategory(categoryName, "Music", pItem.YearFilterEnabled, pItem.YearFrom, pItem.YearTo);
+
+						return GetRandomItemByCategory(categoryName, isClipsRule ? "Clip" : "Music", pItem.YearFilterEnabled, pItem.YearFrom, pItem.YearTo);
 					}
 
 					case AirPlaylistItemType.Genre:
 					{
 						string genreName = pItem.CategoryName ?? "";
+						bool isClipsRule = pItem.RuleSourceType == "Clips";
+
+						if (isClipsRule)
+							return GetRandomClipByGenre(genreName);
 						return GetRandomMusicByGenre(genreName, pItem.YearFilterEnabled, pItem.YearFrom, pItem.YearTo);
 					}
 
