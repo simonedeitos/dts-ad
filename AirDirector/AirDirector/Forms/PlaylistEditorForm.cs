@@ -322,10 +322,12 @@ namespace AirDirector.Forms
             // Columns
             _dgvEditor.Columns.Add(new DataGridViewTextBoxColumn { Name = "colNum", HeaderText = "#", Width = 36, ReadOnly = true });
             var colTime = new DataGridViewTextBoxColumn { Name = "colTime", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnTime", "Orario"), Width = 76, ReadOnly = true };
-            colTime.DefaultCellStyle.ForeColor = Color.Yellow;
+            colTime.DefaultCellStyle.ForeColor = Color.White;
             colTime.DefaultCellStyle.BackColor = Color.FromArgb(35, 35, 35);
             _dgvEditor.Columns.Add(colTime);
             _dgvEditor.Columns.Add(new DataGridViewTextBoxColumn { Name = "colType", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnType", "Tipo"), Width = 42, ReadOnly = true });
+            var colType = _dgvEditor.Columns["colType"];
+            colType.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             _dgvEditor.Columns.Add(new DataGridViewTextBoxColumn { Name = "colElement", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnElement", "Elemento"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true });
             _dgvEditor.Columns.Add(new DataGridViewTextBoxColumn { Name = "colDuration", HeaderText = LanguageManager.GetString("PlaylistEditor.ColumnDuration", "Durata"), Width = 68, ReadOnly = true });
 
@@ -445,7 +447,7 @@ namespace AirDirector.Forms
             _dgvMusic.MouseMove += DgvMusic_MouseMove;
 
             // Add button
-            _btnAddMusic = CreateButton(LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "➤ Aggiungi"), Color.FromArgb(33, 150, 83));
+            _btnAddMusic = CreateButton(LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "+ Aggiungi"), Color.FromArgb(33, 150, 83));
             _btnAddMusic.Dock = DockStyle.Bottom;
             _btnAddMusic.Height = 30;
             _btnAddMusic.Click += (s, e) => AddSelectedMusicToPlaylist();
@@ -495,7 +497,7 @@ namespace AirDirector.Forms
             _dgvClips.MouseDown += DgvClips_MouseDown;
             _dgvClips.MouseMove += DgvClips_MouseMove;
 
-            _btnAddClip = CreateButton(LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "➤ Aggiungi"), Color.FromArgb(33, 150, 83));
+            _btnAddClip = CreateButton(LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "+ Aggiungi"), Color.FromArgb(33, 150, 83));
             _btnAddClip.Dock = DockStyle.Bottom;
             _btnAddClip.Height = 30;
             _btnAddClip.Click += (s, e) => AddSelectedClipToPlaylist();
@@ -538,13 +540,13 @@ namespace AirDirector.Forms
         private TabPage BuildRulesTab()
         {
             TabPage page = new TabPage(LanguageManager.GetString("PlaylistEditor.TabRules", "🔧 Regole"))
-            { BackColor = Color.FromArgb(28, 28, 28), Padding = new Padding(6) };
+            { BackColor = Color.FromArgb(28, 28, 28), Padding = new Padding(16, 14, 6, 6) };
 
-            int y = 8;
+            int y = 14;
 
             // Source selection (Music or Clips)
-            Label lblSource = new Label { Text = LanguageManager.GetString("PlaylistEditor.RuleSource", "Sorgente:"), ForeColor = Color.White, Left = 10, Top = y + 3, Width = 80, Height = 22, Font = new Font("Segoe UI", 10) };
-            _cmbRuleSource = new ComboBox { Left = 95, Top = y, Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
+            Label lblSource = new Label { Text = LanguageManager.GetString("PlaylistEditor.RuleSource", "Sorgente:"), ForeColor = Color.White, Left = 16, Top = y + 3, Width = 80, Height = 22, Font = new Font("Segoe UI", 10) };
+            _cmbRuleSource = new ComboBox { Left = 100, Top = y, Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
             _cmbRuleSource.Items.Add("🎵 " + LanguageManager.GetString("PlaylistEditor.RuleSourceMusic", "Music"));
             _cmbRuleSource.Items.Add("🔔 " + LanguageManager.GetString("PlaylistEditor.RuleSourceClips", "Clips"));
             _cmbRuleSource.SelectedIndex = 0;
@@ -553,9 +555,9 @@ namespace AirDirector.Forms
             y += 40;
 
             // Source type
-            _radRuleCategory = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleCategory", "Categoria"), ForeColor = Color.White, Left = 10, Top = y, AutoSize = true, Checked = true, Font = new Font("Segoe UI", 10) };
-            _radRuleGenre = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleGenre", "Genere"), ForeColor = Color.White, Left = 120, Top = y, AutoSize = true, Font = new Font("Segoe UI", 10) };
-            _radRuleCategoryGenre = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleCategoryGenre", "Categoria + Genere"), ForeColor = Color.White, Left = 200, Top = y, AutoSize = true, Font = new Font("Segoe UI", 10) };
+            _radRuleCategory = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleCategory", "Categoria"), ForeColor = Color.White, Left = 16, Top = y, AutoSize = true, Checked = true, Font = new Font("Segoe UI", 10) };
+            _radRuleGenre = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleGenre", "Genere"), ForeColor = Color.White, Left = 130, Top = y, AutoSize = true, Font = new Font("Segoe UI", 10) };
+            _radRuleCategoryGenre = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.RuleCategoryGenre", "Categoria + Genere"), ForeColor = Color.White, Left = 210, Top = y, AutoSize = true, Font = new Font("Segoe UI", 10) };
             _radRuleCategory.CheckedChanged += (s, e) => UpdateRuleControls();
             _radRuleGenre.CheckedChanged += (s, e) => UpdateRuleControls();
             _radRuleCategoryGenre.CheckedChanged += (s, e) => UpdateRuleControls();
@@ -563,8 +565,8 @@ namespace AirDirector.Forms
             y += 38;
 
             // Category combo
-            Label lblCat = new Label { Text = LanguageManager.GetString("PlaylistEditor.FilterCategory", "Categoria:"), ForeColor = Color.White, Left = 10, Top = y + 3, Width = 80, Height = 22, Font = new Font("Segoe UI", 10) };
-            _cmbRuleCategory = new ComboBox { Left = 95, Top = y, Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
+            Label lblCat = new Label { Text = LanguageManager.GetString("PlaylistEditor.FilterCategory", "Categoria:"), ForeColor = Color.White, Left = 16, Top = y + 3, Width = 80, Height = 22, Font = new Font("Segoe UI", 10) };
+            _cmbRuleCategory = new ComboBox { Left = 100, Top = y, Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
             _cmbRuleCategory.Items.Add("-- " + LanguageManager.GetString("PlaylistEditor.SelectCategory", "Seleziona") + " --");
             foreach (var c in _musicCategories) _cmbRuleCategory.Items.Add(c);
             _cmbRuleCategory.SelectedIndex = 0;
@@ -573,8 +575,8 @@ namespace AirDirector.Forms
             y += 40;
 
             // Genre combo
-            Label lblGen = new Label { Text = LanguageManager.GetString("PlaylistEditor.FilterGenre", "Genere:"), ForeColor = Color.White, Left = 10, Top = y + 3, Width = 80, Height = 22, Font = new Font("Segoe UI", 10) };
-            _cmbRuleGenre = new ComboBox { Left = 95, Top = y, Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
+            Label lblGen = new Label { Text = LanguageManager.GetString("PlaylistEditor.FilterGenre", "Genere:"), ForeColor = Color.White, Left = 16, Top = y + 3, Width = 80, Height = 22, Font = new Font("Segoe UI", 10) };
+            _cmbRuleGenre = new ComboBox { Left = 100, Top = y, Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
             _cmbRuleGenre.Items.Add("-- " + LanguageManager.GetString("PlaylistEditor.SelectGenre", "Seleziona") + " --");
             foreach (var g in _musicGenres) _cmbRuleGenre.Items.Add(g);
             _cmbRuleGenre.SelectedIndex = 0;
@@ -583,13 +585,13 @@ namespace AirDirector.Forms
             y += 40;
 
             // Year filter
-            _chkRuleYearFilter = new CheckBox { Text = LanguageManager.GetString("PlaylistEditor.YearFilter", "Filtro Anni:"), ForeColor = Color.White, Left = 10, Top = y, AutoSize = true, Font = new Font("Segoe UI", 10) };
+            _chkRuleYearFilter = new CheckBox { Text = LanguageManager.GetString("PlaylistEditor.YearFilter", "Filtro Anni:"), ForeColor = Color.White, Left = 16, Top = y, AutoSize = true, Font = new Font("Segoe UI", 10) };
             _chkRuleYearFilter.CheckedChanged += (s, e) => { UpdateRuleControls(); UpdateRuleFoundCount(); };
             page.Controls.Add(_chkRuleYearFilter);
             y += 34;
 
-            Label lblFrom = new Label { Text = LanguageManager.GetString("PlaylistEditor.YearFrom", "Da:"), ForeColor = Color.White, Left = 20, Top = y + 3, Width = 28, Height = 22, Font = new Font("Segoe UI", 10) };
-            _numRuleYearFrom = new NumericUpDown { Left = 52, Top = y, Width = 80, Minimum = 1900, Maximum = DateTime.Now.Year, Value = 2000, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
+            Label lblFrom = new Label { Text = LanguageManager.GetString("PlaylistEditor.YearFrom", "Da:"), ForeColor = Color.White, Left = 26, Top = y + 3, Width = 28, Height = 22, Font = new Font("Segoe UI", 10) };
+            _numRuleYearFrom = new NumericUpDown { Left = 58, Top = y, Width = 80, Minimum = 1900, Maximum = DateTime.Now.Year, Value = 2000, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
             _numRuleYearFrom.ValueChanged += (s, e) => UpdateRuleFoundCount();
             Label lblTo = new Label { Text = LanguageManager.GetString("PlaylistEditor.YearTo", "A:"), ForeColor = Color.White, Left = 140, Top = y + 3, Width = 20, Height = 22, Font = new Font("Segoe UI", 10) };
             _numRuleYearTo = new NumericUpDown { Left = 162, Top = y, Width = 80, Minimum = 1900, Maximum = DateTime.Now.Year, Value = DateTime.Now.Year, BackColor = Color.FromArgb(45, 45, 45), ForeColor = Color.White, Font = new Font("Segoe UI", 10) };
@@ -602,7 +604,7 @@ namespace AirDirector.Forms
             {
                 Text = "",
                 ForeColor = Color.FromArgb(0, 200, 130),
-                Left = 10,
+                Left = 16,
                 Top = y,
                 Width = 400,
                 Height = 44,
@@ -612,8 +614,8 @@ namespace AirDirector.Forms
             y += 54;
 
             // Add rule button
-            _btnAddRule = CreateButton(LanguageManager.GetString("PlaylistEditor.AddRuleToPlaylist", "➤ Aggiungi Regola"), Color.FromArgb(33, 150, 83));
-            _btnAddRule.Left = 10; _btnAddRule.Top = y; _btnAddRule.Width = 220; _btnAddRule.Height = 34;
+            _btnAddRule = CreateButton(LanguageManager.GetString("PlaylistEditor.AddRuleToPlaylist", "+ Aggiungi Regola"), Color.FromArgb(33, 150, 83));
+            _btnAddRule.Left = 16; _btnAddRule.Top = y; _btnAddRule.Width = 220; _btnAddRule.Height = 34;
             _btnAddRule.Click += BtnAddRule_Click;
             page.Controls.Add(_btnAddRule);
 
@@ -697,9 +699,9 @@ namespace AirDirector.Forms
             if (_btnMoveUp != null) _btnMoveUp.Text = LanguageManager.GetString("PlaylistEditor.MoveUp", "⬆ Su");
             if (_btnMoveDown != null) _btnMoveDown.Text = LanguageManager.GetString("PlaylistEditor.MoveDown", "⬇ Giù");
             if (_btnRemove != null) _btnRemove.Text = LanguageManager.GetString("PlaylistEditor.RemoveSelected", "❌ Rimuovi");
-            if (_btnAddMusic != null) _btnAddMusic.Text = LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "➤ Aggiungi");
-            if (_btnAddClip != null) _btnAddClip.Text = LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "➤ Aggiungi");
-            if (_btnAddRule != null) _btnAddRule.Text = LanguageManager.GetString("PlaylistEditor.AddRuleToPlaylist", "➤ Aggiungi Regola");
+            if (_btnAddMusic != null) _btnAddMusic.Text = LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "+ Aggiungi");
+            if (_btnAddClip != null) _btnAddClip.Text = LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "+ Aggiungi");
+            if (_btnAddRule != null) _btnAddRule.Text = LanguageManager.GetString("PlaylistEditor.AddRuleToPlaylist", "+ Aggiungi Regola");
             if (_btnDeletePlaylist != null) _btnDeletePlaylist.Text = LanguageManager.GetString("PlaylistEditor.DeletePlaylist", "Elimina");
             if (_tabArchive != null && _tabArchive.TabPages.Count >= 4)
             {
@@ -737,6 +739,17 @@ namespace AirDirector.Forms
                     durStr
                 );
                 _dgvEditor.Rows[rowIdx].Tag = item;
+
+                // Set row text color based on item type
+                if (item.Type == AirPlaylistItemType.Track)
+                {
+                    _dgvEditor.Rows[rowIdx].DefaultCellStyle.ForeColor = Color.FromArgb(255, 215, 0); // Gold - Music
+                }
+                else if (item.Type == AirPlaylistItemType.Clip)
+                {
+                    _dgvEditor.Rows[rowIdx].DefaultCellStyle.ForeColor = Color.FromArgb(0, 180, 255); // Azure - Clip
+                }
+                // Category/Genre rules keep default white color
             }
 
             _dgvEditor.ResumeLayout();
@@ -973,7 +986,10 @@ namespace AirDirector.Forms
                     CategoryName = item.CategoryName,
                     YearFilterEnabled = item.YearFilterEnabled,
                     YearFrom = item.YearFrom,
-                    YearTo = item.YearTo
+                    YearTo = item.YearTo,
+                    RuleSourceType = item.RuleSourceType,
+                    RuleCategoryName = item.RuleCategoryName,
+                    RuleGenreName = item.RuleGenreName
                 };
                 _playlist.Items.Insert(insertIndex++, newItem);
             }
@@ -1582,7 +1598,10 @@ namespace AirDirector.Forms
                 DurationSeconds = avgDurSec,
                 YearFilterEnabled = !isClips && (_chkRuleYearFilter?.Checked == true),
                 YearFrom = (int)(_numRuleYearFrom?.Value ?? 1900),
-                YearTo = (int)(_numRuleYearTo?.Value ?? DateTime.Now.Year)
+                YearTo = (int)(_numRuleYearTo?.Value ?? DateTime.Now.Year),
+                RuleSourceType = isClips ? "Clips" : "Music",
+                RuleCategoryName = (isCategory || isBoth) ? catName : null,
+                RuleGenreName = (isGenre || isBoth) ? genName : null
             };
 
             _playlist.Items.Add(item);

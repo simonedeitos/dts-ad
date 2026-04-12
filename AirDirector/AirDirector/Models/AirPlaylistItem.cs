@@ -23,6 +23,9 @@ namespace AirDirector.Models
         public string Artist { get; set; }          // Per Track
         public string Title { get; set; }           // Per Track/Clip
         public string CategoryName { get; set; }    // Per Category/Genre
+        public string RuleSourceType { get; set; }  // "Music" o "Clips" (per regole)
+        public string RuleCategoryName { get; set; } // nome categoria regola
+        public string RuleGenreName { get; set; }    // nome genere regola
         public int DurationSeconds { get; set; }    // Durata in secondi
         public int MarkerIN { get; set; }           // ms
         public int MarkerMIX { get; set; }          // ms
@@ -76,12 +79,28 @@ namespace AirDirector.Models
                         return Title;
                     return System.IO.Path.GetFileNameWithoutExtension(FilePath ?? "");
                 case AirPlaylistItemType.Clip:
+                    if (string.IsNullOrEmpty(FilePath))
+                    {
+                        // Regola Clips (senza FilePath diretto)
+                        string source = RuleSourceType ?? "Clips";
+                        var clipParts = new System.Collections.Generic.List<string>();
+                        if (!string.IsNullOrEmpty(RuleGenreName)) clipParts.Add($"Genere: {RuleGenreName}");
+                        if (!string.IsNullOrEmpty(RuleCategoryName)) clipParts.Add($"Categoria: {RuleCategoryName}");
+                        return $"{source} - {string.Join(", ", clipParts)}";
+                    }
                     return !string.IsNullOrEmpty(Title) ? Title
                         : System.IO.Path.GetFileNameWithoutExtension(FilePath ?? "");
                 case AirPlaylistItemType.Category:
-                    return CategoryName ?? "";
                 case AirPlaylistItemType.Genre:
+                {
+                    string source = RuleSourceType ?? "Music";
+                    var parts = new System.Collections.Generic.List<string>();
+                    if (!string.IsNullOrEmpty(RuleGenreName)) parts.Add($"Genere: {RuleGenreName}");
+                    if (!string.IsNullOrEmpty(RuleCategoryName)) parts.Add($"Categoria: {RuleCategoryName}");
+                    if (parts.Count > 0)
+                        return $"{source} - {string.Join(", ", parts)}";
                     return CategoryName ?? "";
+                }
                 default:
                     return string.Empty;
             }
