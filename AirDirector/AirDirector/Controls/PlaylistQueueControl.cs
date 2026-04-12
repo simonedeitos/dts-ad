@@ -3454,7 +3454,9 @@ namespace AirDirector.Controls
 
 					var item = _items[i];
 					bool isProtected = item.IsScheduled ||
-						(item.Type == PlaylistItemType.ADV && item.ScheduledTime <= protectionLimit && item.ScheduledTime >= now);
+						(item.Type == PlaylistItemType.ADV &&
+						 item.ScheduledTime > now &&
+						 item.ScheduledTime <= protectionLimit);
 
 					if (!isProtected)
 					{
@@ -3474,15 +3476,8 @@ namespace AirDirector.Controls
 					if (queueItem != null)
 					{
 						queueItem.IsFromPlaylist = true;
-						if (currentInsert >= 0 && currentInsert <= _items.Count)
-						{
-							_items.Insert(currentInsert, queueItem);
-							currentInsert++;
-						}
-						else
-						{
-							_items.Add(queueItem);
-						}
+						_items.Insert(currentInsert, queueItem);
+						currentInsert++;
 					}
 				}
 			}
