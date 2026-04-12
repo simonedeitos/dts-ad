@@ -86,6 +86,7 @@ namespace AirDirector.Models
                         var clipParts = new System.Collections.Generic.List<string>();
                         if (!string.IsNullOrEmpty(RuleGenreName)) clipParts.Add($"Genere: {RuleGenreName}");
                         if (!string.IsNullOrEmpty(RuleCategoryName)) clipParts.Add($"Categoria: {RuleCategoryName}");
+                        if (YearFilterEnabled) clipParts.Add($"Anni: {YearFrom}-{YearTo}");
                         return $"{source} - {string.Join(", ", clipParts)}";
                     }
                     return !string.IsNullOrEmpty(Title) ? Title
@@ -97,6 +98,7 @@ namespace AirDirector.Models
                     var parts = new System.Collections.Generic.List<string>();
                     if (!string.IsNullOrEmpty(RuleGenreName)) parts.Add($"Genere: {RuleGenreName}");
                     if (!string.IsNullOrEmpty(RuleCategoryName)) parts.Add($"Categoria: {RuleCategoryName}");
+                    if (YearFilterEnabled) parts.Add($"Anni: {YearFrom}-{YearTo}");
                     if (parts.Count > 0)
                         return $"{source} - {string.Join(", ", parts)}";
                     return CategoryName ?? "";
