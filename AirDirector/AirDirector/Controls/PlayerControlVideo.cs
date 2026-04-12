@@ -1036,7 +1036,7 @@ namespace AirDirector.Controls
             _totalDuration = dur; _markerIN = item.MarkerIN; _markerINTRO = item.MarkerINTRO;
             _markerMIX = item.MarkerMIX;
             _markerOUT = item.MarkerOUT;
-            _introTime = item.Intro; if (_introTime.TotalMilliseconds <= 0 && _markerINTRO > 0) _introTime = TimeSpan.FromMilliseconds(_markerINTRO);
+            _introTime = item.Intro; if (_introTime.TotalMilliseconds <= 0 && _markerINTRO > 0) _introTime = TimeSpan.FromMilliseconds(Math.Max(0, _markerINTRO - _markerIN));
             _isPlaying = true; _isPaused = false; _positionMs = item.MarkerIN > 0 ? item.MarkerIN : 0;
             _currentFile = fp; CurrentFilePath = fp; CurrentArtist = item.Artist; CurrentTitle = item.Title;
             Log("[PLAY] ✓ " + fn + (usedPre ? " [PREBUF]" : "") + (isStream ? " [STREAM]" : "") + " dur=" + dur.TotalSeconds.ToString("F0") + "s MIX=" + _markerMIX + " OUT=" + _markerOUT + " bufferShow=" + _bufferShouldShow + " bufferPlaying=" + _bufferDeck.IsPlaying + " bufferDedicated=" + _bufferIsDedicatedVideo);
@@ -1489,7 +1489,7 @@ namespace AirDirector.Controls
         private void UpdateTimerLabels() { if (_lblElapsedHeader != null) _lblElapsedHeader.Text = LanguageManager.GetString("Player.TimeElapsed", "Tempo trascorso"); if (_lblRemainingHeader != null) _lblRemainingHeader.Text = LanguageManager.GetString("Player.TimeRemaining", "Tempo restante"); }
         private void UpdateBtnStates() { if (btnPlay == null) return; btnPlay.BackColor = _isPlaying && !_isPaused ? AppTheme.Success : Color.FromArgb(80, 80, 80); btnPause.BackColor = _isPaused ? AppTheme.Warning : Color.FromArgb(80, 80, 80); btnStop.BackColor = !_isPlaying && !_isPaused ? AppTheme.Danger : Color.FromArgb(80, 80, 80); }
         private void InitTimers() { _updateTimer = new System.Windows.Forms.Timer { Interval = 33 }; _updateTimer.Tick += (s, e) => { if (!_isPlaying || _isPaused) return; UpdCnt(); waveformPanel?.Invalidate(); vuMeterLeftPanel?.Invalidate(); vuMeterRightPanel?.Invalidate(); }; _mixCheckTimer = new System.Windows.Forms.Timer { Interval = 50 }; _mixCheckTimer.Tick += MixCheckTimer_Tick; _blinkTimer = new System.Windows.Forms.Timer { Interval = 500 }; _blinkTimer.Tick += (s, e) => { _blinkState = !_blinkState; }; }
-        private void UpdCnt() { int p = _positionMs; int ee; if (_autoMode && _markerMIX > 0) ee = _markerMIX; else if (_markerOUT > 0) ee = _markerOUT; else ee = (int)_totalDuration.TotalMilliseconds; lblElapsed.Text = TimeSpan.FromMilliseconds(Math.Max(0, p - _markerIN)).ToString(@"mm\:ss"); int r = Math.Max(0, ee - p); lblRemaining.Text = "-" + TimeSpan.FromMilliseconds(r).ToString(@"mm\:ss"); if (r > 0 && r <= 10000) { if (!_blinkTimer.Enabled) _blinkTimer.Start(); lblRemaining.BackColor = _blinkState ? Color.Red : Color.Black; lblRemaining.ForeColor = _blinkState ? Color.Black : AppTheme.LEDRed; } else { _blinkTimer.Stop(); lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed; } int im = (int)_introTime.TotalMilliseconds; if (im > 0 && p < im) { lblIntro.Text = TimeSpan.FromMilliseconds(im - p).ToString(@"mm\:ss"); lblIntro.ForeColor = Color.White; lblIntro.BackColor = Color.Red; } else { lblIntro.Text = ""; lblIntro.BackColor = Color.Black; } }
+        private void UpdCnt() { int p = _positionMs; int ee; if (_autoMode && _markerMIX > 0) ee = _markerMIX; else if (_markerOUT > 0) ee = _markerOUT; else ee = (int)_totalDuration.TotalMilliseconds; lblElapsed.Text = TimeSpan.FromMilliseconds(Math.Max(0, p - _markerIN)).ToString(@"mm\:ss"); int r = Math.Max(0, ee - p); lblRemaining.Text = "-" + TimeSpan.FromMilliseconds(r).ToString(@"mm\:ss"); if (r > 0 && r <= 10000) { if (!_blinkTimer.Enabled) _blinkTimer.Start(); lblRemaining.BackColor = _blinkState ? Color.Red : Color.Black; lblRemaining.ForeColor = _blinkState ? Color.Black : AppTheme.LEDRed; } else { _blinkTimer.Stop(); lblRemaining.BackColor = Color.Black; lblRemaining.ForeColor = AppTheme.LEDRed; } int im = (int)_introTime.TotalMilliseconds; int posFromIn = p - _markerIN; if (im > 0 && posFromIn < im) { lblIntro.Text = TimeSpan.FromMilliseconds(im - posFromIn).ToString(@"mm\:ss"); lblIntro.ForeColor = Color.White; lblIntro.BackColor = Color.Red; } else { lblIntro.Text = ""; lblIntro.BackColor = Color.Black; } }
         private void WfPaint(object s, PaintEventArgs e)
         {
             Graphics g = e.Graphics;
@@ -1518,8 +1518,7 @@ namespace AirDirector.Controls
             int markerMixX = (int)((float)markerMixMs / tm * (w - 1));
 
             // Marker INTRO posizione sulla waveform
-            float introMs = (float)_introTime.TotalMilliseconds;
-            int introX = introMs > 0 ? (int)(Math.Min(1f, introMs / tm) * (w - 1)) : 0;
+            int introX = _markerINTRO > 0 ? (int)(Math.Min(1f, (float)_markerINTRO / tm) * (w - 1)) : 0;
 
             int cy = h / 2;
 
