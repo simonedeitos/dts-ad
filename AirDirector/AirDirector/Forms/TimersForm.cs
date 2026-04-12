@@ -156,7 +156,6 @@ namespace AirDirector.Forms
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 18f, FontStyle.Bold),
-                AutoEllipsis = true,
                 BackColor = Color.Transparent,
                 Text = "--",
                 Padding = Padding.Empty
@@ -169,7 +168,6 @@ namespace AirDirector.Forms
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 16f, FontStyle.Bold),
-                AutoEllipsis = true,
                 BackColor = Color.Transparent,
                 Text = "--",
                 Padding = Padding.Empty
@@ -356,9 +354,9 @@ namespace AirDirector.Forms
             ScaleCountdown(_lblScheduleCountdown, countdown);
             ScaleCountdown(_lblAdCountdown,       countdown);
 
-            // Scale artist/title
-            ScaleName(_lblOnAirArtist, artistSize);
-            ScaleName(_lblOnAirTitle,  titleSize);
+            // Scale artist/title — re-fit to current text so long strings shrink automatically
+            AutoFitLabel(_lblOnAirArtist, _lblOnAirArtist.Text, artistSize);
+            AutoFitLabel(_lblOnAirTitle,  _lblOnAirTitle.Text,  titleSize);
 
             // Scale schedule/ad name/info
             float name = Math.Max(8f, Math.Min(30f, rowH * 0.13f));
@@ -390,6 +388,31 @@ namespace AirDirector.Forms
                 old.Dispose();
             }
             catch { }
+        }
+
+        private static void AutoFitLabel(Label lbl, string text, float maxFontSize, float minFontSize = 7f)
+        {
+            lbl.Text = text;
+            if (lbl.Width <= 0) return;
+
+            float fontSize = maxFontSize;
+            int availableWidth = lbl.Width - 4; // small margin
+
+            while (fontSize > minFontSize)
+            {
+                using (var testFont = new Font("Segoe UI", fontSize, FontStyle.Bold))
+                {
+                    var textSize = TextRenderer.MeasureText(text, testFont);
+                    if (textSize.Width <= availableWidth)
+                        break;
+                }
+                fontSize -= 0.5f;
+            }
+
+            fontSize = Math.Max(minFontSize, fontSize);
+            var old = lbl.Font;
+            lbl.Font = new Font("Segoe UI", fontSize, FontStyle.Bold);
+            old?.Dispose();
         }
 
         private void DrawPanelHeader(Graphics g, Panel panel, string text)
@@ -451,8 +474,15 @@ namespace AirDirector.Forms
                 return;
             }
 
-            _lblOnAirArtist.Text = !string.IsNullOrEmpty(current.Artist) ? current.Artist : "--";
-            _lblOnAirTitle.Text  = !string.IsNullOrEmpty(current.Title)  ? current.Title  : "--";
+            float rowH = _mainLayout != null ? Math.Max(60f, _mainLayout.Height / 3.0f) : 100f;
+            float artistMaxSize = Math.Max(10f, Math.Min(36f, rowH * 0.16f));
+            float titleMaxSize  = Math.Max(9f,  Math.Min(30f, rowH * 0.14f));
+
+            string artistText = !string.IsNullOrEmpty(current.Artist) ? current.Artist : "--";
+            string titleText  = !string.IsNullOrEmpty(current.Title)  ? current.Title  : "--";
+
+            AutoFitLabel(_lblOnAirArtist, artistText, artistMaxSize);
+            AutoFitLabel(_lblOnAirTitle,  titleText,  titleMaxSize);
 
             int posMs = _isRadioTVMode
                 ? (_playerControlVideo?.CurrentPositionMs ?? 0)
