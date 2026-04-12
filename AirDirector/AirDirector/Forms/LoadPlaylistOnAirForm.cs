@@ -92,9 +92,15 @@ namespace AirDirector.Forms
                 if (_txtSearch.ForeColor == Color.FromArgb(150, 150, 150))
                 {
                     _isUpdatingPlaceholder = true;
-                    _txtSearch.Text = "";
-                    _txtSearch.ForeColor = Color.White;
-                    _isUpdatingPlaceholder = false;
+                    try
+                    {
+                        _txtSearch.Text = "";
+                        _txtSearch.ForeColor = Color.White;
+                    }
+                    finally
+                    {
+                        _isUpdatingPlaceholder = false;
+                    }
                 }
             };
             _txtSearch.LostFocus += (s, e) =>
@@ -102,9 +108,15 @@ namespace AirDirector.Forms
                 if (string.IsNullOrWhiteSpace(_txtSearch.Text))
                 {
                     _isUpdatingPlaceholder = true;
-                    _txtSearch.ForeColor = Color.FromArgb(150, 150, 150);
-                    _txtSearch.Text = LanguageManager.GetString("LoadPlaylistOnAir.SearchPlaceholder", "Cerca playlist...");
-                    _isUpdatingPlaceholder = false;
+                    try
+                    {
+                        _txtSearch.ForeColor = Color.FromArgb(150, 150, 150);
+                        _txtSearch.Text = LanguageManager.GetString("LoadPlaylistOnAir.SearchPlaceholder", "Cerca playlist...");
+                    }
+                    finally
+                    {
+                        _isUpdatingPlaceholder = false;
+                    }
                 }
             };
             _txtSearch.TextChanged += (s, e) => FilterGrid();
