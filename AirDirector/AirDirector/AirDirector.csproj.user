@@ -86,6 +86,9 @@
     <Compile Update="Forms\LicenseRemoveConfirmForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Forms\LoadPlaylistOnAirForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Forms\MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
