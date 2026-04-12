@@ -203,9 +203,9 @@ namespace AirDirector.Forms
             {
                 try
                 {
-                    mainSplit.Panel1MinSize = 400;
-                    mainSplit.Panel2MinSize = 300;
                     mainSplit.SplitterDistance = (int)(mainSplit.Width * 0.55);
+                    mainSplit.Panel1MinSize = Math.Min(400, mainSplit.Width / 2);
+                    mainSplit.Panel2MinSize = Math.Min(300, mainSplit.Width / 2);
                 }
                 catch (InvalidOperationException) { }
             };

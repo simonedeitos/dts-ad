@@ -1,4 +1,5 @@
 ﻿using AirDirector.Forms;
+using AirDirector.Models;
 using AirDirector.Services.Database;
 using AirDirector.Themes;
 using CsvHelper.Expressions;
@@ -3159,6 +3160,31 @@ namespace AirDirector.Controls
 				}
 			}
 
+			// Badge PLAYLIST (pillola azzurra/teal)
+			if (item.IsFromPlaylist)
+			{
+				using (Font plFont = new Font("Segoe UI", 7, FontStyle.Bold))
+				{
+					string plText = "PLAYLIST";
+					SizeF plSize = g.MeasureString(plText, plFont);
+					Rectangle plRect = new Rectangle(infoX, row3Y + 1, (int)plSize.Width + 8, 15);
+
+					using (var plPath = GetRoundedRectPath(plRect, 7))
+					using (SolidBrush plBg = new SolidBrush(Color.FromArgb(0, 150, 180)))
+					{
+						g.FillPath(plBg, plPath);
+					}
+
+					using (SolidBrush plTextBrush = new SolidBrush(Color.White))
+					using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+					{
+						g.DrawString(plText, plFont, plTextBrush, plRect, sf);
+					}
+
+					infoX += plRect.Width + 6;
+				}
+			}
+
 			// Badge violazioni (pillola arancio)
 			if (item.Type == PlaylistItemType.Music && item.OriginalMusicEntry != null)
 			{
@@ -3405,6 +3431,139 @@ namespace AirDirector.Controls
 			}
 		}
 
+		public void LoadPlaylistOnAir(AirPlaylist playlist, bool immediate)
+		{
+			if (playlist?.Items == null || playlist.Items.Count == 0)
+				return;
+
+			Log($"[LoadPlaylistOnAir] Caricamento playlist '{playlist.Name}' - immediate={immediate}, {playlist.Items.Count} elementi");
+
+			if (immediate)
+			{
+				// Determina l'indice di inserimento: subito dopo l'elemento in play
+				int insertIndex = _currentPlayingIndex >= 0 ? _currentPlayingIndex + 1 : 0;
+
+				// Rimuovi dalla queue tutti gli elementi NON in play, NON schedulati, NON ADV entro 10 minuti
+				DateTime now = DateTime.Now;
+				DateTime protectionLimit = now.AddMinutes(10);
+
+				for (int i = _items.Count - 1; i >= 0; i--)
+				{
+					if (i == _currentPlayingIndex)
+						continue;
+
+					var item = _items[i];
+					bool isProtected = item.IsScheduled ||
+						(item.Type == PlaylistItemType.ADV &&
+						 item.ScheduledTime > now &&
+						 item.ScheduledTime <= protectionLimit);
+
+					if (!isProtected)
+					{
+						_items.RemoveAt(i);
+						if (i < _currentPlayingIndex)
+							_currentPlayingIndex--;
+						if (i < insertIndex)
+							insertIndex = Math.Max(insertIndex - 1, _currentPlayingIndex >= 0 ? _currentPlayingIndex + 1 : 0);
+					}
+				}
+
+				// Inserisci gli elementi della playlist a partire da insertIndex
+				int currentInsert = insertIndex;
+				foreach (var pItem in playlist.Items)
+				{
+					var queueItem = ConvertPlaylistItem(pItem);
+					if (queueItem != null)
+					{
+						queueItem.IsFromPlaylist = true;
+						_items.Insert(currentInsert, queueItem);
+						currentInsert++;
+					}
+				}
+			}
+			else
+			{
+				// Accoda: aggiunge tutti gli elementi in fondo
+				foreach (var pItem in playlist.Items)
+				{
+					var queueItem = ConvertPlaylistItem(pItem);
+					if (queueItem != null)
+					{
+						queueItem.IsFromPlaylist = true;
+						_items.Add(queueItem);
+					}
+				}
+			}
+
+			RecalculateScheduledTimes();
+			UpdateScrollBar();
+			this.Invalidate();
+			NotifyQueueCountChanged();
+
+			Log($"[LoadPlaylistOnAir] Completato. Elementi in coda: {_items.Count}");
+		}
+
+		private PlaylistQueueItem ConvertPlaylistItem(AirPlaylistItem pItem)
+		{
+			try
+			{
+				switch (pItem.Type)
+				{
+					case AirPlaylistItemType.Track:
+					{
+						var allMusic = DbcManager.LoadFromCsv<MusicEntry>("Music.dbc");
+						var entry = allMusic.FirstOrDefault(m =>
+							string.Equals(m.FilePath, pItem.FilePath, StringComparison.OrdinalIgnoreCase));
+						if (entry != null)
+							return CreateMusicQueueItem(entry);
+
+						Log($"[ConvertPlaylistItem] Track non trovata nel DB: {pItem.FilePath}");
+						return null;
+					}
+
+					case AirPlaylistItemType.Clip:
+					{
+						var allClips = DbcManager.LoadFromCsv<ClipEntry>("Clips.dbc");
+						var entry = allClips.FirstOrDefault(c =>
+							string.Equals(c.FilePath, pItem.FilePath, StringComparison.OrdinalIgnoreCase));
+						if (entry != null)
+							return CreateClipQueueItem(entry);
+
+						Log($"[ConvertPlaylistItem] Clip non trovata nel DB: {pItem.FilePath}");
+						return null;
+					}
+
+					case AirPlaylistItemType.Category:
+					{
+						string categoryName = pItem.CategoryName ?? "";
+						if (categoryName.Contains(" / "))
+						{
+							// Regola combinata Categoria+Genere
+							string combined = categoryName.Replace(" / ", " + ");
+							return GetRandomMusicByCategoryAndGenre(combined, pItem.YearFilterEnabled, pItem.YearFrom, pItem.YearTo);
+						}
+						return GetRandomItemByCategory(categoryName, "Music", pItem.YearFilterEnabled, pItem.YearFrom, pItem.YearTo);
+					}
+
+					case AirPlaylistItemType.Genre:
+					{
+						string genreName = pItem.CategoryName ?? "";
+						return GetRandomMusicByGenre(genreName, pItem.YearFilterEnabled, pItem.YearFrom, pItem.YearTo);
+					}
+
+					default:
+						Log($"[ConvertPlaylistItem] Tipo non gestito: {pItem.Type}");
+						return null;
+				}
+			}
+			catch (Exception ex)
+			{
+				Log($"[ConvertPlaylistItem] Errore conversione item '{pItem.Title}': {ex.Message}");
+				return null;
+			}
+		}
+
+
 		public void RemoveItem(int index)
 		{
 			if (index >= 0 && index < _items.Count)
@@ -3587,6 +3746,7 @@ namespace AirDirector.Controls
 		public int FileDurationMs { get; set; }
 
 		public bool IsScheduled { get; set; }
+		public bool IsFromPlaylist { get; set; }
 		public MusicEntry OriginalMusicEntry { get; set; }
 
 		public int ADVSpotCount { get; set; }
@@ -3631,6 +3791,7 @@ namespace AirDirector.Controls
 			MarkerOUT = 0;
 
 			IsScheduled = false;
+			IsFromPlaylist = false;
 			OriginalMusicEntry = null;
 			ADVSpotCount = 0;
 			ADVFileCount = 0;
