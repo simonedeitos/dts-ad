@@ -24,6 +24,7 @@ namespace AirDirector.Forms
 
         // ── Data ────────────────────────────────────────────────────────────
         private List<PlaylistEntry> _allEntries = new List<PlaylistEntry>();
+        private bool _isUpdatingPlaceholder = false;
 
         private class PlaylistEntry
         {
@@ -90,16 +91,32 @@ namespace AirDirector.Forms
             {
                 if (_txtSearch.ForeColor == Color.FromArgb(150, 150, 150))
                 {
-                    _txtSearch.Text = "";
-                    _txtSearch.ForeColor = Color.White;
+                    _isUpdatingPlaceholder = true;
+                    try
+                    {
+                        _txtSearch.Text = "";
+                        _txtSearch.ForeColor = Color.White;
+                    }
+                    finally
+                    {
+                        _isUpdatingPlaceholder = false;
+                    }
                 }
             };
             _txtSearch.LostFocus += (s, e) =>
             {
                 if (string.IsNullOrWhiteSpace(_txtSearch.Text))
                 {
-                    _txtSearch.Text = LanguageManager.GetString("LoadPlaylistOnAir.SearchPlaceholder", "Cerca playlist...");
-                    _txtSearch.ForeColor = Color.FromArgb(150, 150, 150);
+                    _isUpdatingPlaceholder = true;
+                    try
+                    {
+                        _txtSearch.ForeColor = Color.FromArgb(150, 150, 150);
+                        _txtSearch.Text = LanguageManager.GetString("LoadPlaylistOnAir.SearchPlaceholder", "Cerca playlist...");
+                    }
+                    finally
+                    {
+                        _isUpdatingPlaceholder = false;
+                    }
                 }
             };
             _txtSearch.TextChanged += (s, e) => FilterGrid();
@@ -250,6 +267,9 @@ namespace AirDirector.Forms
 
         private void FilterGrid()
         {
+            if (_isUpdatingPlaceholder)
+                return;
+
             string search = _txtSearch.ForeColor == Color.FromArgb(150, 150, 150)
                 ? ""
                 : (_txtSearch.Text ?? "").Trim();
