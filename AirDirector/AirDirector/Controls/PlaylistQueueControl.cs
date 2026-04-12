@@ -3126,7 +3126,7 @@ namespace AirDirector.Controls
 				using (Font introFont = new Font("Segoe UI", 9, FontStyle.Regular))
 				using (SolidBrush introBrush = new SolidBrush(Color.FromArgb(180, textColor)))
 				{
-					string introText = $"INTRO-IN: {item.Intro.TotalSeconds:F1}s";
+					string introText = $"INTRO: {item.Intro.TotalSeconds:F1}s";
 					SizeF introSize = g.MeasureString(introText, introFont);
 					g.DrawString(introText, introFont, introBrush,
 						contentRect.Right - introSize.Width - CONTENT_PADDING, contentRect.Y + 6);
