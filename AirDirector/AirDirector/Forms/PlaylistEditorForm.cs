@@ -184,8 +184,6 @@ namespace AirDirector.Forms
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
                 BackColor = Color.FromArgb(25, 25, 25),
-                Panel1MinSize = 400,
-                Panel2MinSize = 300,
                 FixedPanel = FixedPanel.None
             };
 
@@ -197,7 +195,12 @@ namespace AirDirector.Forms
 
             this.Load += (s, e) =>
             {
-                try { mainSplit.SplitterDistance = (int)(mainSplit.Width * 0.55); }
+                try
+                {
+                    mainSplit.Panel1MinSize = 400;
+                    mainSplit.Panel2MinSize = 300;
+                    mainSplit.SplitterDistance = (int)(mainSplit.Width * 0.55);
+                }
                 catch (InvalidOperationException) { }
             };
         }
