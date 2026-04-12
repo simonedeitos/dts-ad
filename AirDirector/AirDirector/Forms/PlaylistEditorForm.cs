@@ -393,7 +393,6 @@ namespace AirDirector.Forms
             _txtMusicSearch = CreateSearchBox(LanguageManager.GetString("PlaylistEditor.SearchPlaceholder", "Cerca artista o titolo..."));
             _txtMusicSearch.Dock = DockStyle.Top;
             _txtMusicSearch.TextChanged += (s, e) => ApplyMusicFilter();
-            page.Controls.Add(_txtMusicSearch);
 
             // Filter row
             Panel filterRow = new Panel { Height = 30, Dock = DockStyle.Top, BackColor = Color.Transparent };
@@ -413,7 +412,6 @@ namespace AirDirector.Forms
             _cmbMusicGenre.SelectedIndexChanged += (s, e) => ApplyMusicFilter();
 
             filterRow.Controls.AddRange(new Control[] { lblCat, _cmbMusicCategory, lblGen, _cmbMusicGenre });
-            page.Controls.Add(filterRow);
 
             // DataGridView
             _dgvMusic = CreateArchiveDgv();
@@ -425,14 +423,18 @@ namespace AirDirector.Forms
             _dgvMusic.DoubleClick += (s, e) => AddSelectedMusicToPlaylist();
             _dgvMusic.MouseDown += DgvMusic_MouseDown;
             _dgvMusic.MouseMove += DgvMusic_MouseMove;
-            page.Controls.Add(_dgvMusic);
 
             // Add button
             _btnAddMusic = CreateButton(LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "➤ Aggiungi"), Color.FromArgb(33, 150, 83));
             _btnAddMusic.Dock = DockStyle.Bottom;
             _btnAddMusic.Height = 30;
             _btnAddMusic.Click += (s, e) => AddSelectedMusicToPlaylist();
-            page.Controls.Add(_btnAddMusic);
+
+            // Correct WinForms docking order: Bottom first, then Top controls, then Fill last
+            page.Controls.Add(_btnAddMusic);       // Dock=Bottom
+            page.Controls.Add(filterRow);          // Dock=Top
+            page.Controls.Add(_txtMusicSearch);    // Dock=Top
+            page.Controls.Add(_dgvMusic);          // Dock=Fill (must be last)
 
             ApplyMusicFilter();
             return page;
@@ -446,7 +448,6 @@ namespace AirDirector.Forms
             _txtClipSearch = CreateSearchBox(LanguageManager.GetString("PlaylistEditor.SearchPlaceholder", "Cerca artista o titolo..."));
             _txtClipSearch.Dock = DockStyle.Top;
             _txtClipSearch.TextChanged += (s, e) => ApplyClipFilter();
-            page.Controls.Add(_txtClipSearch);
 
             Panel filterRow = new Panel { Height = 30, Dock = DockStyle.Top, BackColor = Color.Transparent };
             Label lblCat = new Label { Text = LanguageManager.GetString("PlaylistEditor.FilterCategory", "Categoria:"), ForeColor = Color.White, Width = 70, Left = 0, Top = 5, Height = 22, TextAlign = ContentAlignment.MiddleLeft };
@@ -464,7 +465,6 @@ namespace AirDirector.Forms
             _cmbClipGenre.SelectedIndexChanged += (s, e) => ApplyClipFilter();
 
             filterRow.Controls.AddRange(new Control[] { lblCat, _cmbClipCategory, lblGen, _cmbClipGenre });
-            page.Controls.Add(filterRow);
 
             _dgvClips = CreateArchiveDgv();
             _dgvClips.Columns.Add(new DataGridViewTextBoxColumn { Name = "Title", HeaderText = "Titolo", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
@@ -474,13 +474,17 @@ namespace AirDirector.Forms
             _dgvClips.DoubleClick += (s, e) => AddSelectedClipToPlaylist();
             _dgvClips.MouseDown += DgvClips_MouseDown;
             _dgvClips.MouseMove += DgvClips_MouseMove;
-            page.Controls.Add(_dgvClips);
 
             _btnAddClip = CreateButton(LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "➤ Aggiungi"), Color.FromArgb(33, 150, 83));
             _btnAddClip.Dock = DockStyle.Bottom;
             _btnAddClip.Height = 30;
             _btnAddClip.Click += (s, e) => AddSelectedClipToPlaylist();
-            page.Controls.Add(_btnAddClip);
+
+            // Correct WinForms docking order: Bottom first, then Top controls, then Fill last
+            page.Controls.Add(_btnAddClip);        // Dock=Bottom
+            page.Controls.Add(filterRow);          // Dock=Top
+            page.Controls.Add(_txtClipSearch);     // Dock=Top
+            page.Controls.Add(_dgvClips);          // Dock=Fill (must be last)
 
             ApplyClipFilter();
             return page;
@@ -497,13 +501,15 @@ namespace AirDirector.Forms
             _dgvPlaylists.Columns.Add(new DataGridViewTextBoxColumn { Name = "Items", HeaderText = "Elementi", Width = 70 });
             _dgvPlaylists.Dock = DockStyle.Fill;
             _dgvPlaylists.DoubleClick += (s, e) => OpenSelectedPlaylist();
-            page.Controls.Add(_dgvPlaylists);
 
             _btnDeletePlaylist = CreateButton(LanguageManager.GetString("PlaylistEditor.DeletePlaylist", "Elimina"), Color.FromArgb(150, 60, 60));
             _btnDeletePlaylist.Dock = DockStyle.Bottom;
             _btnDeletePlaylist.Height = 30;
             _btnDeletePlaylist.Click += BtnDeletePlaylist_Click;
-            page.Controls.Add(_btnDeletePlaylist);
+
+            // Correct WinForms docking order: Bottom first, then Fill last
+            page.Controls.Add(_btnDeletePlaylist);  // Dock=Bottom
+            page.Controls.Add(_dgvPlaylists);       // Dock=Fill (must be last)
 
             RefreshPlaylistList();
             return page;
