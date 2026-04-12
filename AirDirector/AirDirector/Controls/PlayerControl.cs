@@ -131,6 +131,7 @@ namespace AirDirector.Controls
         public string CurrentTitle { get; private set; } = "";
         public bool IsCurrentlyPlaying => _isPlaying && !_isPaused;
         public int CurrentPositionMs => (int)_currentPosition.TotalMilliseconds;
+        public int CurrentMarkerIN => _markerIN;
         public int CurrentMarkerINTRO => _markerINTRO;
         public int CurrentMarkerMIX => _markerMIX;
 
