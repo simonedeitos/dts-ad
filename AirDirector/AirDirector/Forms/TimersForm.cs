@@ -166,7 +166,7 @@ namespace AirDirector.Forms
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 18f, FontStyle.Bold),
                 BackColor = Color.Transparent,
-                Text = "--",
+                Text = "",
                 Padding = Padding.Empty,
                 UseMnemonic = false
             };
@@ -179,7 +179,7 @@ namespace AirDirector.Forms
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 16f, FontStyle.Bold),
                 BackColor = Color.Transparent,
-                Text = "--",
+                Text = "",
                 Padding = Padding.Empty,
                 UseMnemonic = false
             };
@@ -250,7 +250,7 @@ namespace AirDirector.Forms
                 Height = 40,
                 BackColor = Color.Transparent,
                 UseMnemonic = false,
-                Text = "--"
+                Text = ""
             };
 
             _lblClockText = new Label
@@ -292,7 +292,7 @@ namespace AirDirector.Forms
                 Height = 40,
                 AutoEllipsis = true,
                 BackColor = Color.Transparent,
-                Text = "--",
+                Text = "",
                 UseMnemonic = false
             };
             _lblScheduleCountdown = new Label
@@ -334,7 +334,7 @@ namespace AirDirector.Forms
                 Height = 40,
                 AutoEllipsis = true,
                 BackColor = Color.Transparent,
-                Text = "--",
+                Text = "",
                 UseMnemonic = false
             };
             _lblAdCountdown = new Label
@@ -556,8 +556,8 @@ namespace AirDirector.Forms
             float artistMaxSize = Math.Max(10f, Math.Min(36f, rowH * 0.16f));
             float titleMaxSize  = Math.Max(9f,  Math.Min(30f, rowH * 0.14f));
 
-            string artistText = !string.IsNullOrEmpty(current.Artist) ? current.Artist : "--";
-            string titleText  = !string.IsNullOrEmpty(current.Title)  ? current.Title  : "--";
+            string artistText = !string.IsNullOrEmpty(current.Artist) ? current.Artist : "";
+            string titleText  = !string.IsNullOrEmpty(current.Title)  ? current.Title  : "";
 
             AutoFitLabel(_lblOnAirArtist, artistText, artistMaxSize);
             AutoFitLabel(_lblOnAirTitle,  titleText,  titleMaxSize);
