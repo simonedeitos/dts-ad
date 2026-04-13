@@ -105,7 +105,7 @@ namespace AirDirector.Forms
         private void ApplyLanguage()
         {
             this.Text = LanguageManager.GetString("TimersForm.Title", "Timers");
-            _lblScheduleHeader.Text = LanguageManager.GetString("TimersForm.NextSchedule", "📅 DATA E ORA");
+            _lblScheduleHeader.Text = LanguageManager.GetString("TimersForm.DateAndTime", "📅 DATA E ORA");
             _lblAdHeader.Text = LanguageManager.GetString("TimersForm.NextAd", "📢 PROSSIMA PUBBLICITÀ");
             _lblIntroCountdown.Parent?.Invalidate();
             _lblMixCountdown.Parent?.Invalidate();
