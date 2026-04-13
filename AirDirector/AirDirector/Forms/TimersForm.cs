@@ -47,11 +47,16 @@ namespace AirDirector.Forms
         private Panel _pnlProgressBar;
         private float _trackProgress = 0f;
 
-        // Row 1 – Date & Clock (full width)
+        // Row 1 – Date & Clock (right column)
         private Panel _pnlDateTime;
         private Label _lblDateText;
         private Label _lblClockText;
         private float _dateMaxFontSize = 14f; // updated by ResizeFonts
+
+        // Row 1 – split 50/50 (Queue preview + Date/Clock)
+        private TableLayoutPanel _row1Split;
+        private Panel _pnlQueueNext;
+        private Label[] _lblQueueNext = new Label[3];
 
         // Row 2 – split 50/50
         private TableLayoutPanel _row2Split;
@@ -133,8 +138,8 @@ namespace AirDirector.Forms
                 CellBorderStyle = TableLayoutPanelCellBorderStyle.Single
             };
             _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 34f));
-            _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 22f));
-            _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 44f));
+            _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 30f)); // Row 1 - Date & Clock
+            _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 36f)); // Row 2 - Schedule/Ad
             _mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 
             // ── Row 0: On Air ──────────────────────────────────────────────────
@@ -233,7 +238,46 @@ namespace AirDirector.Forms
 
             _pnlOnAir.Controls.Add(_onAirGrid);
 
-            // ── Row 1: Date & Clock (full width) ──────────────────────────────
+            // ── Row 1 Left: Queue preview ──────────────────────────────────────
+            _pnlQueueNext = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(20, 22, 30),
+                Padding = new Padding(6, 4, 6, 4)
+            };
+
+            var queueGrid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                RowCount = 3,
+                ColumnCount = 1,
+                BackColor = Color.Transparent
+            };
+            queueGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
+            queueGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
+            queueGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.34f));
+            queueGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+
+            for (int i = 0; i < 3; i++)
+            {
+                _lblQueueNext[i] = new Label
+                {
+                    Dock = DockStyle.Fill,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    ForeColor = Color.White,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 11f, FontStyle.Regular),
+                    Text = $"| {i + 2} |  --",
+                    UseMnemonic = false,
+                    AutoEllipsis = true,
+                    Padding = new Padding(4, 0, 0, 0)
+                };
+                queueGrid.Controls.Add(_lblQueueNext[i], 0, i);
+            }
+
+            _pnlQueueNext.Controls.Add(queueGrid);
+
+            // ── Row 1 Right: Date & Clock ──────────────────────────────────────
             _pnlDateTime = new Panel
             {
                 Dock = DockStyle.Fill,
@@ -265,6 +309,21 @@ namespace AirDirector.Forms
 
             _pnlDateTime.Controls.Add(_lblClockText);
             _pnlDateTime.Controls.Add(_lblDateText);
+
+            // ── Row 1: Split 50/50 ─────────────────────────────────────────────
+            _row1Split = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                RowCount = 1,
+                ColumnCount = 2,
+                BackColor = Color.FromArgb(20, 20, 20),
+                CellBorderStyle = TableLayoutPanelCellBorderStyle.Single
+            };
+            _row1Split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            _row1Split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            _row1Split.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            _row1Split.Controls.Add(_pnlQueueNext, 0, 0);
+            _row1Split.Controls.Add(_pnlDateTime, 1, 0);
 
             // ── Row 2 Left: Next Schedule ──────────────────────────────────────
             _pnlSchedule = new Panel
@@ -367,7 +426,7 @@ namespace AirDirector.Forms
 
             // Assemble main layout
             _mainLayout.Controls.Add(_pnlOnAir, 0, 0);
-            _mainLayout.Controls.Add(_pnlDateTime, 0, 1);
+            _mainLayout.Controls.Add(_row1Split, 0, 1);
             _mainLayout.Controls.Add(_row2Split, 0, 2);
 
             this.Controls.Add(_mainLayout);
@@ -436,6 +495,24 @@ namespace AirDirector.Forms
 
                 int dateLabelH = Math.Max(16, Math.Min(50, (int)(dateRowH * 0.35f)));
                 _lblDateText.Height = dateLabelH;
+            }
+
+            // Scale queue preview labels
+            if (_lblQueueNext != null && _pnlQueueNext != null)
+            {
+                float queueRowH = Math.Max(20f, _pnlQueueNext.Height > 0 ? _pnlQueueNext.Height / 3f : 40f);
+                float queueFontSize = Math.Max(7f, Math.Min(16f, queueRowH * 0.35f));
+                foreach (var lbl in _lblQueueNext)
+                {
+                    if (lbl == null) continue;
+                    try
+                    {
+                        var old = lbl.Font;
+                        lbl.Font = new Font("Segoe UI", queueFontSize, FontStyle.Regular);
+                        old?.Dispose();
+                    }
+                    catch { }
+                }
             }
 
             // Invalidate intro/mix panels to redraw paint header
@@ -524,6 +601,7 @@ namespace AirDirector.Forms
 
             UpdateOnAir();
             UpdateDateTime();
+            UpdateQueuePanel();
             UpdateNextSchedule();
             UpdateNextAd();
         }
@@ -589,14 +667,17 @@ namespace AirDirector.Forms
                 SetNoIntro();
             }
 
-            // MIX countdown
-            int mixMarker = _isRadioTVMode
+            // MIX countdown: get from player (PlayerControl already falls back to total duration when marker is 0)
+            int playerMixMarker = _isRadioTVMode
                 ? (_playerControlVideo?.CurrentMarkerMIX ?? 0)
                 : (_playerControl?.CurrentMarkerMIX ?? 0);
 
-            if (mixMarker > 0 && posMs < mixMarker)
+            // Fallback for files without markers (scheduled files, ADV, etc.): use item duration
+            int effectiveMixMarker = playerMixMarker > 0 ? playerMixMarker : (int)current.Duration.TotalMilliseconds;
+
+            if (effectiveMixMarker > 0 && posMs < effectiveMixMarker)
             {
-                _lblMixCountdown.Text = FormatMs(mixMarker - posMs);
+                _lblMixCountdown.Text = FormatMs(effectiveMixMarker - posMs);
                 _lblMixCountdown.ForeColor = Color.Red;
             }
             else
@@ -604,8 +685,10 @@ namespace AirDirector.Forms
                 SetNoMix();
             }
 
-            // Progress bar
-            UpdateProgress(posMs, current.MarkerIN, current.MarkerMIX);
+            // Progress bar: when item has no markers, use full duration as range
+            int progressIN  = current.MarkerMIX > 0 ? current.MarkerIN  : 0;
+            int progressMIX = current.MarkerMIX > 0 ? current.MarkerMIX : effectiveMixMarker;
+            UpdateProgress(posMs, progressIN, progressMIX);
         }
 
         private void UpdateProgress(int posMs, int markerIN, int markerMIX)
@@ -677,6 +760,44 @@ namespace AirDirector.Forms
             catch
             {
                 _lblClockText.Text = "--:--:--";
+            }
+        }
+
+        // ─── Queue Preview (Row 1 Left) ─────────────────────────────────────────
+        private void UpdateQueuePanel()
+        {
+            if (_lblQueueNext == null) return;
+
+            if (_playlistQueue == null)
+            {
+                for (int i = 0; i < _lblQueueNext.Length; i++)
+                    if (_lblQueueNext[i] != null)
+                        _lblQueueNext[i].Text = $"| {i + 2} |  --";
+                return;
+            }
+
+            var current = _playlistQueue.GetCurrentPlayingItem();
+            var allItems = _playlistQueue.GetAllItems();
+            int currentIdx = current != null ? allItems.IndexOf(current) : -1;
+
+            for (int i = 0; i < 3; i++)
+            {
+                if (_lblQueueNext[i] == null) continue;
+                int nextIdx = currentIdx + 1 + i;
+                if (currentIdx >= 0 && nextIdx < allItems.Count)
+                {
+                    var item = allItems[nextIdx];
+                    string artist = item.Artist ?? "";
+                    string title  = item.Title  ?? "";
+                    string display = string.IsNullOrEmpty(artist)
+                        ? (string.IsNullOrEmpty(title) ? "--" : title)
+                        : (string.IsNullOrEmpty(title) ? artist : $"{artist} - {title}");
+                    _lblQueueNext[i].Text = $"| {i + 2} |  {display}";
+                }
+                else
+                {
+                    _lblQueueNext[i].Text = $"| {i + 2} |  --";
+                }
             }
         }
 
