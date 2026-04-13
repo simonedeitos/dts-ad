@@ -56,7 +56,7 @@ namespace AirDirector.Forms
         // Row 1 – split 50/50 (Queue preview + Date/Clock)
         private TableLayoutPanel _row1Split;
         private Panel _pnlQueueNext;
-        private Label[] _lblQueueNext = new Label[3];
+        private Label[] _lblQueueNext = new Label[4];
 
         // Row 2 – split 50/50
         private TableLayoutPanel _row2Split;
@@ -249,17 +249,45 @@ namespace AirDirector.Forms
             var queueGrid = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                RowCount = 3,
+                RowCount = 4,
                 ColumnCount = 1,
                 BackColor = Color.Transparent
             };
-            queueGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
-            queueGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
-            queueGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.34f));
+            queueGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 25f));
+            queueGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 25f));
+            queueGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 25f));
+            queueGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 25f));
             queueGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 4; i++)
             {
+                // Each row: mini TableLayoutPanel with number box + text label
+                var rowLayout = new TableLayoutPanel
+                {
+                    Dock = DockStyle.Fill,
+                    RowCount = 1,
+                    ColumnCount = 2,
+                    BackColor = Color.Transparent,
+                    Margin = new Padding(0, 1, 0, 1)
+                };
+                rowLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 38f));
+                rowLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+                rowLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+                // Number box (left column)
+                var numLabel = new Label
+                {
+                    Dock = DockStyle.Fill,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    ForeColor = Color.White,
+                    BackColor = Color.FromArgb(30, 40, 65),
+                    Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+                    Text = $"{i + 2}",
+                    UseMnemonic = false,
+                    BorderStyle = BorderStyle.FixedSingle
+                };
+
+                // Text label (right column) — Artista - Titolo
                 _lblQueueNext[i] = new Label
                 {
                     Dock = DockStyle.Fill,
@@ -267,12 +295,15 @@ namespace AirDirector.Forms
                     ForeColor = Color.White,
                     BackColor = Color.Transparent,
                     Font = new Font("Segoe UI", 11f, FontStyle.Regular),
-                    Text = $"| {i + 2} |  --",
+                    Text = "--",
                     UseMnemonic = false,
-                    AutoEllipsis = true,
-                    Padding = new Padding(4, 0, 0, 0)
+                    AutoEllipsis = false,
+                    Padding = new Padding(4, 0, 4, 0)
                 };
-                queueGrid.Controls.Add(_lblQueueNext[i], 0, i);
+
+                rowLayout.Controls.Add(numLabel, 0, 0);
+                rowLayout.Controls.Add(_lblQueueNext[i], 1, 0);
+                queueGrid.Controls.Add(rowLayout, 0, i);
             }
 
             _pnlQueueNext.Controls.Add(queueGrid);
@@ -490,28 +521,35 @@ namespace AirDirector.Forms
                 _dateMaxFontSize = Math.Max(10f, Math.Min(30f, dateRowH * 0.25f));
                 AutoFitLabel(_lblDateText, _lblDateText.Text, _dateMaxFontSize);
 
-                float clockSize = Math.Max(12f, Math.Min(80f, Math.Min(dateRowH * 0.40f, formW * 0.18f)));
-                ScaleCountdown(_lblClockText, clockSize);
-
                 int dateLabelH = Math.Max(16, Math.Min(50, (int)(dateRowH * 0.35f)));
                 _lblDateText.Height = dateLabelH;
+
+                // Auto-fit clock font using both width and height of the panel
+                float availW = Math.Max(20f, _pnlDateTime.ClientSize.Width - _pnlDateTime.Padding.Horizontal);
+                float availH = Math.Max(20f, _pnlDateTime.ClientSize.Height - dateLabelH - _pnlDateTime.Padding.Vertical);
+                float clockMax = Math.Max(12f, Math.Min(160f, Math.Min(availH * 0.75f, availW * 0.25f)));
+                float clockSize = clockMax;
+                while (clockSize > 12f)
+                {
+                    using (var testFont = new Font(_countdownFontFamily, clockSize, FontStyle.Bold))
+                    {
+                        var sz = TextRenderer.MeasureText("00:00:00", testFont);
+                        if (sz.Width <= availW - 8 && sz.Height <= availH - 8)
+                            break;
+                    }
+                    clockSize -= 1f;
+                }
+                ScaleCountdown(_lblClockText, clockSize);
             }
 
             // Scale queue preview labels
             if (_lblQueueNext != null && _pnlQueueNext != null)
             {
-                float queueRowH = Math.Max(20f, _pnlQueueNext.Height > 0 ? _pnlQueueNext.Height / 3f : 40f);
-                float queueFontSize = Math.Max(7f, Math.Min(16f, queueRowH * 0.35f));
+                float queueMaxFontSize = GetQueueMaxFontSize();
                 foreach (var lbl in _lblQueueNext)
                 {
                     if (lbl == null) continue;
-                    try
-                    {
-                        var old = lbl.Font;
-                        lbl.Font = new Font("Segoe UI", queueFontSize, FontStyle.Regular);
-                        old?.Dispose();
-                    }
-                    catch { }
+                    AutoFitLabel(lbl, lbl.Text, queueMaxFontSize);
                 }
             }
 
@@ -580,6 +618,13 @@ namespace AirDirector.Forms
                 float y = 2f;
                 g.DrawString(text, font, brush, x, y);
             }
+        }
+
+        private float GetQueueMaxFontSize()
+        {
+            float rowH = Math.Max(20f, _pnlQueueNext != null && _pnlQueueNext.Height > 0
+                ? _pnlQueueNext.Height / 4f : 40f);
+            return Math.Max(7f, Math.Min(16f, rowH * 0.35f));
         }
 
         // ─── Timer Tick ─────────────────────────────────────────────────────────
@@ -772,7 +817,7 @@ namespace AirDirector.Forms
             {
                 for (int i = 0; i < _lblQueueNext.Length; i++)
                     if (_lblQueueNext[i] != null)
-                        _lblQueueNext[i].Text = $"| {i + 2} |  --";
+                        _lblQueueNext[i].Text = "--";
                 return;
             }
 
@@ -780,24 +825,39 @@ namespace AirDirector.Forms
             var allItems = _playlistQueue.GetAllItems();
             int currentIdx = current != null ? allItems.IndexOf(current) : -1;
 
-            for (int i = 0; i < 3; i++)
+            float maxFontSize = GetQueueMaxFontSize();
+
+            // Slot 0 (number "2"): show current playing item
+            if (_lblQueueNext[0] != null)
+            {
+                string display0 = "--";
+                if (current != null)
+                {
+                    string artist = current.Artist ?? "";
+                    string title  = current.Title  ?? "";
+                    display0 = string.IsNullOrEmpty(artist)
+                        ? (string.IsNullOrEmpty(title) ? "--" : title)
+                        : (string.IsNullOrEmpty(title) ? artist : $"{artist} - {title}");
+                }
+                AutoFitLabel(_lblQueueNext[0], display0, maxFontSize);
+            }
+
+            // Slots 1-3 (numbers "3","4","5"): show next items in queue
+            for (int i = 1; i < 4; i++)
             {
                 if (_lblQueueNext[i] == null) continue;
-                int nextIdx = currentIdx + 1 + i;
+                int nextIdx = currentIdx + i;
+                string display = "--";
                 if (currentIdx >= 0 && nextIdx < allItems.Count)
                 {
                     var item = allItems[nextIdx];
                     string artist = item.Artist ?? "";
                     string title  = item.Title  ?? "";
-                    string display = string.IsNullOrEmpty(artist)
+                    display = string.IsNullOrEmpty(artist)
                         ? (string.IsNullOrEmpty(title) ? "--" : title)
                         : (string.IsNullOrEmpty(title) ? artist : $"{artist} - {title}");
-                    _lblQueueNext[i].Text = $"| {i + 2} |  {display}";
                 }
-                else
-                {
-                    _lblQueueNext[i].Text = $"| {i + 2} |  --";
-                }
+                AutoFitLabel(_lblQueueNext[i], display, maxFontSize);
             }
         }
 
