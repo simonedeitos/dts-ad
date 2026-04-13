@@ -51,6 +51,7 @@ namespace AirDirector.Forms
         private Panel _pnlDateTime;
         private Label _lblDateText;
         private Label _lblClockText;
+        private float _dateMaxFontSize = 14f; // updated by ResizeFonts
 
         // Row 2 – split 50/50
         private TableLayoutPanel _row2Split;
@@ -427,8 +428,8 @@ namespace AirDirector.Forms
             if (_pnlDateTime != null)
             {
                 float dateRowH = Math.Max(40f, _pnlDateTime.Height);
-                float dateMaxSize = Math.Max(10f, Math.Min(30f, dateRowH * 0.25f));
-                AutoFitLabel(_lblDateText, _lblDateText.Text, dateMaxSize);
+                _dateMaxFontSize = Math.Max(10f, Math.Min(30f, dateRowH * 0.25f));
+                AutoFitLabel(_lblDateText, _lblDateText.Text, _dateMaxFontSize);
 
                 float clockSize = Math.Max(12f, Math.Min(80f, Math.Min(dateRowH * 0.40f, formW * 0.18f)));
                 ScaleCountdown(_lblClockText, clockSize);
@@ -667,13 +668,8 @@ namespace AirDirector.Forms
                 DateTime now = DateTime.Now;
                 var culture = new System.Globalization.CultureInfo("it-IT");
 
-                string dayName   = culture.TextInfo.ToTitleCase(now.ToString("dddd", culture));
-                string monthName = culture.TextInfo.ToTitleCase(now.ToString("MMMM", culture));
-                string dateText  = $"{dayName} {now.Day:00} {monthName}, {now.Year}";
-
-                float rowH = _pnlDateTime != null ? Math.Max(40f, _pnlDateTime.Height) : 80f;
-                float maxDateSize = Math.Max(10f, Math.Min(30f, rowH * 0.25f));
-                AutoFitLabel(_lblDateText, dateText, maxDateSize);
+                string dateText = culture.TextInfo.ToTitleCase(now.ToString("dddd d MMMM, yyyy", culture));
+                AutoFitLabel(_lblDateText, dateText, _dateMaxFontSize);
 
                 _lblClockText.Text = now.ToString("HH:mm:ss");
                 _lblClockText.ForeColor = Color.White;
