@@ -413,8 +413,11 @@ namespace AirDirector.Controls
 					reloadReason = $"{now.Hour:D2}:00 - Verifica oraria";
 				}
 
+				bool isMidnightReload = false;
+
 				if (shouldReload)
 				{
+					isMidnightReload = (reloadReason == "Cambio data" || reloadReason == "00:00 - Fallback mezzanotte");
 					Log($"[PlaylistADV] 🔄 Ricarica palinsesto: {reloadReason}");
 					LoadAdvCache();
 				}
@@ -423,6 +426,12 @@ namespace AirDirector.Controls
 				{
 					LoadNextDaySchedules();
 					CalculateNextDayScheduleLoadTime();
+				}
+
+				if (isMidnightReload)
+				{
+					CatchUpMissedSchedules(now);
+					CatchUpMissedADVSchedules(now);
 				}
 
 				LookAheadAndExecuteSchedules(now);
@@ -578,6 +587,88 @@ namespace AirDirector.Controls
 			catch (Exception ex)
 			{
 				Log($"[PlaylistADV] ❌ Errore LookAhead ADV: {ex.Message}");
+			}
+		}
+
+		// Recupera schedulazioni mancate tra 00:00:00 e now (solo entro i primi 2 minuti dalla mezzanotte).
+		private void CatchUpMissedSchedules(DateTime now)
+		{
+			try
+			{
+				TimeSpan catchUpLimit = TimeSpan.FromMinutes(2);
+				if (now.TimeOfDay > catchUpLimit) return;
+
+				int currentDayOfWeek = (int)now.DayOfWeek;
+				var schedules = DbcManager.LoadFromCsv<ScheduleEntry>("Schedules.dbc");
+				var activeSchedules = schedules
+					.Where(s => s.IsEnabled == 1 && IsDayEnabled(s, currentDayOfWeek))
+					.ToList();
+
+				if (activeSchedules.Count == 0) return;
+
+				TimeSpan windowEnd = now.TimeOfDay;
+
+				foreach (var schedule in activeSchedules)
+				{
+					var times = schedule.Times.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+
+					foreach (var timeStr in times)
+					{
+						if (!TimeSpan.TryParse(timeStr, out TimeSpan scheduleTime)) continue;
+						if (scheduleTime > windowEnd) continue;
+
+						string scheduleKey = $"{schedule.Type}_{schedule.Name}_{timeStr}_{now:yyyy-MM-dd}";
+						if (_executedSchedules.Contains(scheduleKey)) continue;
+
+						Log($"[Schedules] 🔄 Catch-up: {schedule.Name} @ {timeStr} (mancata durante reload)");
+						_executedSchedules.Add(scheduleKey);
+						_isInitialStartup = false;
+						_pendingScheduleVideoBufferPath = schedule.VideoBufferPath ?? "";
+						ExecuteSchedule(schedule);
+						_pendingScheduleVideoBufferPath = "";
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Log($"[Schedules] ❌ Errore CatchUp Schedules: {ex.Message}");
+			}
+		}
+
+		// Recupera slot ADV mancati tra 00:00:00 e now (solo entro i primi 2 minuti dalla mezzanotte).
+		private void CatchUpMissedADVSchedules(DateTime now)
+		{
+			try
+			{
+				TimeSpan catchUpLimit = TimeSpan.FromMinutes(2);
+				if (now.TimeOfDay > catchUpLimit) return;
+
+				if (_cachedAdvItems.Count == 0) return;
+
+				var todaySlots = _cachedAdvItems
+					.Where(a => a.Date.Date == now.Date && a.IsActive)
+					.GroupBy(a => a.SlotTime)
+					.Select(g => new { SlotTime = g.Key, Items = g.OrderBy(x => x.SequenceOrder).ToList() })
+					.ToList();
+
+				TimeSpan windowEnd = now.TimeOfDay;
+
+				foreach (var slot in todaySlots)
+				{
+					if (!TimeSpan.TryParse(slot.SlotTime, out TimeSpan slotTime)) continue;
+					if (slotTime > windowEnd) continue;
+
+					string advKey = $"ADV_{slot.SlotTime}_{now:yyyy-MM-dd}";
+					if (_executedSchedules.Contains(advKey)) continue;
+
+					Log($"[PlaylistADV] 🔄 Catch-up ADV slot {slot.SlotTime} (mancato durante reload)");
+					_executedSchedules.Add(advKey);
+					ExecuteADVSlot(now, slot.SlotTime, slot.Items);
+				}
+			}
+			catch (Exception ex)
+			{
+				Log($"[PlaylistADV] ❌ Errore CatchUp ADV: {ex.Message}");
 			}
 		}
 
