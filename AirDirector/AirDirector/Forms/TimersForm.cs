@@ -47,13 +47,16 @@ namespace AirDirector.Forms
         private Panel _pnlProgressBar;
         private float _trackProgress = 0f;
 
-        // Row 1 – Next Schedule
+        // Row 1 – Split left/right
+        private TableLayoutPanel _row1Split;
+
+        // Row 1 Left – Date & Clock (replaces Next Schedule)
         private Panel _pnlSchedule;
         private Label _lblScheduleHeader;
         private Label _lblScheduleName;
         private Label _lblScheduleCountdown;
 
-        // Row 2 – Next Ad
+        // Row 1 Right – Next Ad
         private Panel _pnlAd;
         private Label _lblAdHeader;
         private Label _lblAdInfo;
@@ -104,7 +107,7 @@ namespace AirDirector.Forms
         private void ApplyLanguage()
         {
             this.Text = LanguageManager.GetString("TimersForm.Title", "Timers");
-            _lblScheduleHeader.Text = LanguageManager.GetString("TimersForm.NextSchedule", "📅 PROSSIMA SCHEDULAZIONE");
+            _lblScheduleHeader.Text = LanguageManager.GetString("TimersForm.DateAndTime", "📅 DATA E ORA");
             _lblAdHeader.Text = LanguageManager.GetString("TimersForm.NextAd", "📢 PROSSIMA PUBBLICITÀ");
             _lblIntroCountdown.Parent?.Invalidate();
             _lblMixCountdown.Parent?.Invalidate();
@@ -118,14 +121,13 @@ namespace AirDirector.Forms
             _mainLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                RowCount = 3,
+                RowCount = 2,
                 ColumnCount = 1,
                 BackColor = Color.FromArgb(20, 20, 20),
                 CellBorderStyle = TableLayoutPanelCellBorderStyle.Single
             };
-            _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 34f));
-            _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 33f));
-            _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 33f));
+            _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50f));
+            _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50f));
             _mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 
             // ── Row 0: On Air ──────────────────────────────────────────────────
@@ -158,7 +160,9 @@ namespace AirDirector.Forms
                 Font = new Font("Segoe UI", 18f, FontStyle.Bold),
                 BackColor = Color.Transparent,
                 Text = "--",
-                Padding = Padding.Empty
+                Padding = Padding.Empty,
+                AutoEllipsis = false,
+                UseMnemonic = false
             };
 
             // Titolo (col 0, row 1)
@@ -170,7 +174,9 @@ namespace AirDirector.Forms
                 Font = new Font("Segoe UI", 16f, FontStyle.Bold),
                 BackColor = Color.Transparent,
                 Text = "--",
-                Padding = Padding.Empty
+                Padding = Padding.Empty,
+                AutoEllipsis = false,
+                UseMnemonic = false
             };
 
             // Intro panel (col 1, row 0) — header drawn via Paint, countdown fills all space
@@ -246,7 +252,8 @@ namespace AirDirector.Forms
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 11f, FontStyle.Bold),
                 Height = 40,
-                AutoEllipsis = true,
+                AutoEllipsis = false,
+                UseMnemonic = false,
                 BackColor = Color.Transparent,
                 Text = "--"
             };
@@ -287,7 +294,8 @@ namespace AirDirector.Forms
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 11f, FontStyle.Bold),
                 Height = 40,
-                AutoEllipsis = true,
+                AutoEllipsis = false,
+                UseMnemonic = false,
                 BackColor = Color.Transparent,
                 Text = "--"
             };
@@ -304,10 +312,24 @@ namespace AirDirector.Forms
             _pnlAd.Controls.Add(_lblAdInfo);
             _pnlAd.Controls.Add(_lblAdHeader);
 
+            // Assemble Row 1 split (50/50: left=date/clock, right=ad)
+            _row1Split = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                RowCount = 1,
+                ColumnCount = 2,
+                BackColor = Color.FromArgb(20, 20, 20),
+                CellBorderStyle = TableLayoutPanelCellBorderStyle.Single
+            };
+            _row1Split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            _row1Split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            _row1Split.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            _row1Split.Controls.Add(_pnlSchedule, 0, 0);
+            _row1Split.Controls.Add(_pnlAd, 1, 0);
+
             // Assemble main layout
             _mainLayout.Controls.Add(_pnlOnAir, 0, 0);
-            _mainLayout.Controls.Add(_pnlSchedule, 0, 1);
-            _mainLayout.Controls.Add(_pnlAd, 0, 2);
+            _mainLayout.Controls.Add(_row1Split, 0, 1);
 
             this.Controls.Add(_mainLayout);
         }
@@ -318,7 +340,7 @@ namespace AirDirector.Forms
             if (_mainLayout == null) return;
 
             float formW = Math.Max(352f, this.ClientSize.Width);
-            float rowH  = Math.Max(60f,  _mainLayout.Height / 3.0f);
+            float rowH  = Math.Max(60f,  _mainLayout.Height / 2.0f);
 
             float countdown = Math.Max(12f, Math.Min(120f, Math.Min(rowH * 0.35f, formW * 0.22f)));
 
@@ -358,10 +380,11 @@ namespace AirDirector.Forms
             AutoFitLabel(_lblOnAirArtist, _lblOnAirArtist.Text, artistSize);
             AutoFitLabel(_lblOnAirTitle,  _lblOnAirTitle.Text,  titleSize);
 
-            // Scale schedule/ad name/info
+            // Date label auto-fit and ad info scale
+            float dateMaxSize = Math.Max(8f, Math.Min(22f, rowH * 0.13f));
+            AutoFitLabel(_lblScheduleName, _lblScheduleName.Text, dateMaxSize);
             float name = Math.Max(8f, Math.Min(30f, rowH * 0.13f));
-            ScaleName(_lblScheduleName, name);
-            ScaleName(_lblAdInfo,       name);
+            ScaleName(_lblAdInfo, name);
 
             // Invalidate intro/mix panels to redraw paint header
             _lblIntroCountdown.Parent?.Invalidate();
@@ -392,18 +415,20 @@ namespace AirDirector.Forms
 
         private static void AutoFitLabel(Label lbl, string text, float maxFontSize, float minFontSize = 7f)
         {
+            lbl.AutoEllipsis = false;
             lbl.Text = text;
             if (lbl.Width <= 0) return;
 
             float fontSize = maxFontSize;
-            int availableWidth = lbl.Width - 4; // small margin
+            int availableWidth  = lbl.Width  - 4; // small margin
+            int availableHeight = lbl.Height > 0 ? lbl.Height - 4 : int.MaxValue;
 
             while (fontSize > minFontSize)
             {
                 using (var testFont = new Font("Segoe UI", fontSize, FontStyle.Bold))
                 {
                     var textSize = TextRenderer.MeasureText(text, testFont);
-                    if (textSize.Width <= availableWidth)
+                    if (textSize.Width <= availableWidth && textSize.Height <= availableHeight)
                         break;
                 }
                 fontSize -= 0.5f;
@@ -582,60 +607,22 @@ namespace AirDirector.Forms
             _lblMixCountdown.ForeColor = Color.Red;
         }
 
-        // ─── Next Schedule ──────────────────────────────────────────────────────
+        // ─── Date & Clock (left half of Row 1) ────────────────────────────────────
         private void UpdateNextSchedule()
         {
-            try
-            {
-                DateTime now = DateTime.Now;
-                int dow = (int)now.DayOfWeek;
+            DateTime now = DateTime.Now;
+            var culture = new System.Globalization.CultureInfo("it-IT");
 
-                var schedules = DbcManager.LoadFromCsv<ScheduleEntry>("Schedules.dbc");
-                var active = schedules.Where(s => s.IsEnabled == 1 && IsDayEnabled(s, dow)).ToList();
+            string day   = culture.DateTimeFormat.GetDayName(now.DayOfWeek);
+            string month = culture.DateTimeFormat.GetMonthName(now.Month);
+            string dateStr = $"{char.ToUpper(day[0])}{day.Substring(1)} {now.Day} {char.ToUpper(month[0])}{month.Substring(1)}, {now.Year}";
 
-                ScheduleEntry next = null;
-                DateTime nextTime = DateTime.MaxValue;
+            float rowH = _mainLayout != null ? Math.Max(60f, _mainLayout.Height / 2.0f) : 100f;
+            float dateMaxSize = Math.Max(8f, Math.Min(22f, rowH * 0.13f));
+            AutoFitLabel(_lblScheduleName, dateStr, dateMaxSize);
 
-                foreach (var s in active)
-                {
-                    if (string.IsNullOrEmpty(s.Times)) continue;
-                    foreach (var t in s.Times.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
-                    {
-                        if (TimeSpan.TryParse(t.Trim(), out TimeSpan ts))
-                        {
-                            DateTime dt = now.Date.Add(ts);
-                            if (dt > now && dt < nextTime) { next = s; nextTime = dt; }
-                        }
-                    }
-                }
-
-                if (next != null)
-                {
-                    _lblScheduleName.Text = $"{nextTime:HH:mm:ss}  –  {next.Name}";
-                    int sec = (int)(nextTime - now).TotalSeconds;
-                    int secH = sec / 3600, secM = (sec % 3600) / 60, secS = sec % 60;
-                    _lblScheduleCountdown.Text = secH > 0 ? $"{secH:00}:{secM:00}:{secS:00}" : $"{secM:00}:{secS:00}";
-
-                    if (sec <= 120)
-                    {
-                        _lblScheduleCountdown.ForeColor = _blinkState ? Color.Red : Color.White;
-                    }
-                    else
-                    {
-                        _lblScheduleCountdown.ForeColor = Color.White;
-                    }
-                }
-                else
-                {
-                    _lblScheduleName.Text = LanguageManager.GetString("TimersForm.NoSchedule", "----------");
-                    _lblScheduleCountdown.Text = "--:--:--";
-                    _lblScheduleCountdown.ForeColor = Color.White;
-                }
-            }
-            catch
-            {
-                _lblScheduleCountdown.Text = "--:--:--";
-            }
+            _lblScheduleCountdown.Text       = now.ToString("HH:mm:ss");
+            _lblScheduleCountdown.ForeColor  = Color.White;
         }
 
         // ─── Next Ad ────────────────────────────────────────────────────────────
@@ -717,18 +704,6 @@ namespace AirDirector.Forms
             int h = s / 3600, m = (s % 3600) / 60, sec = s % 60;
             return h > 0 ? $"{h:00}:{m:00}:{sec:00}" : $"{m:00}:{sec:00}";
         }
-
-        private static bool IsDayEnabled(ScheduleEntry schedule, int dow) => dow switch
-        {
-            0 => schedule.Sunday == 1,
-            1 => schedule.Monday == 1,
-            2 => schedule.Tuesday == 1,
-            3 => schedule.Wednesday == 1,
-            4 => schedule.Thursday == 1,
-            5 => schedule.Friday == 1,
-            6 => schedule.Saturday == 1,
-            _ => false
-        };
 
         // ─── ADV Cache (same algorithm as OverviewControl) ──────────────────────
         private void LoadAdvCache()
