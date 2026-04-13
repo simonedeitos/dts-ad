@@ -99,6 +99,13 @@ namespace AirDirector.Forms
         private Label _lblCountdown;
         private Label _lblOpenFileName;
 
+        // ✅ Supported video file extensions (used in SetupVideoPreview)
+        private static readonly string[] _videoFileExtensions =
+        {
+            ".mp4", ".avi", ".mkv", ".mov", ".wmv",
+            ".ts", ".mts", ".m2ts", ".webm"
+        };
+
         public MusicEditorForm(MusicEntry musicEntry, bool isClip = false)
         {
             InitializeComponent();
@@ -791,8 +798,7 @@ namespace AirDirector.Forms
             if (!hasVideo)
             {
                 string ext = Path.GetExtension(_musicEntry.FilePath ?? "").ToLowerInvariant();
-                if (ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".mov" ||
-                    ext == ".wmv" || ext == ".ts" || ext == ".mts" || ext == ".m2ts" || ext == ".webm")
+                if (Array.IndexOf(_videoFileExtensions, ext) >= 0)
                 {
                     videoPath = _musicEntry.FilePath;
                     hasVideo = !string.IsNullOrEmpty(videoPath) && File.Exists(videoPath);
@@ -806,8 +812,7 @@ namespace AirDirector.Forms
                 string baseName = Path.GetFileNameWithoutExtension(_musicEntry.FilePath);
                 if (!string.IsNullOrEmpty(dir) && !string.IsNullOrEmpty(baseName))
                 {
-                    string[] videoExts = { ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".ts", ".mts", ".m2ts", ".webm" };
-                    foreach (string vExt in videoExts)
+                    foreach (string vExt in _videoFileExtensions)
                     {
                         string candidate = Path.Combine(dir, baseName + vExt);
                         if (File.Exists(candidate))
