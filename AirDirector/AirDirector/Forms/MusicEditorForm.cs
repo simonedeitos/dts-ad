@@ -94,6 +94,11 @@ namespace AirDirector.Forms
         private VideoPreviewForm _videoPreviewForm;
         private Button _btnVideoPreview;
 
+        // ✅ TOOLBAR – countup / countdown / filename labels (created programmatically)
+        private Label _lblCountup;
+        private Label _lblCountdown;
+        private Label _lblOpenFileName;
+
         public MusicEditorForm(MusicEntry musicEntry, bool isClip = false)
         {
             InitializeComponent();
@@ -143,6 +148,7 @@ namespace AirDirector.Forms
             SetupVolumeControls();
             SetupVuMeter();
             SetupVideoPreview();
+            SetupToolbarLabels();
             LoadGenreSuggestions();
             LoadCategorySuggestions();
 
@@ -793,6 +799,27 @@ namespace AirDirector.Forms
                 }
             }
 
+            // For clips/spots: look for a video file in the same folder with the same base name
+            if (!hasVideo && !string.IsNullOrEmpty(_musicEntry.FilePath))
+            {
+                string dir = Path.GetDirectoryName(_musicEntry.FilePath);
+                string baseName = Path.GetFileNameWithoutExtension(_musicEntry.FilePath);
+                if (!string.IsNullOrEmpty(dir) && !string.IsNullOrEmpty(baseName))
+                {
+                    string[] videoExts = { ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".ts", ".mts", ".m2ts", ".webm" };
+                    foreach (string vExt in videoExts)
+                    {
+                        string candidate = Path.Combine(dir, baseName + vExt);
+                        if (File.Exists(candidate))
+                        {
+                            videoPath = candidate;
+                            hasVideo = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
             if (!hasVideo)
                 return;
 
@@ -849,6 +876,57 @@ namespace AirDirector.Forms
                 screen.WorkingArea.Bottom - _videoPreviewForm.Height);
             _videoPreviewForm.FormClosed += (s2, ev2) => _videoPreviewForm = null;
             _videoPreviewForm.Show(this);
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // TOOLBAR LABELS – countup, countdown, open file name
+        // ═════════════════════════════════════════════════════════════════
+
+        private void SetupToolbarLabels()
+        {
+            // ── Open file name – right of btnStop ──
+            _lblOpenFileName = new Label
+            {
+                Text = Path.GetFileName(_musicEntry.FilePath ?? ""),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(btnStop.Right + 15, btnStop.Top + (btnStop.Height - 20) / 2),
+                AutoEllipsis = true
+            };
+            toolbarPanel.Controls.Add(_lblOpenFileName);
+
+            // ── Countup (elapsed time) – green, placed after the filename label ──
+            _lblCountup = new Label
+            {
+                Text = "00:00",
+                Font = new Font("Consolas", 11F, FontStyle.Bold),
+                ForeColor = Color.Lime,
+                BackColor = Color.Transparent,
+                AutoSize = true,
+                Location = new Point(btnStop.Right + 15, btnStop.Top + (btnStop.Height - 20) / 2 + 22)
+            };
+            toolbarPanel.Controls.Add(_lblCountup);
+
+            // ── Countdown (remaining time) – orange/red, right of countup ──
+            _lblCountdown = new Label
+            {
+                Text = "-00:00",
+                Font = new Font("Consolas", 11F, FontStyle.Bold),
+                ForeColor = Color.OrangeRed,
+                BackColor = Color.Transparent,
+                AutoSize = true,
+                Location = new Point(btnStop.Right + 80, btnStop.Top + (btnStop.Height - 20) / 2 + 22)
+            };
+            toolbarPanel.Controls.Add(_lblCountdown);
+        }
+
+        /// <summary>Formats milliseconds as MM:SS (short format for countup/countdown).</summary>
+        private string FormatTimeShort(int milliseconds)
+        {
+            if (milliseconds < 0) milliseconds = 0;
+            TimeSpan ts = TimeSpan.FromMilliseconds(milliseconds);
+            return $"{(int)ts.TotalMinutes:D2}:{ts.Seconds:D2}";
         }
 
         private void BtnVideoPreview_Click(object sender, EventArgs e)
@@ -1782,6 +1860,11 @@ namespace AirDirector.Forms
             btnPlay.BackColor = Color.FromArgb(40, 160, 40);
             lblCurrentPosition.Text = "00:00:00.000";
             lblCurrentPositionMs.Text = "0 ms";
+
+            // Reset countup / countdown
+            if (_lblCountup != null)   _lblCountup.Text   = "00:00";
+            if (_lblCountdown != null) _lblCountdown.Text = "-00:00";
+
             picWaveform.Invalidate();
 
             // Stop and reset video preview
@@ -2004,8 +2087,15 @@ namespace AirDirector.Forms
             if (_audioReader != null)
             {
                 int currentMs = (int)_audioReader.CurrentTime.TotalMilliseconds;
+                int totalMs = (int)_audioReader.TotalTime.TotalMilliseconds;
                 lblCurrentPosition.Text = FormatTime(currentMs);
                 lblCurrentPositionMs.Text = $"{currentMs} ms";
+
+                // ✅ Update countup / countdown labels
+                if (_lblCountup != null)
+                    _lblCountup.Text = FormatTimeShort(currentMs);
+                if (_lblCountdown != null)
+                    _lblCountdown.Text = "-" + FormatTimeShort(Math.Max(0, totalMs - currentMs));
 
                 // ✅ Periodic video sync: re-align if drift > 500ms (check every ~500ms)
                 if (_videoPreviewForm != null && !_videoPreviewForm.IsDisposed && _isPlaying)
@@ -2022,7 +2112,6 @@ namespace AirDirector.Forms
                 // Solo se l'utente non ha scrollato manualmente
                 if (!_userScrolled && _zoomLevel > 1.01f && _waveformData != null && _waveformData.Length > 0)
                 {
-                    int totalMs = (int)_audioReader.TotalTime.TotalMilliseconds;
                     int visibleSamples = (int)(_waveformData.Length / _zoomLevel);
                     int currentSample = (int)((float)currentMs / totalMs * _waveformData.Length);
 
