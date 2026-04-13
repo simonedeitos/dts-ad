@@ -545,8 +545,7 @@ namespace AirDirector.Forms
             // Scale queue preview labels
             if (_lblQueueNext != null && _pnlQueueNext != null)
             {
-                float queueRowH = Math.Max(20f, _pnlQueueNext.Height > 0 ? _pnlQueueNext.Height / 4f : 40f);
-                float queueMaxFontSize = Math.Max(7f, Math.Min(16f, queueRowH * 0.35f));
+                float queueMaxFontSize = GetQueueMaxFontSize();
                 foreach (var lbl in _lblQueueNext)
                 {
                     if (lbl == null) continue;
@@ -619,6 +618,13 @@ namespace AirDirector.Forms
                 float y = 2f;
                 g.DrawString(text, font, brush, x, y);
             }
+        }
+
+        private float GetQueueMaxFontSize()
+        {
+            float rowH = Math.Max(20f, _pnlQueueNext != null && _pnlQueueNext.Height > 0
+                ? _pnlQueueNext.Height / 4f : 40f);
+            return Math.Max(7f, Math.Min(16f, rowH * 0.35f));
         }
 
         // ─── Timer Tick ─────────────────────────────────────────────────────────
@@ -819,9 +825,7 @@ namespace AirDirector.Forms
             var allItems = _playlistQueue.GetAllItems();
             int currentIdx = current != null ? allItems.IndexOf(current) : -1;
 
-            float rowH = Math.Max(20f, _pnlQueueNext != null && _pnlQueueNext.Height > 0
-                ? _pnlQueueNext.Height / 4f : 40f);
-            float maxFontSize = Math.Max(7f, Math.Min(16f, rowH * 0.35f));
+            float maxFontSize = GetQueueMaxFontSize();
 
             // Slot 0 (number "2"): show current playing item
             if (_lblQueueNext[0] != null)
