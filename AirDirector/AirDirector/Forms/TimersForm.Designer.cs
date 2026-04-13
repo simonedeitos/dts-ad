@@ -18,6 +18,7 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(TimersForm));
             SuspendLayout();
             // 
             // TimersForm
@@ -25,6 +26,7 @@ namespace AirDirector.Forms
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(690, 740);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             MinimumSize = new Size(352, 284);
             Name = "TimersForm";
             StartPosition = FormStartPosition.CenterParent;

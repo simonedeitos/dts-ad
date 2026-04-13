@@ -7,10 +7,15 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <ApplicationIcon>AirDirector.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="playercontrolvideo_old-ok.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="AirDirector.ico" />
   </ItemGroup>
 
   <ItemGroup>

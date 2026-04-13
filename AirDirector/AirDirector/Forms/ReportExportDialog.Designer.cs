@@ -13,13 +13,18 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
-            this.SuspendLayout();
-            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(600, 620);
-            this.Name = "ReportExportDialog";
-            this.Text = "Export Report CSV";
-            this.ResumeLayout(false);
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(ReportExportDialog));
+            SuspendLayout();
+            // 
+            // ReportExportDialog
+            // 
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(600, 620);
+            Icon = (Icon)resources.GetObject("$this.Icon");
+            Name = "ReportExportDialog";
+            Text = "Export Report CSV";
+            ResumeLayout(false);
         }
     }
 }

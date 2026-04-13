@@ -15,18 +15,20 @@
 
         private void InitializeComponent()
         {
-            this.SuspendLayout();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(LicenseForm));
+            SuspendLayout();
             // 
             // LicenseForm
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(620, 600);
-            this.MinimumSize = new System.Drawing.Size(640, 640);
-            this.Name = "LicenseForm";
-            this.Text = "Attivazione Licenza";
-            this.Load += new System.EventHandler(this.LicenseForm_Load);
-            this.ResumeLayout(false);
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(546, 563);
+            Icon = (Icon)resources.GetObject("$this.Icon");
+            MinimumSize = new Size(562, 602);
+            Name = "LicenseForm";
+            Text = "Attivazione Licenza";
+            Load += LicenseForm_Load;
+            ResumeLayout(false);
         }
     }
 }

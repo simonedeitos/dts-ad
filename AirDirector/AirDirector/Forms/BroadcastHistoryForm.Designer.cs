@@ -45,6 +45,7 @@ namespace AirDirector.Forms
             DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle7 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle8 = new DataGridViewCellStyle();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(BroadcastHistoryForm));
             filterPanel = new Panel();
             lblFrom = new Label();
             dtpFrom = new DateTimePicker();
@@ -385,6 +386,7 @@ namespace AirDirector.Forms
             Controls.Add(statsPanel);
             Controls.Add(filterPanel);
             ForeColor = Color.White;
+            Icon = (Icon)resources.GetObject("$this.Icon");
             MinimumSize = new Size(900, 600);
             Name = "BroadcastHistoryForm";
             Text = "Broadcast History";

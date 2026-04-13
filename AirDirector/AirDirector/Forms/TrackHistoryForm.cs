@@ -187,6 +187,11 @@ namespace AirDirector.Forms
             }
         }
 
+        private void InitializeComponent()
+        {
+
+        }
+
         private void BtnExport_Click(object sender, EventArgs e)
         {
             try

@@ -15,13 +15,18 @@ namespace AirDirector.Forms
 
         private void InitializeComponent()
         {
-            this.SuspendLayout();
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(440, 280);
-            this.Name = "LicenseRemoveConfirmForm";
-            this.Text = "Conferma Rimozione";
-            this.ResumeLayout(false);
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(LicenseRemoveConfirmForm));
+            SuspendLayout();
+            // 
+            // LicenseRemoveConfirmForm
+            // 
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(385, 262);
+            Icon = (Icon)resources.GetObject("$this.Icon");
+            Name = "LicenseRemoveConfirmForm";
+            Text = "Conferma Rimozione";
+            ResumeLayout(false);
         }
     }
 }
