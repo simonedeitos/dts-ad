@@ -294,7 +294,7 @@ namespace AirDirector.Forms
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 11f, FontStyle.Bold),
                 Height = 40,
-                AutoEllipsis = false,
+                AutoEllipsis = true,
                 UseMnemonic = false,
                 BackColor = Color.Transparent,
                 Text = "--"
@@ -615,7 +615,9 @@ namespace AirDirector.Forms
 
             string day   = culture.DateTimeFormat.GetDayName(now.DayOfWeek);
             string month = culture.DateTimeFormat.GetMonthName(now.Month);
-            string dateStr = $"{char.ToUpper(day[0])}{day.Substring(1)} {now.Day} {char.ToUpper(month[0])}{month.Substring(1)}, {now.Year}";
+            string dayCapitalized   = day.Length > 0   ? char.ToUpper(day[0])   + day.Substring(1)   : day;
+            string monthCapitalized = month.Length > 0 ? char.ToUpper(month[0]) + month.Substring(1) : month;
+            string dateStr = $"{dayCapitalized} {now.Day} {monthCapitalized}, {now.Year}";
 
             float rowH = _mainLayout != null ? Math.Max(60f, _mainLayout.Height / 2.0f) : 100f;
             float dateMaxSize = Math.Max(8f, Math.Min(22f, rowH * 0.13f));
