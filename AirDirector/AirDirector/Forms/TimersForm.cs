@@ -622,9 +622,9 @@ namespace AirDirector.Forms
 
         private float GetQueueMaxFontSize()
         {
-            float rowH = Math.Max(20f, _pnlQueueNext != null && _pnlQueueNext.Height > 0
-                ? _pnlQueueNext.Height / 4f : 40f);
-            return Math.Max(7f, Math.Min(16f, rowH * 0.35f));
+            float rowH = Math.Max(10f, _pnlQueueNext != null && _pnlQueueNext.Height > 0
+                ? _pnlQueueNext.Height / 4f : 60f);
+            return Math.Max(7f, Math.Min(36f, rowH * 0.35f));
         }
 
         // ─── Timer Tick ─────────────────────────────────────────────────────────
@@ -676,8 +676,8 @@ namespace AirDirector.Forms
             }
 
             float rowH = _mainLayout != null ? Math.Max(60f, _mainLayout.Height / 3.0f) : 100f;
-            float artistMaxSize = Math.Max(10f, Math.Min(36f, rowH * 0.16f));
-            float titleMaxSize  = Math.Max(9f,  Math.Min(30f, rowH * 0.14f));
+            float artistMaxSize = Math.Max(10f, Math.Min(60f, rowH * 0.16f));
+            float titleMaxSize  = Math.Max(9f,  Math.Min(60f, rowH * 0.14f));
 
             string artistText = !string.IsNullOrEmpty(current.Artist) ? current.Artist : "";
             string titleText  = !string.IsNullOrEmpty(current.Title)  ? current.Title  : "";
@@ -817,7 +817,7 @@ namespace AirDirector.Forms
             {
                 for (int i = 0; i < _lblQueueNext.Length; i++)
                     if (_lblQueueNext[i] != null)
-                        _lblQueueNext[i].Text = "--";
+                        _lblQueueNext[i].Text = "";
                 return;
             }
 
@@ -827,36 +827,25 @@ namespace AirDirector.Forms
 
             float maxFontSize = GetQueueMaxFontSize();
 
-            // Slot 0 (number "2"): show current playing item
-            if (_lblQueueNext[0] != null)
-            {
-                string display0 = "--";
-                if (current != null)
-                {
-                    string artist = current.Artist ?? "";
-                    string title  = current.Title  ?? "";
-                    display0 = string.IsNullOrEmpty(artist)
-                        ? (string.IsNullOrEmpty(title) ? "--" : title)
-                        : (string.IsNullOrEmpty(title) ? artist : $"{artist} - {title}");
-                }
-                AutoFitLabel(_lblQueueNext[0], display0, maxFontSize);
-            }
-
-            // Slots 1-3 (numbers "3","4","5"): show next items in queue
-            for (int i = 1; i < 4; i++)
+            // Slots 0-3 (numbers "2","3","4","5"): next items in queue
+            for (int i = 0; i < 4; i++)
             {
                 if (_lblQueueNext[i] == null) continue;
-                int nextIdx = currentIdx + i;
-                string display = "--";
+
+                int nextIdx = currentIdx + i + 1;
+                string display = "";
+
                 if (currentIdx >= 0 && nextIdx < allItems.Count)
                 {
                     var item = allItems[nextIdx];
                     string artist = item.Artist ?? "";
-                    string title  = item.Title  ?? "";
+                    string title = item.Title ?? "";
+
                     display = string.IsNullOrEmpty(artist)
-                        ? (string.IsNullOrEmpty(title) ? "--" : title)
+                        ? (string.IsNullOrEmpty(title) ? "" : title)
                         : (string.IsNullOrEmpty(title) ? artist : $"{artist} - {title}");
                 }
+
                 AutoFitLabel(_lblQueueNext[i], display, maxFontSize);
             }
         }
