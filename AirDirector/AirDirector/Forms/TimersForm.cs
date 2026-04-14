@@ -682,9 +682,6 @@ namespace AirDirector.Forms
             string artistText = !string.IsNullOrEmpty(current.Artist) ? current.Artist : "";
             string titleText  = !string.IsNullOrEmpty(current.Title)  ? current.Title  : "";
 
-            AutoFitLabel(_lblOnAirArtist, artistText, artistMaxSize);
-            AutoFitLabel(_lblOnAirTitle,  titleText,  titleMaxSize);
-
             int posMs = _isRadioTVMode
                 ? (_playerControlVideo?.CurrentPositionMs ?? 0)
                 : (_playerControl?.CurrentPositionMs ?? 0);
@@ -699,6 +696,14 @@ namespace AirDirector.Forms
                 : (_playerControl?.CurrentMarkerIN ?? 0);
 
             int effectiveIntro = introMarker - markerIN; // INTRO-IN
+
+            // Append intro duration to title when > 1s
+            int introSeconds = effectiveIntro / 1000;
+            if (introSeconds > 1)
+                titleText = $"{titleText} [{introSeconds}s]";
+
+            AutoFitLabel(_lblOnAirArtist, artistText, artistMaxSize);
+            AutoFitLabel(_lblOnAirTitle,  titleText,  titleMaxSize);
 
             if (effectiveIntro > 0 && posMs < introMarker)
             {
