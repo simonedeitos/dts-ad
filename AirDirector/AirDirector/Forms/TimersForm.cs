@@ -697,11 +697,6 @@ namespace AirDirector.Forms
 
             int effectiveIntro = introMarker - markerIN; // INTRO-IN
 
-            // Append intro duration to title when > 1s
-            int introSeconds = effectiveIntro / 1000;
-            if (introSeconds > 1)
-                titleText = $"{titleText} [{introSeconds}s]";
-
             AutoFitLabel(_lblOnAirArtist, artistText, artistMaxSize);
             AutoFitLabel(_lblOnAirTitle,  titleText,  titleMaxSize);
 
@@ -849,6 +844,12 @@ namespace AirDirector.Forms
                     display = string.IsNullOrEmpty(artist)
                         ? (string.IsNullOrEmpty(title) ? "" : title)
                         : (string.IsNullOrEmpty(title) ? artist : $"{artist} - {title}");
+
+                    // Append intro [Ns] if intro > 1 second
+                    int itemIntroMs = item.MarkerINTRO - item.MarkerIN;
+                    int itemIntroSec = itemIntroMs / 1000;
+                    if (itemIntroSec > 1 && !string.IsNullOrEmpty(display))
+                        display = $"{display} [{itemIntroSec}s]";
                 }
 
                 AutoFitLabel(_lblQueueNext[i], display, maxFontSize);
