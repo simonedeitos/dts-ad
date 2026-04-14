@@ -1008,8 +1008,11 @@ namespace AirDirector.Controls
 
                 if (databasePathChanged || modeChanged)
                 {
+                    string restartMsg = modeChanged
+                        ? LanguageManager.GetString("Configuration.RestartRequiredMode", "⚠️ Hai cambiato la modalità operativa. È necessario riavviare AirDirector per applicare le modifiche.\n\nVuoi riavviare ora?")
+                        : LanguageManager.GetString("Configuration.RestartRequired", "⚠️ Il percorso del database è stato modificato. È necessario riavviare AirDirector per applicare le modifiche.\n\nVuoi riavviare ora?");
                     var result = MessageBox.Show(
-                        LanguageManager.GetString("Configuration.RestartRequired", "⚠️ " + (modeChanged ? "La modalità operativa è stata modificata.\n\n" : "Il percorso del database è stato modificato.\n\n") + "È necessario riavviare il software per applicare le modifiche.\n\nVuoi riavviare ora?"),
+                        restartMsg,
                         LanguageManager.GetString("Configuration.RestartTitle", "Riavvio Richiesto"),
                         MessageBoxButtons.YesNo,
                         MessageBoxIcon.Warning);

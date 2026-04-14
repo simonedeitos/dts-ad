@@ -45,6 +45,8 @@ namespace AirDirector.Models
         public string OutputFilePath { get; set; }
         public bool BoostVolume { get; set; }
         public bool BoostDownloadVolume { get; set; }
+        public bool VolumeAdjustEnabled { get; set; }
+        public int VolumeAdjustDb { get; set; }
 
         public DownloadTask()
         {
@@ -78,6 +80,8 @@ namespace AirDirector.Models
             OutputFilePath = "";
             BoostVolume = false;
             BoostDownloadVolume = false;
+            VolumeAdjustEnabled = false;
+            VolumeAdjustDb = 0;
         }
 
         public void CopyFrom(DownloadTask source)
@@ -112,6 +116,8 @@ namespace AirDirector.Models
             OutputFilePath = source.OutputFilePath;
             BoostVolume = source.BoostVolume;
             BoostDownloadVolume = source.BoostDownloadVolume;
+            VolumeAdjustEnabled = source.VolumeAdjustEnabled;
+            VolumeAdjustDb = source.VolumeAdjustDb;
         }
 
         // Converte il task in formato CSV per Downloader.dbc
@@ -130,7 +136,8 @@ namespace AirDirector.Models
                    $"{EscapeCsv(MainFilePath)},{(UseBackground ? "1" : "0")},{EscapeCsv(BackgroundFilePath)}," +
                    $"{BackgroundVolume},{(UseCloser ? "1" : "0")},{EscapeCsv(CloserFilePath)}," +
                    $"{EscapeCsv(OutputFilePath)},{(BoostVolume ? "1" : "0")}," +
-                   $"{(BoostDownloadVolume ? "1" : "0")}";
+                   $"{(BoostDownloadVolume ? "1" : "0")}," +
+                   $"{(VolumeAdjustEnabled ? "1" : "0")},{VolumeAdjustDb}";
         }
 
         // Crea un task da una riga CSV
@@ -170,7 +177,9 @@ namespace AirDirector.Models
                 CloserFilePath = parts[26],
                 OutputFilePath = parts[27],
                 BoostVolume = parts.Length > 28 && parts[28] == "1",
-                BoostDownloadVolume = parts.Length > 29 && parts[29] == "1"
+                BoostDownloadVolume = parts.Length > 29 && parts[29] == "1",
+                VolumeAdjustEnabled = parts.Length > 30 && parts[30] == "1",
+                VolumeAdjustDb = parts.Length > 31 && int.TryParse(parts[31], out int vdb) ? vdb : 0
             };
 
             return task;

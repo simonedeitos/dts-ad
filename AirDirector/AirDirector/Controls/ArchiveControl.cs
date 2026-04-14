@@ -21,6 +21,7 @@ namespace AirDirector.Controls
         private Panel headerPanel;
         private Label lblHeader;
         private TextBox txtSearch;
+        private Button btnSearchClear;
         private ComboBox cmbGenreFilter;
         private ComboBox cmbCategoryFilter;
         private Button btnClearFilters;
@@ -249,6 +250,20 @@ namespace AirDirector.Controls
             };
             txtSearch.TextChanged += (s, e) => ApplyFilters();
             headerPanel.Controls.Add(txtSearch);
+
+            btnSearchClear = new Button
+            {
+                Text = "✕",
+                Size = new Size(25, 25),
+                BackColor = Color.FromArgb(108, 117, 125),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnSearchClear.FlatAppearance.BorderSize = 0;
+            btnSearchClear.Click += (s, e) => { txtSearch.Text = ""; txtSearch.Focus(); };
+            headerPanel.Controls.Add(btnSearchClear);
 
             btnZoomOut = new Button
             {
@@ -711,8 +726,11 @@ namespace AirDirector.Controls
             x1 -= (btnZoomOut.Width + 5);
             btnZoomOut.Location = new Point(x1, 14);
 
-            x1 -= (txtSearch.Width + 15);
+            x1 -= (txtSearch.Width + 5);
             txtSearch.Location = new Point(x1, 12);
+
+            x1 -= (btnSearchClear.Width + 3);
+            btnSearchClear.Location = new Point(x1, 12);
 
             int x2 = panelWidth - btnClearFilters.Width - MARGIN;
             btnClearFilters.Location = new Point(x2, 48);
@@ -1255,11 +1273,9 @@ namespace AirDirector.Controls
 
                                 if (modifyGenre && !string.IsNullOrWhiteSpace(newGenre))
                                 {
-                                    if (UpdateGenreInFile(musicEntry.FilePath, newGenre))
-                                    {
-                                        musicEntry.Genre = newGenre;
-                                        changed = true;
-                                    }
+                                    UpdateGenreInFile(musicEntry.FilePath, newGenre); // best-effort tag update
+                                    musicEntry.Genre = newGenre;
+                                    changed = true;
                                 }
 
                                 if (modifyCategory)
@@ -1285,11 +1301,9 @@ namespace AirDirector.Controls
 
                                 if (modifyGenre && !string.IsNullOrWhiteSpace(newGenre))
                                 {
-                                    if (UpdateGenreInFile(clipEntry.FilePath, newGenre))
-                                    {
-                                        clipEntry.Genre = newGenre;
-                                        changed = true;
-                                    }
+                                    UpdateGenreInFile(clipEntry.FilePath, newGenre); // best-effort tag update
+                                    clipEntry.Genre = newGenre;
+                                    changed = true;
                                 }
 
                                 if (modifyCategory)

@@ -590,7 +590,8 @@ namespace AirDirector.Forms
 
                     if (count > 0)
                     {
-                        double totalSeconds = filtered.Sum(e => NormalizeDuration(e.Duration));
+                        double totalSeconds = filtered.Sum(e =>
+                            e.MarkerMIX > e.MarkerIN ? NormalizeDuration(e.MarkerMIX - e.MarkerIN) : NormalizeDuration(e.Duration));
                         avgDuration = totalSeconds / count;
                     }
                 }
@@ -602,7 +603,8 @@ namespace AirDirector.Forms
 
                     if (count > 0)
                     {
-                        double totalSeconds = filtered.Sum(e => NormalizeDuration(e.Duration));
+                        double totalSeconds = filtered.Sum(e =>
+                            e.MarkerMIX > e.MarkerIN ? NormalizeDuration(e.MarkerMIX - e.MarkerIN) : NormalizeDuration(e.Duration));
                         avgDuration = totalSeconds / count;
                     }
                 }
@@ -996,7 +998,8 @@ namespace AirDirector.Forms
 
                     if (filtered.Count > 0)
                     {
-                        double totalSeconds = filtered.Sum(e => NormalizeDuration(e.Duration));
+                        double totalSeconds = filtered.Sum(e =>
+                            e.MarkerMIX > e.MarkerIN ? NormalizeDuration(e.MarkerMIX - e.MarkerIN) : NormalizeDuration(e.Duration));
                         return totalSeconds / filtered.Count;
                     }
                 }
@@ -1007,7 +1010,8 @@ namespace AirDirector.Forms
 
                     if (filtered.Count > 0)
                     {
-                        double totalSeconds = filtered.Sum(e => NormalizeDuration(e.Duration));
+                        double totalSeconds = filtered.Sum(e =>
+                            e.MarkerMIX > e.MarkerIN ? NormalizeDuration(e.MarkerMIX - e.MarkerIN) : NormalizeDuration(e.Duration));
                         return totalSeconds / filtered.Count;
                     }
                 }
