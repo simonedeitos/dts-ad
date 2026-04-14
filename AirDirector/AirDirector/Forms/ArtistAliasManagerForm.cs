@@ -233,7 +233,7 @@ namespace AirDirector.Forms
                 foreach (var m in allMusic)
                 {
                     // Estrai artisti da Artist e FeaturedArtists
-                    var (primary, featured) = ArtistParsingService.ParseArtists(m.Artist, m.Title);
+                    var (primary, featured) = ArtistParsingService.ParseArtists(m.Artist, m.Title, existingAliases);
 
                     if (!string.IsNullOrWhiteSpace(primary) && !existingNames.Contains(primary))
                         newArtists.Add(primary);
