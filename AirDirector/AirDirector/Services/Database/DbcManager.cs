@@ -146,6 +146,13 @@ namespace AirDirector.Services.Database
                 SaveToCsvInternal(recordersPath, new List<RecorderEntry>());
                 Console.WriteLine("[DbcManager] Recorders.dbc creato");
             }
+
+            string artistsPath = Path.Combine(DatabasePath, "Artists.dbc");
+            if (!File.Exists(artistsPath))
+            {
+                SaveToCsvInternal(artistsPath, new List<ArtistAliasEntry>());
+                Console.WriteLine("[DbcManager] Artists.dbc creato");
+            }
         }
 
         public static List<T> LoadFromCsv<T>(string fileName)
@@ -543,12 +550,20 @@ namespace AirDirector.Services.Database
         public int IgnoreHourlySeparation { get; set; }
     }
 
+    public class ArtistAliasEntry : IDbcEntry
+    {
+        public int ID { get; set; }
+        public string ArtistName { get; set; } = "";
+        public string Aliases { get; set; } = "";
+    }
+
     public class MusicEntry : IDbcEntry
     {
         public int ID { get; set; }
         public string FilePath { get; set; } = "";
         public string Artist { get; set; } = "";
         public string Title { get; set; } = "";
+        public string FeaturedArtists { get; set; } = "";
         public string Album { get; set; } = "";
         public string Genre { get; set; } = "";
         public string Categories { get; set; } = "";

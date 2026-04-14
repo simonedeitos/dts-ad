@@ -9,6 +9,7 @@ using NAudio.Wave;
 using AirDirector.Services.Database;
 using AirDirector.Services.Licensing;
 using AirDirector.Services.Localization;
+using AirDirector.Services;
 using AirDirector.Forms;
 using AirDirector.Themes;
 
@@ -1891,6 +1892,11 @@ namespace AirDirector.Controls
                 new[] { ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".ts", ".mts", ".m2ts", ".webm" },
                 StringComparer.OrdinalIgnoreCase);
 
+            // ✅ Carica alias artisti una sola volta per tutta l'importazione
+            List<ArtistAliasEntry> _importAliases;
+            try { _importAliases = DbcManager.LoadFromCsv<ArtistAliasEntry>("Artists.dbc"); }
+            catch { _importAliases = new List<ArtistAliasEntry>(); }
+
             try
             {
                 foreach (string filePath in filePaths)
@@ -1978,8 +1984,8 @@ namespace AirDirector.Controls
                         if (_archiveType == "Music")
                         {
                             var musicEntry = isVideo
-                                ? CreateMusicEntryFromVideo(currentPath)
-                                : CreateMusicEntryFromFile(currentPath);
+                                ? CreateMusicEntryFromVideo(currentPath, _importAliases)
+                                : CreateMusicEntryFromFile(currentPath, _importAliases);
 
                             // Override artist/title with conversion form settings
                             if (!string.IsNullOrWhiteSpace(importArtist)) musicEntry.Artist = importArtist;
@@ -2069,7 +2075,7 @@ namespace AirDirector.Controls
             }
         }
 
-        private MusicEntry CreateMusicEntryFromFile(string filePath)
+        private MusicEntry CreateMusicEntryFromFile(string filePath, List<ArtistAliasEntry> importAliases = null)
         {
             string artist = "Unknown Artist";
             string title = Path.GetFileNameWithoutExtension(filePath);
@@ -2117,10 +2123,15 @@ namespace AirDirector.Controls
 
             int mixDuration = ConfigurationControl.GetMixDuration();
 
+            // ✅ Auto-detect artisti secondari
+            var aliases = importAliases ?? DbcManager.LoadFromCsv<ArtistAliasEntry>("Artists.dbc");
+            var (_primaryArtist, _featuredArtists) = ArtistParsingService.ParseArtists(artist, title, aliases);
+
             return new MusicEntry
             {
                 FilePath = filePath,
-                Artist = artist,
+                Artist = _primaryArtist,
+                FeaturedArtists = _featuredArtists.Count > 0 ? string.Join(";", _featuredArtists) : "",
                 Title = title,
                 Album = "",
                 Genre = genre,
@@ -2151,7 +2162,7 @@ namespace AirDirector.Controls
         }
 
         // ✅ NUOVO:  Crea MusicEntry da file video MP4
-        private MusicEntry CreateMusicEntryFromVideo(string filePath)
+        private MusicEntry CreateMusicEntryFromVideo(string filePath, List<ArtistAliasEntry> importAliases = null)
         {
             string artist = "Unknown Artist";
             string title = Path.GetFileNameWithoutExtension(filePath);
@@ -2196,10 +2207,15 @@ namespace AirDirector.Controls
 
             int mixDuration = ConfigurationControl.GetMixDuration();
 
+            // ✅ Auto-detect artisti secondari
+            var vAliases = importAliases ?? DbcManager.LoadFromCsv<ArtistAliasEntry>("Artists.dbc");
+            var (_vPrimaryArtist, _vFeaturedArtists) = ArtistParsingService.ParseArtists(artist, title, vAliases);
+
             return new MusicEntry
             {
                 FilePath = filePath,
-                Artist = artist,
+                Artist = _vPrimaryArtist,
+                FeaturedArtists = _vFeaturedArtists.Count > 0 ? string.Join(";", _vFeaturedArtists) : "",
                 Title = title,
                 Album = "",
                 Genre = genre,

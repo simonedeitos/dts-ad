@@ -1,6 +1,7 @@
 ﻿using AirDirector.Forms;
 using AirDirector.Models;
 using AirDirector.Services.Database;
+using AirDirector.Services;
 using AirDirector.Themes;
 using CsvHelper.Expressions;
 using Newtonsoft.Json;
@@ -65,6 +66,13 @@ namespace AirDirector.Controls
 		private DateTime _lastAdvReloadTime = DateTime.MinValue; // ✅ MANCAVA QUESTO!
 
 		private Services.Core.DailyLogger _dailyLogger; 
+
+		// ✅ Cache alias artisti per evitare di ricaricare Artists.dbc ad ogni chiamata
+		private List<ArtistAliasEntry> _cachedAliases = null;
+		private DateTime _aliasesCacheTime = DateTime.MinValue;
+
+		// ✅ Tracking clip recenti per rotazione
+		private readonly HashSet<int> _recentClipIds = new HashSet<int>();
 
 		public event EventHandler<int> QueueReady;
 		public event EventHandler<int> QueueCountChanged;
@@ -1972,12 +1980,18 @@ namespace AirDirector.Controls
                     return null;
                 }
 
-                Random rnd = new Random(Guid.NewGuid().GetHashCode());
-                var selected = valid[rnd.Next(valid.Count)];
+                var available = valid.Where(c => CanPlayClip(c)).ToList();
+                if (available.Count > 0)
+                {
+                    Random rnd = new Random(Guid.NewGuid().GetHashCode());
+                    var selected = available[rnd.Next(available.Count)];
+                    _recentClipIds.Add(selected.ID);
+                    Log($"[GetRandomClipByGenre] ✅ Selezionato: {selected.Title}");
+                    return CreateClipQueueItem(selected);
+                }
 
-                Log($"[GetRandomClipByGenre] ✅ Selezionato: {selected.Title}");
-
-                return CreateClipQueueItem(selected);
+                Log($"[GetRandomClipByGenre] ⚠️ Applico FALLBACK rotazione");
+                return GetBestAvailableClip(valid, $"genere:{genre}");
             }
             catch (Exception ex)
             {
@@ -2083,12 +2097,18 @@ namespace AirDirector.Controls
                     return null;
                 }
 
-                Random rnd = new Random(Guid.NewGuid().GetHashCode());
-                var selected = valid[rnd.Next(valid.Count)];
+                var available = valid.Where(c => CanPlayClip(c)).ToList();
+                if (available.Count > 0)
+                {
+                    Random rnd = new Random(Guid.NewGuid().GetHashCode());
+                    var selected = available[rnd.Next(available.Count)];
+                    _recentClipIds.Add(selected.ID);
+                    Log($"[GetRandomClipByCategoryAndGenre] ✅ Selezionato: {selected.Title}");
+                    return CreateClipQueueItem(selected);
+                }
 
-                Log($"[GetRandomClipByCategoryAndGenre] ✅ Selezionato: {selected.Title}");
-
-                return CreateClipQueueItem(selected);
+                Log($"[GetRandomClipByCategoryAndGenre] ⚠️ Applico FALLBACK rotazione");
+                return GetBestAvailableClip(valid, $"categoria+genere:{category}+{genre}");
             }
             catch (Exception ex)
             {
@@ -2098,6 +2118,119 @@ namespace AirDirector.Controls
         }
 
         // (CONTINUA CON TUTTI I METODI RIMANENTI IDENTICI AL TUO CODICE...)
+
+        // ✅ Cache alias artisti
+        private List<ArtistAliasEntry> GetCachedAliases()
+        {
+            if (_cachedAliases == null || (DateTime.Now - _aliasesCacheTime).TotalMinutes > 5)
+            {
+                try
+                {
+                    _cachedAliases = DbcManager.LoadFromCsv<ArtistAliasEntry>("Artists.dbc");
+                    _aliasesCacheTime = DateTime.Now;
+                }
+                catch (Exception ex)
+                {
+                    Log($"[GetCachedAliases] ⚠️ Errore caricamento Artists.dbc: {ex.Message}");
+                    _cachedAliases = new List<ArtistAliasEntry>();
+                }
+            }
+            return _cachedAliases;
+        }
+
+        // ✅ Verifica se un clip può essere inserito in coda (rotazione clip)
+        private bool CanPlayClip(ClipEntry clip)
+        {
+            try
+            {
+                // Escludi clip già presenti nella coda attuale
+                if (_items.Any(i => i.Type == PlaylistItemType.Clip && i.FilePath == clip.FilePath))
+                    return false;
+
+                // Escludi clip nel batch in generazione
+                var genBatch = _generatingBatch;
+                if (genBatch != null)
+                {
+                    List<PlaylistQueueItem> snapshot;
+                    lock (_generatingBatchLock) { snapshot = genBatch.ToList(); }
+                    if (snapshot.Any(i => i.Type == PlaylistItemType.Clip && i.FilePath == clip.FilePath))
+                        return false;
+                }
+
+                // Escludi clip recentemente usati
+                if (_recentClipIds.Contains(clip.ID))
+                    return false;
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log($"[CanPlayClip] Errore: {ex.Message}");
+                return true;
+            }
+        }
+
+        // ✅ Seleziona il miglior clip disponibile con rotazione (fallback)
+        private PlaylistQueueItem GetBestAvailableClip(List<ClipEntry> validClips, string context)
+        {
+            try
+            {
+                if (validClips.Count == 0)
+                    return null;
+
+                // Escludi clip già in coda o nel batch
+                var clipsInQueue = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var i in _items)
+                    if (i.Type == PlaylistItemType.Clip && !string.IsNullOrEmpty(i.FilePath))
+                        clipsInQueue.Add(i.FilePath);
+
+                var genBatch = _generatingBatch;
+                if (genBatch != null)
+                {
+                    List<PlaylistQueueItem> snapshot;
+                    lock (_generatingBatchLock) { snapshot = genBatch.ToList(); }
+                    foreach (var i in snapshot)
+                        if (i.Type == PlaylistItemType.Clip && !string.IsNullOrEmpty(i.FilePath))
+                            clipsInQueue.Add(i.FilePath);
+                }
+
+                // Prova prima quelli non in coda
+                var notInQueue = validClips.Where(c => !clipsInQueue.Contains(c.FilePath)).ToList();
+
+                // Se tutti in coda, usa tutti i disponibili
+                var candidates = notInQueue.Count > 0 ? notInQueue : validClips;
+
+                // Prova quelli non recenti
+                var notRecent = candidates.Where(c => !_recentClipIds.Contains(c.ID)).ToList();
+                if (notRecent.Count == 0)
+                {
+                    // Reset rotazione: tutti usati
+                    _recentClipIds.Clear();
+                    Log($"[GetBestAvailableClip] [{context}] Reset rotazione clip – tutti usati");
+                    notRecent = candidates;
+                }
+
+                // Ordina per PlayCount ascendente poi LastPlayed ascendente
+                var selected = notRecent
+                    .OrderBy(c => c.PlayCount)
+                    .ThenBy(c => c.LastPlayed ?? "")
+                    .ThenBy(c => Guid.NewGuid())
+                    .FirstOrDefault();
+
+                if (selected != null)
+                {
+                    _recentClipIds.Add(selected.ID);
+                    return CreateClipQueueItem(selected);
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Log($"[GetBestAvailableClip] ❌ Errore: {ex.Message}");
+                return null;
+            }
+        }
 
         private List<string> GetViolations(MusicEntry entry)
         {
@@ -2113,6 +2246,7 @@ namespace AirDirector.Controls
                 DateTime limitTrack = now.AddHours(-hourlySeparationHours);
 
                 var recentReports = ReportManager.LoadReport(limitTrack, now);
+                var aliases = GetCachedAliases();
 
                 // Controllo separazione brano
                 foreach (var report in recentReports)
@@ -2136,7 +2270,10 @@ namespace AirDirector.Controls
                 {
                     foreach (var report in recentReports)
                     {
-                        if (report.Type == "Music" && report.Artist == entry.Artist)
+                        if (report.Type == "Music" && ArtistParsingService.ArtistsOverlap(
+                                entry.Artist, entry.FeaturedArtists,
+                                report.Artist, "",
+                                aliases))
                         {
                             if (DateTime.TryParse($"{report.Date:yyyy-MM-dd} {report.StartTime}", out DateTime playedTime))
                             {
@@ -2162,17 +2299,25 @@ namespace AirDirector.Controls
                     foreach (var kvp in _queueSnapshotAtCreation)
                     {
                         string[] parts = kvp.Key.Split(new[] { "|||" }, StringSplitOptions.None);
-                        if (parts.Length == 2 && parts[0] == entry.Artist)
+                        if (parts.Length == 2)
                         {
-                            TimeSpan timeDiff = kvp.Value - now;
-                            if (timeDiff.TotalHours < artistSeparationHours && timeDiff.TotalHours >= 0)
+                            // Confronto con overlap artisti
+                            string queueArtist = parts[0];
+                            if (ArtistParsingService.ArtistsOverlap(
+                                    entry.Artist, entry.FeaturedArtists,
+                                    queueArtist, "",
+                                    aliases))
                             {
-                                string artistSepKey = LanguageManager.GetString("Queue.ArtistSeparation", "Sep.Artista");
-                                if (!violations.Contains(artistSepKey))
+                                TimeSpan timeDiff = kvp.Value - now;
+                                if (timeDiff.TotalHours < artistSeparationHours && timeDiff.TotalHours >= 0)
                                 {
-                                    violations.Add(LanguageManager.GetString("Queue.ArtistNearby", "Artista vicino")); // ? CORRETTO
+                                    string artistSepKey = LanguageManager.GetString("Queue.ArtistSeparation", "Sep.Artista");
+                                    if (!violations.Contains(artistSepKey))
+                                    {
+                                        violations.Add(LanguageManager.GetString("Queue.ArtistNearby", "Artista vicino")); // ? CORRETTO
+                                    }
+                                    break;
                                 }
-                                break;
                             }
                         }
                     }
@@ -2198,6 +2343,7 @@ namespace AirDirector.Controls
 				DateTime limitTrack = now.AddHours(-hourlySeparationHours);
 
 				var recentReports = ReportManager.LoadReport(limitTrack, now);
+				var aliases = GetCachedAliases();
 
 				foreach (var report in recentReports)
 				{
@@ -2212,7 +2358,10 @@ namespace AirDirector.Controls
 							}
 						}
 
-						if (report.Artist == entry.Artist)
+						if (ArtistParsingService.ArtistsOverlap(
+								entry.Artist, entry.FeaturedArtists,
+								report.Artist, "",
+								aliases))
 						{
 							if (DateTime.TryParse($"{report.Date:yyyy-MM-dd} {report.StartTime}", out DateTime playedTime))
 							{
@@ -2230,7 +2379,10 @@ namespace AirDirector.Controls
 						if (item.Artist == entry.Artist && item.Title == entry.Title)
 							return false;
 
-						if (item.Artist == entry.Artist)
+						if (ArtistParsingService.ArtistsOverlap(
+								entry.Artist, entry.FeaturedArtists,
+								item.Artist, item.FeaturedArtists,
+								aliases))
 						{
 							TimeSpan timeDiff = item.ScheduledTime - now;
 
@@ -2252,7 +2404,10 @@ namespace AirDirector.Controls
 							if (item.Artist == entry.Artist && item.Title == entry.Title)
 								return false;
 
-							if (item.Artist == entry.Artist)
+							if (ArtistParsingService.ArtistsOverlap(
+									entry.Artist, entry.FeaturedArtists,
+									item.Artist, item.FeaturedArtists,
+									aliases))
 								return false;
 						}
 					}
@@ -2373,8 +2528,16 @@ namespace AirDirector.Controls
 					if (valid.Count == 0)
 						return null;
 
-					Random rnd = new Random(Guid.NewGuid().GetHashCode());
-					return CreateClipQueueItem(valid[rnd.Next(valid.Count)]);
+					var available = valid.Where(c => CanPlayClip(c)).ToList();
+					if (available.Count > 0)
+					{
+						Random rnd = new Random(Guid.NewGuid().GetHashCode());
+						var sel = available[rnd.Next(available.Count)];
+						_recentClipIds.Add(sel.ID);
+						return CreateClipQueueItem(sel);
+					}
+
+					return GetBestAvailableClip(valid, $"categoria:{category}");
 				}
 
 				return null;
@@ -2401,11 +2564,16 @@ namespace AirDirector.Controls
 
 				var recentReports = ReportManager.LoadReport(limitTrack.AddHours(-24), now);
 
-				var artistsInQueue = new HashSet<string>(
-					_items.Where(i => i.Type == PlaylistItemType.Music && !string.IsNullOrEmpty(i.Artist))
-						  .Select(i => i.Artist),
-					StringComparer.OrdinalIgnoreCase
-				);
+				var aliases = GetCachedAliases();
+				var artistsInQueue = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+				foreach (var i in _items)
+				{
+					if (i.Type == PlaylistItemType.Music)
+					{
+						foreach (var a in ArtistParsingService.GetAllArtists(i.Artist, i.FeaturedArtists, aliases))
+							artistsInQueue.Add(a);
+					}
+				}
 
 				var genBatch = _generatingBatch;
 				List<PlaylistQueueItem> genBatchSnapshot = null;
@@ -2414,9 +2582,12 @@ namespace AirDirector.Controls
 					lock (_generatingBatchLock) { genBatchSnapshot = genBatch.ToList(); }
 					foreach (var gi in genBatchSnapshot)
 					{
-						if (gi.Type == PlaylistItemType.Music && !string.IsNullOrEmpty(gi.Artist))
-							artistsInQueue.Add(gi.Artist);
-				 	}
+						if (gi.Type == PlaylistItemType.Music)
+						{
+							foreach (var a in ArtistParsingService.GetAllArtists(gi.Artist, gi.FeaturedArtists, aliases))
+								artistsInQueue.Add(a);
+						}
+					}
 				}
 
 				var scoredTracks = new List<(MusicEntry track, int penaltyScore, DateTime? lastPlayed)>();
@@ -2476,7 +2647,8 @@ namespace AirDirector.Controls
 						continue;
 					}
 
-					if (artistsInQueue.Contains(track.Artist))
+					var trackArtists = ArtistParsingService.GetAllArtists(track.Artist, track.FeaturedArtists, aliases);
+					if (artistsInQueue.Overlaps(trackArtists))
 						penalty += 5000;
 
 					var trackReports = recentReports.Where(r =>
@@ -2502,7 +2674,7 @@ namespace AirDirector.Controls
 
 					var artistReports = recentReports.Where(r =>
 						r.Type == "Music" &&
-						r.Artist == track.Artist).ToList();
+						ArtistParsingService.ArtistsOverlap(track.Artist, track.FeaturedArtists, r.Artist, "", aliases)).ToList();
 
 					if (artistReports.Any())
 					{
@@ -2676,6 +2848,7 @@ namespace AirDirector.Controls
                 Type = PlaylistItemType.Music,
                 ScheduledTime = DateTime.Now,
                 Artist = entry.Artist,
+                FeaturedArtists = entry.FeaturedArtists ?? "",
                 Title = entry.Title,
                 Year = entry.Year,
                 Duration = TimeSpan.FromMilliseconds(effectiveDurationMs),
@@ -3894,6 +4067,7 @@ namespace AirDirector.Controls
 		public DateTime ScheduledTime { get; set; }
 		public DateTime ActualStartTime { get; set; }
 		public string Artist { get; set; }
+		public string FeaturedArtists { get; set; }
 		public string Title { get; set; }
 		public int Year { get; set; }
 		public TimeSpan Duration { get; set; }
@@ -3942,6 +4116,7 @@ namespace AirDirector.Controls
 			ScheduledTime = DateTime.Now;
 			ActualStartTime = DateTime.Now;
 			Artist = string.Empty;
+			FeaturedArtists = string.Empty;
 			Title = string.Empty;
 			Year = 0;
 			Duration = TimeSpan.Zero;
