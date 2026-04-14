@@ -845,7 +845,7 @@
             lblFeaturedArtists.Name = "lblFeaturedArtists";
             lblFeaturedArtists.Size = new System.Drawing.Size(80, 15);
             lblFeaturedArtists.TabIndex = 15;
-            lblFeaturedArtists.Text = "Artisti Feat.:";
+            lblFeaturedArtists.Text = "";
 
             // txtFeaturedArtistsDisplay
             txtFeaturedArtistsDisplay.Font = new System.Drawing.Font("Segoe UI", 10F);
