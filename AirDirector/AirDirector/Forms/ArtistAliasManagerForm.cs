@@ -23,13 +23,12 @@ namespace AirDirector.Forms
         // Right panel
         private DataGridView dgvAliases;
         private Label lblAliasesHeader;
-        private FlowLayoutPanel rightButtonsPanel;
+        private Panel rightButtonsPanel;
         private Button btnAddAlias;
         private Button btnRemoveAlias;
 
         // Bottom bar
         private Panel bottomPanel;
-        private FlowLayoutPanel bottomButtonsPanel;
         private Button btnAutoScan;
         private Button btnClose;
 
@@ -61,7 +60,7 @@ namespace AirDirector.Forms
 
         private void InitializeComponents()
         {
-            this.Text = "🎤 " + LanguageManager.GetString("ArtistAlias.Title", "Gestione Alias Artisti");
+            this.Text = "🎤 " + LanguageManager.GetString("ArtistAliasManager.Title", "Gestione Alias Artisti");
             this.Size = new Size(1000, 600);
             this.MinimumSize = new Size(800, 480);
             this.StartPosition = FormStartPosition.CenterParent;
@@ -76,44 +75,33 @@ namespace AirDirector.Forms
             };
 
             btnAutoScan = CreateButton(
-                "🔍 " + LanguageManager.GetString("ArtistAlias.AutoScan", "Auto-Scan"),
+                "🔍 " + LanguageManager.GetString("ArtistAliasManager.AutoScan", "Auto-Scan"),
                 AppTheme.BgLight);
             btnClose = CreateButton(
-                "✖ " + LanguageManager.GetString("ArtistAlias.Close", "Chiudi"),
+                "✖ " + LanguageManager.GetString("Common.Close", "Chiudi"),
                 AppTheme.BgLight);
 
             btnAutoScan.Click += BtnAutoScan_Click;
             btnClose.Click += (s, e) => this.Close();
 
-            bottomButtonsPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Left,
-                AutoSize = true,
-                WrapContents = false,
-                FlowDirection = FlowDirection.LeftToRight,
-                Padding = new Padding(0),
-                Margin = new Padding(0)
-            };
-            bottomButtonsPanel.Controls.Add(btnAutoScan);
-            bottomButtonsPanel.Controls.Add(btnClose);
-            bottomPanel.Controls.Add(bottomButtonsPanel);
+            bottomPanel.Controls.Add(btnAutoScan);
+            btnAutoScan.Location = new Point(6, 8);
+            btnClose.Location = new Point(6 + btnAutoScan.Width + 8, 8);
+            bottomPanel.Controls.Add(btnClose);
 
             // ── SplitContainer ──────────────────────────────────────────────
             splitMain = new SplitContainer
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
-                SplitterDistance = 500,
-                SplitterWidth = 5,
-                IsSplitterFixed = false,
-                Panel1MinSize = 200,
-                Panel2MinSize = 200
+                SplitterDistance = 560,
+                SplitterWidth = 5
             };
 
             // ── Left panel: songs with featured artists ─────────────────────
             lblSongsHeader = new Label
             {
-                Text = LanguageManager.GetString("ArtistAlias.TracksWithAliases", "Brani con Alias Artisti"),
+                Text = LanguageManager.GetString("ArtistAliasManager.SongsWithAliases", "Brani con Alias Artisti"),
                 Dock = DockStyle.Top,
                 Height = 24,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
@@ -136,19 +124,19 @@ namespace AirDirector.Forms
             dgvSongs.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "colArtist",
-                HeaderText = LanguageManager.GetString("ArtistAlias.Artist", "Artista"),
+                HeaderText = LanguageManager.GetString("ArtistAliasManager.Artist", "Artista"),
                 FillWeight = 30
             });
             dgvSongs.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "colTitle",
-                HeaderText = LanguageManager.GetString("MusicEditor.Title", "Titolo"),
+                HeaderText = LanguageManager.GetString("ArtistAliasManager.Title", "Titolo"),
                 FillWeight = 40
             });
             dgvSongs.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "colFeatured",
-                HeaderText = LanguageManager.GetString("ArtistAlias.ArtistAliases", "Alias Artisti del Brano"),
+                HeaderText = LanguageManager.GetString("ArtistAliasManager.FeaturedArtists", "Artisti Feat."),
                 FillWeight = 30
             });
             dgvSongs.SelectionChanged += DgvSongs_SelectionChanged;
@@ -159,7 +147,7 @@ namespace AirDirector.Forms
             // ── Right panel: aliases for selected song ──────────────────────
             lblAliasesHeader = new Label
             {
-                Text = LanguageManager.GetString("ArtistAlias.ArtistAliases", "Alias Artisti del Brano"),
+                Text = LanguageManager.GetString("ArtistAliasManager.AliasesForSong", "Alias del brano selezionato"),
                 Dock = DockStyle.Top,
                 Height = 24,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
@@ -182,44 +170,41 @@ namespace AirDirector.Forms
             dgvAliases.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "colAliasArtist",
-                HeaderText = LanguageManager.GetString("ArtistAlias.Artist", "Artista"),
+                HeaderText = LanguageManager.GetString("ArtistAliasManager.FeaturedArtistName", "Artista Feat."),
                 FillWeight = 40
             });
             dgvAliases.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "colCanonical",
-                HeaderText = LanguageManager.GetString("ArtistAlias.ArtistName", "Nome Artista Canonico"),
+                HeaderText = LanguageManager.GetString("ArtistAliasManager.CanonicalName", "Nome Canonico"),
                 FillWeight = 35
             });
             dgvAliases.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "colAliasesKnown",
-                HeaderText = LanguageManager.GetString("ArtistAlias.Aliases", "Alias (separati da ;)"),
+                HeaderText = LanguageManager.GetString("ArtistAliasManager.KnownAliases", "Alias Conosciuti"),
                 FillWeight = 25
             });
 
-            rightButtonsPanel = new FlowLayoutPanel
+            rightButtonsPanel = new Panel
             {
                 Dock = DockStyle.Bottom,
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false,
-                AutoScroll = true,
-                Padding = new Padding(4, 6, 4, 6),
-                Margin = new Padding(0)
+                Height = 44,
+                Padding = new Padding(4, 6, 4, 6)
             };
 
             btnAddAlias = CreateButton(
-                "➕ " + LanguageManager.GetString("ArtistAlias.AddAlias", "Aggiungi Alias"),
+                "➕ " + LanguageManager.GetString("ArtistAliasManager.AddFeatured", "Aggiungi Feat."),
                 AppTheme.Primary);
             btnRemoveAlias = CreateButton(
-                "🗑️ " + LanguageManager.GetString("ArtistAlias.RemoveAlias", "Rimuovi"),
+                "🗑️ " + LanguageManager.GetString("ArtistAliasManager.RemoveFeatured", "Rimuovi Feat."),
                 Color.IndianRed);
 
             btnAddAlias.Click += BtnAddAlias_Click;
             btnRemoveAlias.Click += BtnRemoveAlias_Click;
 
+            btnAddAlias.Location = new Point(4, 7);
+            btnRemoveAlias.Location = new Point(4 + btnAddAlias.Width + 6, 7);
             rightButtonsPanel.Controls.Add(btnAddAlias);
             rightButtonsPanel.Controls.Add(btnRemoveAlias);
 
@@ -230,9 +215,6 @@ namespace AirDirector.Forms
             // ── Assembly ────────────────────────────────────────────────────
             this.Controls.Add(splitMain);
             this.Controls.Add(bottomPanel);
-
-            this.Shown += (s, e) => UpdateSplitDistance();
-            this.Resize += (s, e) => UpdateSplitDistance();
         }
 
         private Button CreateButton(string text, Color backColor)
@@ -257,7 +239,6 @@ namespace AirDirector.Forms
         {
             this.BackColor = AppTheme.BgDark;
             bottomPanel.BackColor = AppTheme.BgDark;
-            bottomButtonsPanel.BackColor = AppTheme.BgDark;
             rightButtonsPanel.BackColor = AppTheme.BgDark;
             splitMain.BackColor = AppTheme.BgDark;
 
@@ -384,29 +365,24 @@ namespace AirDirector.Forms
             if (_selectedSong == null)
             {
                 lblAliasesHeader.Text = LanguageManager.GetString(
-                    "ArtistAlias.ArtistAliases", "Alias Artisti del Brano");
+                    "ArtistAliasManager.AliasesForSong", "Alias del brano selezionato");
                 return;
             }
 
-            lblAliasesHeader.Text = LanguageManager.GetString("ArtistAlias.ArtistAliases", "Alias Artisti del Brano");
+            lblAliasesHeader.Text = string.Format(
+                LanguageManager.GetString("ArtistAliasManager.AliasesForSongFmt",
+                    "Alias: {0} – {1}"),
+                _selectedSong.Artist, _selectedSong.Title);
 
-            var (primaryArtist, parsedFeatured) = ArtistParsingService.ParseArtists(
-                _selectedSong.Artist, _selectedSong.Title, _artistEntries);
+            if (string.IsNullOrWhiteSpace(_selectedSong.FeaturedArtists))
+                return;
 
-            var songArtists = new List<string>();
-            AddIfMissing(songArtists, primaryArtist);
-            foreach (var detected in parsedFeatured)
-                AddIfMissing(songArtists, detected);
-
-            foreach (var explicitArtist in (_selectedSong.FeaturedArtists ?? "")
+            var featuredNames = _selectedSong.FeaturedArtists
                 .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(n => n.Trim())
-                .Where(n => !string.IsNullOrWhiteSpace(n)))
-            {
-                AddIfMissing(songArtists, explicitArtist);
-            }
+                .Where(n => !string.IsNullOrWhiteSpace(n));
 
-            foreach (var name in songArtists)
+            foreach (var name in featuredNames)
             {
                 // Find canonical name and known aliases from Artists.dbc
                 var entry = _artistEntries.FirstOrDefault(a =>
@@ -436,15 +412,15 @@ namespace AirDirector.Forms
             if (_selectedSong == null)
             {
                 MessageBox.Show(
-                    LanguageManager.GetString("ArtistAlias.SelectSongFirst", "Seleziona prima un brano."),
-                    LanguageManager.GetString("ArtistAlias.Title", "Gestione Alias Artisti"),
+                    LanguageManager.GetString("ArtistAliasManager.SelectSongFirst", "Seleziona prima un brano."),
+                    LanguageManager.GetString("ArtistAliasManager.Title", "Gestione Alias Artisti"),
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             string newArtist = Microsoft.VisualBasic.Interaction.InputBox(
-                LanguageManager.GetString("ArtistAlias.EnterArtistName", "Inserisci il nome dell'artista da aggiungere:"),
-                LanguageManager.GetString("ArtistAlias.AddAlias", "Aggiungi Alias"),
+                LanguageManager.GetString("ArtistAliasManager.EnterArtistName", "Inserisci il nome dell'artista feat. da aggiungere:"),
+                LanguageManager.GetString("ArtistAliasManager.AddFeatured", "Aggiungi Artista Feat."),
                 "");
 
             if (string.IsNullOrWhiteSpace(newArtist)) return;
@@ -459,8 +435,8 @@ namespace AirDirector.Forms
             if (existing.Any(n => string.Equals(n, newArtist, StringComparison.OrdinalIgnoreCase)))
             {
                 MessageBox.Show(
-                    LanguageManager.GetString("ArtistAlias.ArtistAlreadyPresent", "L'artista è già presente."),
-                    LanguageManager.GetString("ArtistAlias.Title", "Gestione Alias Artisti"),
+                    LanguageManager.GetString("ArtistAliasManager.ArtistAlreadyPresent", "L'artista è già presente."),
+                    LanguageManager.GetString("ArtistAliasManager.Title", "Gestione Alias Artisti"),
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -485,9 +461,7 @@ namespace AirDirector.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"{LanguageManager.GetString("Common.Error", "Errore")}: {ex.Message}",
-                    LanguageManager.GetString("Common.Error", "Errore"),
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Errore: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -500,8 +474,8 @@ namespace AirDirector.Forms
 
             var confirmResult = MessageBox.Show(
                 string.Format(
-                    LanguageManager.GetString("ArtistAlias.ConfirmDelete",
-                        "Eliminare l'alias per '{0}'?"), artistToRemove),
+                    LanguageManager.GetString("ArtistAliasManager.ConfirmRemoveFeatured",
+                        "Rimuovere '{0}' dagli artisti feat. del brano?"), artistToRemove),
                 LanguageManager.GetString("Common.Confirm", "Conferma"),
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
@@ -526,9 +500,7 @@ namespace AirDirector.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"{LanguageManager.GetString("Common.Error", "Errore")}: {ex.Message}",
-                    LanguageManager.GetString("Common.Error", "Errore"),
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Errore: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -538,38 +510,31 @@ namespace AirDirector.Forms
             {
                 LoadArtistEntries();
                 var allMusic = DbcManager.LoadFromCsv<MusicEntry>("Music.dbc");
-                int newArtistsAdded = 0;
+                int updated = 0;
 
                 foreach (var m in allMusic)
                 {
                     // Skip songs manually edited by the user
                     if (_manuallyEditedIds.Contains(m.ID)) continue;
 
-                    var (primary, detected) = ArtistParsingService.ParseArtists(m.Artist, m.Title, _artistEntries);
+                    var (_, detected) = ArtistParsingService.ParseArtists(m.Artist, m.Title, _artistEntries);
 
-                    var detectedAll = new List<string>();
-                    AddIfMissing(detectedAll, primary);
-                    foreach (var detectedArtist in detected)
-                        AddIfMissing(detectedAll, detectedArtist);
-
-                    if (detectedAll.Count == 0) continue;
+                    if (detected.Count == 0) continue;
 
                     // Merge detected with existing FeaturedArtists (don't overwrite custom ones)
                     var existing = (m.FeaturedArtists ?? "")
                         .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
                         .Select(n => n.Trim())
                         .Where(n => !string.IsNullOrWhiteSpace(n))
-                        .ToList();
-                    var existingSet = new HashSet<string>(existing, StringComparer.OrdinalIgnoreCase);
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
                     bool changed = false;
-                    foreach (var d in detectedAll)
+                    foreach (var d in detected)
                     {
-                        if (existingSet.Add(d))
+                        if (!existing.Contains(d))
                         {
                             existing.Add(d);
                             changed = true;
-                            newArtistsAdded++;
                         }
                     }
 
@@ -577,8 +542,10 @@ namespace AirDirector.Forms
                     {
                         m.FeaturedArtists = string.Join(";", existing);
                         DbcManager.Update("Music.dbc", m);
+                        updated++;
+
                         // Persist any new artists in Artists.dbc
-                        foreach (var d in detectedAll)
+                        foreach (var d in detected)
                             PersistArtistEntry(d);
                     }
                 }
@@ -586,44 +553,20 @@ namespace AirDirector.Forms
                 LoadArtistEntries();
                 LoadSongs();
 
-                var message = newArtistsAdded > 0
-                    ? string.Format(
-                        LanguageManager.GetString("ArtistAlias.AutoScanResult",
-                            "Auto-Scan completato: {0} nuovi artisti aggiunti."), newArtistsAdded)
-                    : LanguageManager.GetString("ArtistAlias.NoNewArtists", "Nessun nuovo artista trovato.");
-
                 MessageBox.Show(
-                    message,
-                    LanguageManager.GetString("ArtistAlias.AutoScan", "Auto-Scan"),
+                    string.Format(
+                        LanguageManager.GetString("ArtistAliasManager.AutoScanResult",
+                            "Auto-Scan completato: {0} brani aggiornati."), updated),
+                    LanguageManager.GetString("ArtistAliasManager.AutoScan", "Auto-Scan"),
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"{LanguageManager.GetString("Common.Error", "Errore")}: {ex.Message}",
-                    LanguageManager.GetString("Common.Error", "Errore"),
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Errore Auto-Scan: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
-
-        private void UpdateSplitDistance()
-        {
-            if (splitMain == null || splitMain.ClientSize.Width <= 0) return;
-
-            int target = splitMain.ClientSize.Width / 2;
-            int min = splitMain.Panel1MinSize;
-            int max = splitMain.ClientSize.Width - splitMain.Panel2MinSize;
-            splitMain.SplitterDistance = Math.Max(min, Math.Min(target, max));
-        }
-
-        private static void AddIfMissing(List<string> list, string value)
-        {
-            if (string.IsNullOrWhiteSpace(value)) return;
-            string trimmed = value.Trim();
-            if (!list.Any(v => string.Equals(v, trimmed, StringComparison.OrdinalIgnoreCase)))
-                list.Add(trimmed);
-        }
 
         private void PersistArtistEntry(string artistName)
         {
@@ -666,8 +609,8 @@ namespace AirDirector.Forms
         {
             bool isNew = Entry.ID == 0;
             this.Text = isNew
-                ? LanguageManager.GetString("ArtistAlias.AddArtist", "Aggiungi Artista")
-                : LanguageManager.GetString("ArtistAlias.EditArtist", "Modifica Artista");
+                ? LanguageManager.GetString("ArtistAliasManager.AddArtist", "Aggiungi Artista")
+                : LanguageManager.GetString("ArtistAliasManager.EditArtist", "Modifica Artista");
             this.Size = new Size(420, 200);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -677,7 +620,7 @@ namespace AirDirector.Forms
 
             var lblName = new Label
             {
-                Text = LanguageManager.GetString("ArtistAlias.ArtistName", "Nome Artista Canonico"),
+                Text = LanguageManager.GetString("ArtistAliasManager.ArtistName", "Nome Canonico:"),
                 Location = new Point(10, 15),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
@@ -695,7 +638,7 @@ namespace AirDirector.Forms
 
             var lblAliases = new Label
             {
-                Text = LanguageManager.GetString("ArtistAlias.Aliases", "Alias (separati da ;)"),
+                Text = LanguageManager.GetString("ArtistAliasManager.Aliases", "Alias (sep. da ;):"),
                 Location = new Point(10, 50),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
@@ -713,9 +656,7 @@ namespace AirDirector.Forms
 
             var btnOk = new Button
             {
-                Text = "✔ " + (isNew
-                    ? LanguageManager.GetString("ArtistAlias.Add", "Aggiungi")
-                    : LanguageManager.GetString("ArtistAlias.Edit", "Modifica")),
+                Text = "✔ OK",
                 DialogResult = DialogResult.OK,
                 Location = new Point(230, 130),
                 Size = new Size(80, 28),
@@ -728,7 +669,7 @@ namespace AirDirector.Forms
 
             var btnCancel = new Button
             {
-                Text = "✖ " + LanguageManager.GetString("Common.Cancel", "Annulla"),
+                Text = "✖ Annulla",
                 DialogResult = DialogResult.Cancel,
                 Location = new Point(318, 130),
                 Size = new Size(80, 28),
