@@ -56,6 +56,9 @@
     <Compile Update="Controls\WhatsAppControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Forms\ArtistAliasManagerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Forms\BatchEditForm.cs">
       <SubType>Form</SubType>
     </Compile>
