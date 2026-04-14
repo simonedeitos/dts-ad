@@ -1105,6 +1105,12 @@ namespace AirDirector.Controls
                     await BoostDownloadVolumeAsync(processedLocalPath);
                 }
 
+                if (task.VolumeAdjustEnabled && task.VolumeAdjustDb != 0)
+                {
+                    LogMessage(string.Format(LanguageManager.GetString("Download.AdjustingVolumeDb", "Regolazione volume file scaricato ({0} dB)..."), task.VolumeAdjustDb));
+                    await AdjustVolumeDbAsync(processedLocalPath, task.VolumeAdjustDb);
+                }
+
                 if (task.CompositionEnabled)
                 {
                     await ComposeAudioFilesAsync(task);
@@ -1366,6 +1372,94 @@ namespace AirDirector.Controls
                     }
 
                     LogMessage(LanguageManager.GetString("Download.VolumeBoostDone", "✅ Amplificazione volume completata"));
+                }
+                catch (Exception ex) when (IsFileInUseException(ex))
+                {
+                    LogMessage(string.Format(
+                        LanguageManager.GetString("Download.FileInUseSkip",
+                            "⚠️ File in uso da un altro processo, conversione MP3 saltata: {0}"),
+                        filePath));
+                }
+                catch (Exception ex)
+                {
+                    LogMessage(string.Format(LanguageManager.GetString("Download.VolumeBoostError", "❌ Errore amplificazione volume: {0}"), ex.Message));
+                    throw;
+                }
+            });
+        }
+
+        // ---------------------------------------------------------------
+        // Regolazione volume in dB
+        // ---------------------------------------------------------------
+        private async Task AdjustVolumeDbAsync(string filePath, int dB)
+        {
+            await Task.Run(() =>
+            {
+                try
+                {
+                    if (!File.Exists(filePath))
+                        return;
+
+                    if (IsFileLocked(filePath))
+                    {
+                        LogMessage(string.Format(
+                            LanguageManager.GetString("Download.FileInUseSkip",
+                                "⚠️ File in uso da un altro processo, conversione MP3 saltata: {0}"),
+                            filePath));
+                        return;
+                    }
+
+                    string ext = Path.GetExtension(filePath).ToLower();
+                    if (ext != ".mp3" && ext != ".wma")
+                    {
+                        LogMessage(string.Format(LanguageManager.GetString("Download.VolumeBoostUnsupported", "⚠️ Formato non supportato per amplificazione volume: {0}"), ext));
+                        return;
+                    }
+
+                    float factor = (float)Math.Pow(10.0, dB / 20.0);
+
+                    string tempWavFile = Path.Combine(
+                        Path.GetDirectoryName(filePath),
+                        Path.GetFileNameWithoutExtension(filePath) + "_vdb_temp.wav"
+                    );
+                    string tempOutFile = Path.Combine(
+                        Path.GetDirectoryName(filePath),
+                        Path.GetFileNameWithoutExtension(filePath) + "_vdb_out" + ext
+                    );
+
+                    using (var reader = new AudioFileReader(filePath))
+                    {
+                        var volumeProvider = new VolumeSampleProvider(reader);
+                        volumeProvider.Volume = factor;
+                        WaveFileWriter.CreateWaveFile16(tempWavFile, volumeProvider);
+                    }
+
+                    using (var reader = new AudioFileReader(tempWavFile))
+                    {
+                        if (ext == ".mp3")
+                            MediaFoundationEncoder.EncodeToMp3(reader, tempOutFile, 320000);
+                        else
+                            MediaFoundationEncoder.EncodeToWma(reader, tempOutFile);
+                    }
+
+                    try { File.Delete(tempWavFile); } catch { }
+
+                    try
+                    {
+                        File.Delete(filePath);
+                        File.Move(tempOutFile, filePath);
+                    }
+                    catch (Exception ex) when (IsFileInUseException(ex))
+                    {
+                        LogMessage(string.Format(
+                            LanguageManager.GetString("Download.FileInUseSkip",
+                                "⚠️ File in uso da un altro processo, conversione MP3 saltata: {0}"),
+                            filePath));
+                        try { File.Delete(tempOutFile); } catch { }
+                        return;
+                    }
+
+                    LogMessage(string.Format(LanguageManager.GetString("Download.VolumeAdjustDone", "✅ Regolazione volume completata ({0} dB)"), dB));
                 }
                 catch (Exception ex) when (IsFileInUseException(ex))
                 {

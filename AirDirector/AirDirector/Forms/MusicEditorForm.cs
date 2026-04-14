@@ -1846,7 +1846,7 @@ namespace AirDirector.Forms
                 _waveOut?.Play();
                 _isPlaying = true;
                 _positionTimer.Start();
-                btnPlay.Text = "⏸ PAUSE";
+                btnPlay.Text = "❚❚ PAUSE";
                 btnPlay.BackColor = Color.FromArgb(200, 100, 0);
 
                 // Sync and play video preview

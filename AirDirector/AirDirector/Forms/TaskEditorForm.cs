@@ -38,6 +38,8 @@ namespace AirDirector.Forms
         private ListBox listTimes;
         private CheckBox chkEnableComposition;
         private CheckBox chkBoostDownloadVolume;
+        private CheckBox chkVolumeAdjust;
+        private NumericUpDown numVolumeAdjustDb;
 
         private Label lblName;
         private Label lblHttpUrl;
@@ -141,6 +143,9 @@ namespace AirDirector.Forms
 
             if (chkBoostDownloadVolume != null)
                 chkBoostDownloadVolume.Text = LanguageManager.GetString("Composition.BoostVolume", "Aumenta volume (-0.5db)");
+
+            if (chkVolumeAdjust != null)
+                chkVolumeAdjust.Text = LanguageManager.GetString("Download.VolumeAdjust", "Regolazione volume (dB):");
 
             if (gbDays != null)
                 gbDays.Text = LanguageManager.GetString("TaskEditor.DownloadDays", "Giorni di Download");
@@ -422,6 +427,28 @@ namespace AirDirector.Forms
                 Font = new Font("Segoe UI", 10)
             };
             contentPanel.Controls.Add(chkBoostDownloadVolume);
+
+            chkVolumeAdjust = new CheckBox
+            {
+                Text = LanguageManager.GetString("Download.VolumeAdjust", "Regolazione volume (dB):"),
+                Location = new Point(15, yPos + 110),
+                Size = new Size(240, 23),
+                Font = new Font("Segoe UI", 10)
+            };
+            numVolumeAdjustDb = new NumericUpDown
+            {
+                Minimum = -10,
+                Maximum = 10,
+                Value = 0,
+                DecimalPlaces = 0,
+                Location = new Point(260, yPos + 110),
+                Size = new Size(60, 23),
+                Font = new Font("Segoe UI", 10),
+                Enabled = false
+            };
+            chkVolumeAdjust.CheckedChanged += (s, e) => numVolumeAdjustDb.Enabled = chkVolumeAdjust.Checked;
+            contentPanel.Controls.Add(chkVolumeAdjust);
+            contentPanel.Controls.Add(numVolumeAdjustDb);
         }
 
         private void CreateScheduleTab()
@@ -598,6 +625,9 @@ namespace AirDirector.Forms
 
             txtLocalPath.Text = Task.LocalFilePath;
             chkBoostDownloadVolume.Checked = Task.BoostDownloadVolume;
+            chkVolumeAdjust.Checked = Task.VolumeAdjustEnabled;
+            numVolumeAdjustDb.Value = Math.Max(-10, Math.Min(10, Task.VolumeAdjustDb));
+            numVolumeAdjustDb.Enabled = Task.VolumeAdjustEnabled;
 
             chkMonday.Checked = Task.Monday;
             chkTuesday.Checked = Task.Tuesday;
@@ -780,6 +810,8 @@ namespace AirDirector.Forms
             Task.FtpPassword = txtFtpPassword.Text;
             Task.LocalFilePath = txtLocalPath.Text;
             Task.BoostDownloadVolume = chkBoostDownloadVolume.Checked;
+            Task.VolumeAdjustEnabled = chkVolumeAdjust.Checked;
+            Task.VolumeAdjustDb = (int)numVolumeAdjustDb.Value;
             Task.Monday = chkMonday.Checked;
             Task.Tuesday = chkTuesday.Checked;
             Task.Wednesday = chkWednesday.Checked;
