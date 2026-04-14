@@ -563,7 +563,6 @@ namespace AirDirector.Services.Database
         public string FilePath { get; set; } = "";
         public string Artist { get; set; } = "";
         public string Title { get; set; } = "";
-        public string FeaturedArtists { get; set; } = "";
         public string Album { get; set; } = "";
         public string Genre { get; set; } = "";
         public string Categories { get; set; } = "";
@@ -591,6 +590,7 @@ namespace AirDirector.Services.Database
         public string VideoFilePath { get; set; } = "";
         public string NDISourceName { get; set; } = "";
         public VideoSourceType VideoSource { get; set; } = VideoSourceType.None;
+        public string FeaturedArtists { get; set; } = "";
     }
 
     public class ClipEntry : IDbcEntry
