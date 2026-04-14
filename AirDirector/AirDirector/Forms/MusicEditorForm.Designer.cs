@@ -61,6 +61,9 @@
         private System.Windows.Forms.Label lblCategories;
         private System.Windows.Forms.TextBox txtCategoriesDisplay;
         private System.Windows.Forms.Button btnCategoriesDropdown;
+        private System.Windows.Forms.Label lblFeaturedArtists;
+        private System.Windows.Forms.TextBox txtFeaturedArtistsDisplay;
+        private System.Windows.Forms.Button btnFeaturedArtistsDropdown;
         private System.Windows.Forms.Label lblFilePath;
         private System.Windows.Forms.TextBox txtFilePath;
 
@@ -160,6 +163,9 @@
             lblCategories = new System.Windows.Forms.Label();
             txtCategoriesDisplay = new System.Windows.Forms.TextBox();
             btnCategoriesDropdown = new System.Windows.Forms.Button();
+            lblFeaturedArtists = new System.Windows.Forms.Label();
+            txtFeaturedArtistsDisplay = new System.Windows.Forms.TextBox();
+            btnFeaturedArtistsDropdown = new System.Windows.Forms.Button();
             lblFilePath = new System.Windows.Forms.Label();
             txtFilePath = new System.Windows.Forms.TextBox();
             grpPeriod = new System.Windows.Forms.GroupBox();
@@ -701,6 +707,9 @@
             bottomPanel.Controls.Add(lblCategories);
             bottomPanel.Controls.Add(txtCategoriesDisplay);
             bottomPanel.Controls.Add(btnCategoriesDropdown);
+            bottomPanel.Controls.Add(lblFeaturedArtists);
+            bottomPanel.Controls.Add(txtFeaturedArtistsDisplay);
+            bottomPanel.Controls.Add(btnFeaturedArtistsDropdown);
             bottomPanel.Controls.Add(lblFilePath);
             bottomPanel.Controls.Add(txtFilePath);
             bottomPanel.Controls.Add(grpPeriod);
@@ -828,6 +837,36 @@
             btnCategoriesDropdown.Text = "▼";
             btnCategoriesDropdown.UseVisualStyleBackColor = true;
             btnCategoriesDropdown.Click += (s, e) => ShowCategoryPopup();
+
+            // lblFeaturedArtists
+            lblFeaturedArtists.AutoSize = true;
+            lblFeaturedArtists.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            lblFeaturedArtists.Location = new System.Drawing.Point(15, 88);
+            lblFeaturedArtists.Name = "lblFeaturedArtists";
+            lblFeaturedArtists.Size = new System.Drawing.Size(80, 15);
+            lblFeaturedArtists.TabIndex = 15;
+            lblFeaturedArtists.Text = "Artisti Feat.:";
+
+            // txtFeaturedArtistsDisplay
+            txtFeaturedArtistsDisplay.Font = new System.Drawing.Font("Segoe UI", 10F);
+            txtFeaturedArtistsDisplay.Location = new System.Drawing.Point(100, 85);
+            txtFeaturedArtistsDisplay.Name = "txtFeaturedArtistsDisplay";
+            txtFeaturedArtistsDisplay.Size = new System.Drawing.Size(420, 25);
+            txtFeaturedArtistsDisplay.TabIndex = 16;
+            txtFeaturedArtistsDisplay.ReadOnly = true;
+            txtFeaturedArtistsDisplay.Cursor = System.Windows.Forms.Cursors.Hand;
+            txtFeaturedArtistsDisplay.Click += (s, e) => { if (!_isClip) ShowFeaturedArtistsPopup(); };
+
+            // btnFeaturedArtistsDropdown
+            btnFeaturedArtistsDropdown.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            btnFeaturedArtistsDropdown.Font = new System.Drawing.Font("Segoe UI", 9F);
+            btnFeaturedArtistsDropdown.Location = new System.Drawing.Point(520, 85);
+            btnFeaturedArtistsDropdown.Name = "btnFeaturedArtistsDropdown";
+            btnFeaturedArtistsDropdown.Size = new System.Drawing.Size(30, 25);
+            btnFeaturedArtistsDropdown.TabIndex = 17;
+            btnFeaturedArtistsDropdown.Text = "▼";
+            btnFeaturedArtistsDropdown.UseVisualStyleBackColor = true;
+            btnFeaturedArtistsDropdown.Click += (s, e) => { if (!_isClip) ShowFeaturedArtistsPopup(); };
 
             // lblFilePath
             lblFilePath.AutoSize = true;
