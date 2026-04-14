@@ -474,7 +474,7 @@ namespace AirDirector.Forms
             // Intro/Mix countdown: right column occupies ~40% of width, each panel gets ~40% of row height
             float rightW = formW * 0.40f;
             float counterH = rowH * 0.40f;
-            float introMixCountdown = Math.Max(10f, Math.Min(
+            float introMixCountdown = Math.Max(6f, Math.Min(
                 rightW * 0.18f,
                 counterH * 0.45f
             ));
@@ -499,7 +499,7 @@ namespace AirDirector.Forms
 
             // Scale countdown fonts
             float row2H = Math.Max(60f, _row2Split != null ? _row2Split.Height : rowH);
-            float countdown = Math.Max(12f, Math.Min(120f, Math.Min(row2H * 0.35f, (formW * 0.5f) * 0.22f)));
+            float countdown = Math.Max(6f, Math.Min(120f, Math.Min(row2H * 0.35f, (formW * 0.5f) * 0.22f)));
             ScaleCountdown(_lblIntroCountdown,    introMixCountdown);
             ScaleCountdown(_lblMixCountdown,      introMixCountdown);
             ScaleCountdown(_lblScheduleCountdown, countdown);
@@ -527,9 +527,9 @@ namespace AirDirector.Forms
                 // Auto-fit clock font using both width and height of the panel
                 float availW = Math.Max(20f, _pnlDateTime.ClientSize.Width - _pnlDateTime.Padding.Horizontal);
                 float availH = Math.Max(20f, _pnlDateTime.ClientSize.Height - dateLabelH - _pnlDateTime.Padding.Vertical);
-                float clockMax = Math.Max(12f, Math.Min(160f, Math.Min(availH * 0.75f, availW * 0.25f)));
+                float clockMax = Math.Max(6f, Math.Min(160f, Math.Min(availH * 0.75f, availW * 0.25f)));
                 float clockSize = clockMax;
-                while (clockSize > 12f)
+                while (clockSize > 6f)
                 {
                     using (var testFont = new Font(_countdownFontFamily, clockSize, FontStyle.Bold))
                     {
@@ -563,7 +563,7 @@ namespace AirDirector.Forms
             try
             {
                 var old = lbl.Font;
-                lbl.Font = new Font(_countdownFontFamily, Math.Max(8f, size), FontStyle.Bold);
+                lbl.Font = new Font(_countdownFontFamily, Math.Max(5f, size), FontStyle.Bold);
                 old.Dispose();
             }
             catch { }
