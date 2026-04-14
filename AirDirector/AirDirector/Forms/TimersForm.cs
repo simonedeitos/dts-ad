@@ -462,7 +462,35 @@ namespace AirDirector.Forms
 
             this.Controls.Add(_mainLayout);
         }
+        private void AutoFitCountdown(Label lbl, string text, float maxFontSize, float minFontSize = 5f)
+        {
+            lbl.Text = text;
+            if (lbl.Width <= 0 || lbl.Height <= 0) return;
 
+            float fontSize = maxFontSize;
+
+            int availableWidth = lbl.Width - 6;
+            int availableHeight = lbl.Height - 6;
+
+            while (fontSize > minFontSize)
+            {
+                using (var testFont = new Font(_countdownFontFamily, fontSize, FontStyle.Bold))
+                {
+                    var size = TextRenderer.MeasureText(text, testFont);
+
+                    if (size.Width <= availableWidth && size.Height <= availableHeight)
+                        break;
+                }
+
+                fontSize -= 0.5f;
+            }
+
+            fontSize = Math.Max(minFontSize, fontSize);
+
+            var old = lbl.Font;
+            lbl.Font = new Font(_countdownFontFamily, fontSize, FontStyle.Bold);
+            old?.Dispose();
+        }
         // ─── Responsive font scaling ────────────────────────────────────────────
         private void ResizeFonts()
         {
@@ -502,8 +530,8 @@ namespace AirDirector.Forms
             float countdown = Math.Max(6f, Math.Min(120f, Math.Min(row2H * 0.35f, (formW * 0.5f) * 0.22f)));
             ScaleCountdown(_lblIntroCountdown,    introMixCountdown);
             ScaleCountdown(_lblMixCountdown,      introMixCountdown);
-            ScaleCountdown(_lblScheduleCountdown, countdown);
-            ScaleCountdown(_lblAdCountdown,       countdown);
+            AutoFitCountdown(_lblScheduleCountdown, _lblScheduleCountdown.Text, countdown);
+            AutoFitCountdown(_lblAdCountdown, _lblAdCountdown.Text, countdown);
 
             // Scale artist/title — re-fit to current text so long strings shrink automatically
             AutoFitLabel(_lblOnAirArtist, _lblOnAirArtist.Text, artistSize);
@@ -882,7 +910,11 @@ namespace AirDirector.Forms
                     _lblScheduleName.Text = $"{nextTime:HH:mm:ss}  –  {next.Name}";
                     int sec = (int)(nextTime - now).TotalSeconds;
                     int secH = sec / 3600, secM = (sec % 3600) / 60, secS = sec % 60;
-                    _lblScheduleCountdown.Text = secH > 0 ? $"{secH:00}:{secM:00}:{secS:00}" : $"{secM:00}:{secS:00}";
+                    string txt = secH > 0
+    ? $"{secH:00}:{secM:00}:{secS:00}"
+    : $"{secM:00}:{secS:00}";
+
+                    AutoFitCountdown(_lblScheduleCountdown, txt, _lblScheduleCountdown.Font.Size);
 
                     if (sec <= 120)
                     {
@@ -953,7 +985,11 @@ namespace AirDirector.Forms
 
                     int sec = (int)(nextAdDt.Value - now).TotalSeconds;
                     int secH = sec / 3600, secM = (sec % 3600) / 60, secS = sec % 60;
-                    _lblAdCountdown.Text = secH > 0 ? $"{secH:00}:{secM:00}:{secS:00}" : $"{secM:00}:{secS:00}";
+                    string txt = secH > 0
+    ? $"{secH:00}:{secM:00}:{secS:00}"
+    : $"{secM:00}:{secS:00}";
+
+                    AutoFitCountdown(_lblAdCountdown, txt, _lblAdCountdown.Font.Size);
 
                     if (sec <= 120)
                     {
