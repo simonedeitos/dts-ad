@@ -1404,7 +1404,7 @@ namespace AirDirector.Controls
                     {
                         LogMessage(string.Format(
                             LanguageManager.GetString("Download.FileInUseSkip",
-                                "⚠️ File in uso da un altro processo, conversione MP3 saltata: {0}"),
+                                "⚠️ File in uso da un altro processo, regolazione volume saltata: {0}"),
                             filePath));
                         return;
                     }
@@ -1453,7 +1453,7 @@ namespace AirDirector.Controls
                     {
                         LogMessage(string.Format(
                             LanguageManager.GetString("Download.FileInUseSkip",
-                                "⚠️ File in uso da un altro processo, conversione MP3 saltata: {0}"),
+                                "⚠️ File in uso da un altro processo, regolazione volume saltata: {0}"),
                             filePath));
                         try { File.Delete(tempOutFile); } catch { }
                         return;
@@ -1465,7 +1465,7 @@ namespace AirDirector.Controls
                 {
                     LogMessage(string.Format(
                         LanguageManager.GetString("Download.FileInUseSkip",
-                            "⚠️ File in uso da un altro processo, conversione MP3 saltata: {0}"),
+                            "⚠️ File in uso da un altro processo, regolazione volume saltata: {0}"),
                         filePath));
                 }
                 catch (Exception ex)
