@@ -721,7 +721,7 @@
             bottomPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
             bottomPanel.Location = new System.Drawing.Point(0, 410);
             bottomPanel.Name = "bottomPanel";
-            bottomPanel.Size = new System.Drawing.Size(1263, 317);
+            bottomPanel.Size = new System.Drawing.Size(1263, 352);
             bottomPanel.TabIndex = 3;
 
             // lblTitle
@@ -871,7 +871,7 @@
             // lblFilePath
             lblFilePath.AutoSize = true;
             lblFilePath.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            lblFilePath.Location = new System.Drawing.Point(25, 261);
+            lblFilePath.Location = new System.Drawing.Point(25, 296);
             lblFilePath.Name = "lblFilePath";
             lblFilePath.Size = new System.Drawing.Size(64, 15);
             lblFilePath.TabIndex = 13;
@@ -879,7 +879,7 @@
 
             // txtFilePath
             txtFilePath.Font = new System.Drawing.Font("Consolas", 9F);
-            txtFilePath.Location = new System.Drawing.Point(110, 258);
+            txtFilePath.Location = new System.Drawing.Point(110, 293);
             txtFilePath.Name = "txtFilePath";
             txtFilePath.ReadOnly = true;
             txtFilePath.Size = new System.Drawing.Size(800, 22);
@@ -891,7 +891,7 @@
             grpPeriod.Controls.Add(chkEnableValidTo);
             grpPeriod.Controls.Add(dtpValidTo);
             grpPeriod.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold);
-            grpPeriod.Location = new System.Drawing.Point(15, 95);
+            grpPeriod.Location = new System.Drawing.Point(15, 130);
             grpPeriod.Name = "grpPeriod";
             grpPeriod.Size = new System.Drawing.Size(365, 55);
             grpPeriod.TabIndex = 14;
@@ -938,7 +938,7 @@
 
             // grpMonths
             grpMonths.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold);
-            grpMonths.Location = new System.Drawing.Point(15, 160);
+            grpMonths.Location = new System.Drawing.Point(15, 195);
             grpMonths.Name = "grpMonths";
             grpMonths.Size = new System.Drawing.Size(680, 55);
             grpMonths.TabIndex = 15;
@@ -947,7 +947,7 @@
 
             // grpDays
             grpDays.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold);
-            grpDays.Location = new System.Drawing.Point(736, 160);
+            grpDays.Location = new System.Drawing.Point(736, 195);
             grpDays.Name = "grpDays";
             grpDays.Size = new System.Drawing.Size(500, 55);
             grpDays.TabIndex = 16;
@@ -956,7 +956,7 @@
 
             // grpHours
             grpHours.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold);
-            grpHours.Location = new System.Drawing.Point(386, 95);
+            grpHours.Location = new System.Drawing.Point(386, 130);
             grpHours.Name = "grpHours";
             grpHours.Size = new System.Drawing.Size(850, 55);
             grpHours.TabIndex = 17;
@@ -966,7 +966,7 @@
             // btnSave
             btnSave.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             btnSave.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
-            btnSave.Location = new System.Drawing.Point(1006, 245);
+            btnSave.Location = new System.Drawing.Point(1006, 280);
             btnSave.Name = "btnSave";
             btnSave.Size = new System.Drawing.Size(110, 45);
             btnSave.TabIndex = 18;
@@ -978,7 +978,7 @@
             btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             btnCancel.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             btnCancel.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
-            btnCancel.Location = new System.Drawing.Point(1126, 245);
+            btnCancel.Location = new System.Drawing.Point(1126, 280);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new System.Drawing.Size(110, 45);
             btnCancel.TabIndex = 19;
