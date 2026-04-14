@@ -9,6 +9,7 @@ using NAudio.Wave;
 using AirDirector.Services.Database;
 using AirDirector.Services.Licensing;
 using AirDirector.Services.Localization;
+using AirDirector.Services;
 using AirDirector.Forms;
 using AirDirector.Themes;
 
@@ -2117,10 +2118,15 @@ namespace AirDirector.Controls
 
             int mixDuration = ConfigurationControl.GetMixDuration();
 
+            // ✅ Auto-detect artisti secondari
+            var _aliases = DbcManager.LoadFromCsv<ArtistAliasEntry>("Artists.dbc");
+            var (_primaryArtist, _featuredArtists) = ArtistParsingService.ParseArtists(artist, title, _aliases);
+
             return new MusicEntry
             {
                 FilePath = filePath,
-                Artist = artist,
+                Artist = _primaryArtist,
+                FeaturedArtists = _featuredArtists.Count > 0 ? string.Join(";", _featuredArtists) : "",
                 Title = title,
                 Album = "",
                 Genre = genre,
@@ -2196,10 +2202,15 @@ namespace AirDirector.Controls
 
             int mixDuration = ConfigurationControl.GetMixDuration();
 
+            // ✅ Auto-detect artisti secondari
+            var _vAliases = DbcManager.LoadFromCsv<ArtistAliasEntry>("Artists.dbc");
+            var (_vPrimaryArtist, _vFeaturedArtists) = ArtistParsingService.ParseArtists(artist, title, _vAliases);
+
             return new MusicEntry
             {
                 FilePath = filePath,
-                Artist = artist,
+                Artist = _vPrimaryArtist,
+                FeaturedArtists = _vFeaturedArtists.Count > 0 ? string.Join(";", _vFeaturedArtists) : "",
                 Title = title,
                 Album = "",
                 Genre = genre,
