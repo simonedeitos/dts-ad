@@ -104,8 +104,16 @@ namespace AirDirector.Services
 
             if (!string.IsNullOrWhiteSpace(artist))
             {
-                string resolved = aliases != null ? ResolveAlias(artist.Trim(), aliases) : artist.Trim();
-                all.Add(resolved);
+                var parsedArtists = ParseArtists(artist, string.Empty, aliases);
+
+                if (!string.IsNullOrWhiteSpace(parsedArtists.PrimaryArtist))
+                    all.Add(parsedArtists.PrimaryArtist.Trim());
+
+                foreach (var featured in parsedArtists.FeaturedArtists)
+                {
+                    if (!string.IsNullOrWhiteSpace(featured))
+                        all.Add(featured.Trim());
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(featuredArtists))
