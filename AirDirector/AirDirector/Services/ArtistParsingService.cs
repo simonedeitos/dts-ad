@@ -107,12 +107,12 @@ namespace AirDirector.Services
                 var parsedArtists = ParseArtists(artist, string.Empty, aliases);
 
                 if (!string.IsNullOrWhiteSpace(parsedArtists.PrimaryArtist))
-                    all.Add(parsedArtists.PrimaryArtist.Trim());
+                    all.Add(parsedArtists.PrimaryArtist);
 
                 foreach (var featured in parsedArtists.FeaturedArtists)
                 {
                     if (!string.IsNullOrWhiteSpace(featured))
-                        all.Add(featured.Trim());
+                        all.Add(featured);
                 }
             }
 
