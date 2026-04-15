@@ -2009,7 +2009,11 @@ namespace AirDirector.Controls
                                 $"IN={musicEntry.MarkerIN}ms INTRO={musicEntry.MarkerINTRO}ms " +
                                 $"MIX={musicEntry.MarkerMIX}ms OUT={musicEntry.MarkerOUT}ms");
 
-                            if (DbcManager.Insert("Music.dbc", musicEntry)) imported++;
+                            if (DbcManager.Insert("Music.dbc", musicEntry))
+                            {
+                                imported++;
+                                PersistImportedFeaturedArtists(musicEntry, _importAliases);
+                            }
                             else errors++;
                         }
                         else
@@ -2159,6 +2163,40 @@ namespace AirDirector.Controls
                 NDISourceName = "",
                 VideoSource = VideoSourceType.None
             };
+        }
+
+        private void PersistImportedFeaturedArtists(MusicEntry musicEntry, List<ArtistAliasEntry> importAliases)
+        {
+            if (musicEntry == null || importAliases == null || string.IsNullOrWhiteSpace(musicEntry.FeaturedArtists))
+                return;
+
+            var featuredNames = musicEntry.FeaturedArtists
+                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(n => n.Trim())
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            var existingArtistNames = importAliases
+                .Select(a => a.ArtistName?.Trim())
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var artistName in featuredNames)
+            {
+                if (existingArtistNames.Contains(artistName)) continue;
+
+                var newEntry = new ArtistAliasEntry
+                {
+                    ArtistName = artistName,
+                    Aliases = ""
+                };
+
+                if (DbcManager.Insert("Artists.dbc", newEntry))
+                {
+                    importAliases.Add(newEntry);
+                    existingArtistNames.Add(artistName);
+                }
+            }
         }
 
         // ✅ NUOVO:  Crea MusicEntry da file video MP4

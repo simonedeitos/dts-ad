@@ -65,6 +65,7 @@ namespace AirDirector.Forms
             this.MinimumSize = new Size(800, 480);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.Sizable;
+            this.Load += ArtistAliasManagerForm_Load;
 
             // ── Bottom bar ──────────────────────────────────────────────────
             bottomPanel = new Panel
@@ -84,17 +85,22 @@ namespace AirDirector.Forms
             btnAutoScan.Click += BtnAutoScan_Click;
             btnClose.Click += (s, e) => this.Close();
 
-            bottomPanel.Controls.Add(btnAutoScan);
-            btnAutoScan.Location = new Point(6, 8);
-            btnClose.Location = new Point(6 + btnAutoScan.Width + 8, 8);
-            bottomPanel.Controls.Add(btnClose);
+            var bottomButtonsFlow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Left,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoSize = true
+            };
+            bottomButtonsFlow.Controls.Add(btnAutoScan);
+            bottomButtonsFlow.Controls.Add(btnClose);
+            bottomPanel.Controls.Add(bottomButtonsFlow);
 
             // ── SplitContainer ──────────────────────────────────────────────
             splitMain = new SplitContainer
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
-                SplitterDistance = 560,
                 SplitterWidth = 5
             };
 
@@ -130,7 +136,7 @@ namespace AirDirector.Forms
             dgvSongs.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "colTitle",
-                HeaderText = LanguageManager.GetString("ArtistAliasManager.Title", "Titolo"),
+                HeaderText = LanguageManager.GetString("ArtistAliasManager.Title_col", "Titolo"),
                 FillWeight = 40
             });
             dgvSongs.Columns.Add(new DataGridViewTextBoxColumn
@@ -203,10 +209,16 @@ namespace AirDirector.Forms
             btnAddAlias.Click += BtnAddAlias_Click;
             btnRemoveAlias.Click += BtnRemoveAlias_Click;
 
-            btnAddAlias.Location = new Point(4, 7);
-            btnRemoveAlias.Location = new Point(4 + btnAddAlias.Width + 6, 7);
-            rightButtonsPanel.Controls.Add(btnAddAlias);
-            rightButtonsPanel.Controls.Add(btnRemoveAlias);
+            var rightButtonsFlow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Left,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoSize = true
+            };
+            rightButtonsFlow.Controls.Add(btnAddAlias);
+            rightButtonsFlow.Controls.Add(btnRemoveAlias);
+            rightButtonsPanel.Controls.Add(rightButtonsFlow);
 
             splitMain.Panel2.Controls.Add(dgvAliases);
             splitMain.Panel2.Controls.Add(lblAliasesHeader);
@@ -215,6 +227,11 @@ namespace AirDirector.Forms
             // ── Assembly ────────────────────────────────────────────────────
             this.Controls.Add(splitMain);
             this.Controls.Add(bottomPanel);
+        }
+
+        private void ArtistAliasManagerForm_Load(object sender, EventArgs e)
+        {
+            splitMain.SplitterDistance = splitMain.Width / 2;
         }
 
         private Button CreateButton(string text, Color backColor)
@@ -374,15 +391,19 @@ namespace AirDirector.Forms
                     "Alias: {0} – {1}"),
                 _selectedSong.Artist, _selectedSong.Title);
 
-            if (string.IsNullOrWhiteSpace(_selectedSong.FeaturedArtists))
-                return;
+            var allNames = new List<string>();
+            if (!string.IsNullOrWhiteSpace(_selectedSong.Artist))
+                allNames.Add(_selectedSong.Artist.Trim());
 
-            var featuredNames = _selectedSong.FeaturedArtists
-                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(n => n.Trim())
-                .Where(n => !string.IsNullOrWhiteSpace(n));
+            if (!string.IsNullOrWhiteSpace(_selectedSong.FeaturedArtists))
+            {
+                allNames.AddRange(_selectedSong.FeaturedArtists
+                    .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(n => n.Trim())
+                    .Where(n => !string.IsNullOrWhiteSpace(n)));
+            }
 
-            foreach (var name in featuredNames)
+            foreach (var name in allNames.Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 // Find canonical name and known aliases from Artists.dbc
                 var entry = _artistEntries.FirstOrDefault(a =>

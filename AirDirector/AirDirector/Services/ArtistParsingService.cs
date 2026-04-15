@@ -29,6 +29,7 @@ namespace AirDirector.Services
         {
             var featured = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             string primaryArtist = artistField?.Trim() ?? "";
+            bool artistSplitDetected = false;
 
             // 1. Parse del campo Artist per separatori
             foreach (var sep in ArtistSeparators)
@@ -36,6 +37,7 @@ namespace AirDirector.Services
                 int idx = primaryArtist.IndexOf(sep, StringComparison.OrdinalIgnoreCase);
                 if (idx >= 0)
                 {
+                    artistSplitDetected = true;
                     string rest = primaryArtist.Substring(idx + sep.Length);
                     primaryArtist = primaryArtist.Substring(0, idx).Trim();
 
@@ -51,6 +53,9 @@ namespace AirDirector.Services
                     break;
                 }
             }
+
+            if (artistSplitDetected && !string.IsNullOrWhiteSpace(primaryArtist))
+                featured.Add(primaryArtist);
 
             // 2. Parse del titolo per feat/ft tra parentesi o no
             if (!string.IsNullOrEmpty(titleField))
@@ -82,8 +87,8 @@ namespace AirDirector.Services
                 primaryArtist = ResolveAlias(primaryArtist, aliases);
             }
 
-            // Rimuovi il principale dai featured per evitare duplicati
-            featured.Remove(primaryArtist);
+            if (!artistSplitDetected)
+                featured.Remove(primaryArtist);
 
             return (primaryArtist, featured.ToList());
         }
