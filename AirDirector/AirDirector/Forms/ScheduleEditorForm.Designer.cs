@@ -479,9 +479,9 @@ namespace AirDirector.Forms
             btnSave.FlatStyle = FlatStyle.Flat;
             btnSave.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnSave.ForeColor = Color.White;
-            btnSave.Location = new Point(480, 625);
+            btnSave.Location = new Point(559, 625);
             btnSave.Name = "btnSave";
-            btnSave.Size = new Size(90, 35);
+            btnSave.Size = new Size(111, 35);
             btnSave.TabIndex = 5;
             btnSave.Text = "💾 Salva";
             btnSave.UseVisualStyleBackColor = false;
@@ -496,9 +496,9 @@ namespace AirDirector.Forms
             btnCancel.FlatStyle = FlatStyle.Flat;
             btnCancel.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnCancel.ForeColor = Color.White;
-            btnCancel.Location = new Point(580, 625);
+            btnCancel.Location = new Point(435, 625);
             btnCancel.Name = "btnCancel";
-            btnCancel.Size = new Size(90, 35);
+            btnCancel.Size = new Size(111, 35);
             btnCancel.TabIndex = 6;
             btnCancel.Text = "✖ Annulla";
             btnCancel.UseVisualStyleBackColor = false;
