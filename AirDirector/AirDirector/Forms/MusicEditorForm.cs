@@ -488,7 +488,7 @@ namespace AirDirector.Forms
                 FormBorderStyle = FormBorderStyle.FixedToolWindow,
                 StartPosition = FormStartPosition.Manual,
                 ShowInTaskbar = false,
-                Text = LanguageManager.GetString("MusicEditor.FeaturedArtists", "Artisti Feat.:"),
+                Text = LanguageManager.GetString("MusicEditor.FeaturedArtists", "Artisti Feat."),
                 Size = new Size(280, 300),
                 BackColor = this.BackColor
             };
@@ -1426,7 +1426,7 @@ namespace AirDirector.Forms
                 lblYear.Text = LanguageManager.GetString("MusicEditor.Year", "Anno:");
                 lblGenre.Text = LanguageManager.GetString("MusicEditor.Genre", "Genere:");
                 lblCategories.Text = LanguageManager.GetString("MusicEditor.Categories", "Categorie:");
-                if (!_isClip) lblFeaturedArtists.Text = LanguageManager.GetString("MusicEditor.FeaturedArtists", "Artisti Feat.:");
+                if (!_isClip) lblFeaturedArtists.Text = LanguageManager.GetString("MusicEditor.FeaturedArtists", "Artisti Feat.");
                 lblFilePath.Text = LanguageManager.GetString("MusicEditor.FilePath", "File Audio:");
 
                 // ✅ GROUPBOX
