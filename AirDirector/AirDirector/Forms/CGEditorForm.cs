@@ -600,9 +600,27 @@ namespace AirDirector.Forms
             tab.Controls.Add(txtLabel);
 
             AddLabelAndCombo(tab, "Position:", 260, y, 55, 100,
-                new[] { "Top Left", "Top Center", "Top Right" },
-                _spotLabelPosition == "TopLeft" ? 0 : (_spotLabelPosition == "TopCenter" ? 1 : 2),
-                (idx) => { _spotLabelPosition = idx == 0 ? "TopLeft" : (idx == 1 ? "TopCenter" : "TopRight"); _previewPanel.Invalidate(); });
+                new[] { "Top Left", "Top Center", "Top Right", "Bottom" },
+                _spotLabelPosition switch
+                {
+                    "TopLeft" => 0,
+                    "TopCenter" => 1,
+                    "TopRight" => 2,
+                    "Bottom" => 3,
+                    _ => 0
+                },
+                (idx) =>
+                {
+                    _spotLabelPosition = idx switch
+                    {
+                        0 => "TopLeft",
+                        1 => "TopCenter",
+                        2 => "TopRight",
+                        3 => "Bottom",
+                        _ => "TopLeft"
+                    };
+                    _previewPanel.Invalidate();
+                });
 
             AddLabelAndNumeric(tab, "Font Size:", 450, y, 60, 50, 8, 48, _spotLabelFontSize, (v) => { _spotLabelFontSize = v; _previewPanel.Invalidate(); });
 
@@ -887,6 +905,10 @@ namespace AirDirector.Forms
                     case "TopRight":
                         x = w - boxW - marginX;
                         y = marginY;
+                        break;
+                    case "Bottom":
+                        x = (w - boxW) / 2;
+                        y = h - boxH - marginY;
                         break;
                 }
 

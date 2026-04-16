@@ -846,6 +846,10 @@ namespace AirDirector.Services
                         x = w - boxW - _spotLabelMarginX;
                         y = _spotLabelMarginY;
                         break;
+                    case "Bottom":
+                        x = (w - boxW) / 2;
+                        y = h - boxH - _spotLabelMarginY;
+                        break;
                 }
 
                 // Background

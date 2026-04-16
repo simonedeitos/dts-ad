@@ -2083,6 +2083,8 @@ namespace AirDirector.Forms
                         .Select(r => r.OutputPath)
                         .ToList());
             }
+
+            Close();
         }
 
         // ═════════════════════════════════════════════════════════════════

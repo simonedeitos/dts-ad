@@ -3312,11 +3312,19 @@ namespace AirDirector.Controls
 				g.Clip = oldClip;
 			}
 
-			using (Font numFont = new Font("Segoe UI", 20, FontStyle.Bold))
+			string slotNumber = (index + 1).ToString();
+			float slotFontSize = slotNumber.Length switch
+			{
+				1 => 20f,
+				2 => 16f,
+				_ => 12f
+			};
+
+			using (Font numFont = new Font("Segoe UI", slotFontSize, FontStyle.Bold))
 			using (SolidBrush numBrush = new SolidBrush(Color.FromArgb(180, textColor)))
 			using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
 			{
-				g.DrawString($"{index + 1}", numFont, numBrush, numPanel, sf);
+				g.DrawString(slotNumber, numFont, numBrush, numPanel, sf);
 			}
 
 			// ── PANNELLO ICONA (riquadro separato) ──
