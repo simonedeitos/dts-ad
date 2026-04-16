@@ -849,7 +849,7 @@
 
             // txtFeaturedArtistsDisplay
             txtFeaturedArtistsDisplay.Font = new System.Drawing.Font("Segoe UI", 10F);
-            txtFeaturedArtistsDisplay.Location = new System.Drawing.Point(100, 85);
+            txtFeaturedArtistsDisplay.Location = new System.Drawing.Point(120, 85);
             txtFeaturedArtistsDisplay.Name = "txtFeaturedArtistsDisplay";
             txtFeaturedArtistsDisplay.Size = new System.Drawing.Size(420, 25);
             txtFeaturedArtistsDisplay.TabIndex = 16;
@@ -860,7 +860,7 @@
             // btnFeaturedArtistsDropdown
             btnFeaturedArtistsDropdown.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             btnFeaturedArtistsDropdown.Font = new System.Drawing.Font("Segoe UI", 9F);
-            btnFeaturedArtistsDropdown.Location = new System.Drawing.Point(520, 85);
+            btnFeaturedArtistsDropdown.Location = new System.Drawing.Point(540, 85);
             btnFeaturedArtistsDropdown.Name = "btnFeaturedArtistsDropdown";
             btnFeaturedArtistsDropdown.Size = new System.Drawing.Size(30, 25);
             btnFeaturedArtistsDropdown.TabIndex = 17;

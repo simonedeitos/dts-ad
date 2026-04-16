@@ -1336,11 +1336,9 @@ namespace AirDirector.Controls
 
             RefreshArchive();
 
-            MessageBox.Show(
-                string.Format(LanguageManager.GetString("Archive.BatchEditComplete", "✅ Aggiornati:  {0}\n❌ Errori: {1}"), updated, errors),
-                LanguageManager.GetString("Archive.BatchEditCompletedTitle", "Modifica Batch Completata"),
-                MessageBoxButtons.OK,
-                errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+            Log(string.Format(
+                LanguageManager.GetString("Archive.BatchEditComplete", "✅ Aggiornati:  {0}\n❌ Errori: {1}"),
+                updated, errors));
         }
 
         private void SetBatchEditButtonsEnabled(bool enabled)
@@ -2070,8 +2068,11 @@ namespace AirDirector.Controls
                     message += $"\n\n📊 Totale:  {currentCount}/{maxAllowed}";
                 }
 
-                MessageBox.Show(message, "Import Completato", MessageBoxButtons.OK,
-                    errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+                if (convForm == null)
+                {
+                    MessageBox.Show(message, "Import Completato", MessageBoxButtons.OK,
+                        errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+                }
             }
             finally
             {
