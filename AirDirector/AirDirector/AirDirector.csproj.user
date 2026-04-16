@@ -116,6 +116,9 @@
     <Compile Update="Forms\SplashForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Forms\StreamingManagerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Forms\TaskEditorForm.cs">
       <SubType>Form</SubType>
     </Compile>

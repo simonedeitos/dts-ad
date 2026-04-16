@@ -139,7 +139,7 @@ namespace AirDirector.Forms
             txtStreamURL.Font = new Font("Segoe UI", 9F);
             txtStreamURL.Location = new Point(170, 145);
             txtStreamURL.Name = "txtStreamURL";
-            txtStreamURL.Size = new Size(393, 23);
+            txtStreamURL.Size = new Size(312, 23);
             txtStreamURL.TabIndex = 10;
             // 
             // radClock
@@ -244,7 +244,7 @@ namespace AirDirector.Forms
             // 
             lblStreamDuration.Enabled = false;
             lblStreamDuration.Font = new Font("Segoe UI", 9F);
-            lblStreamDuration.Location = new Point(569, 126);
+            lblStreamDuration.Location = new Point(488, 150);
             lblStreamDuration.Name = "lblStreamDuration";
             lblStreamDuration.Size = new Size(75, 16);
             lblStreamDuration.TabIndex = 11;

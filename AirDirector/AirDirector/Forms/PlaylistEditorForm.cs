@@ -202,7 +202,7 @@ namespace AirDirector.Forms
         private void InitializeComponent()
         {
             this.Text = LanguageManager.GetString("PlaylistEditor.Title", "PLAYLIST EDITOR");
-            this.Size = new Size(1400, 850);
+            this.Size = new Size(1500, 950);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.Sizable;
             this.BackColor = Color.FromArgb(25, 25, 25);
