@@ -80,6 +80,7 @@ namespace AirDirector.Controls
 		public event EventHandler<string> PreviewRequested;
 		public event EventHandler<string> ClockChanged;
 		public event EventHandler ReportUpdated;
+		public event EventHandler<CommandExecutionEventArgs> CommandExecutionRequested;
 
 		public PlaylistQueueControl()
 		{
@@ -3214,7 +3215,13 @@ namespace AirDirector.Controls
 			// ── COLORI ──
 			Color bgColor, textColor, sideBarColor;
 
-			if (item.Type == PlaylistItemType.ADV)
+			if (item.IsCommand)
+			{
+				bgColor = Color.FromArgb(45, 45, 45);
+				textColor = Color.FromArgb(200, 200, 200);
+				sideBarColor = Color.FromArgb(120, 120, 120);
+			}
+			else if (item.Type == PlaylistItemType.ADV)
 			{
 				bgColor = Color.FromArgb(80, 25, 25);
 				textColor = Color.White;
@@ -3362,7 +3369,9 @@ namespace AirDirector.Controls
 			}
 
 			string icon;
-			if (item.Type == PlaylistItemType.ADV)
+			if (item.IsCommand)
+				icon = "⚙️";
+			else if (item.Type == PlaylistItemType.ADV)
 				icon = "💲";
 			else if (!string.IsNullOrEmpty(item.FilePath) &&
 					 (item.FilePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
@@ -3422,7 +3431,9 @@ namespace AirDirector.Controls
 			}
 
 			// ── DURATA (11pt Bold, a destra, centrata verticalmente ma leggermente sotto) ──
-			string durationText = $"⏱ {FormatDuration(item.Duration)}";
+			string durationText = item.IsCommand
+				? "---"
+				: $"⏱ {FormatDuration(item.Duration)}";
 
 			using (Font durationFont = new Font("Segoe UI", 11, FontStyle.Bold))
 			using (SolidBrush durationBrush = new SolidBrush(textColor))
@@ -3975,6 +3986,34 @@ namespace AirDirector.Controls
                         };
                     }
 
+					case AirPlaylistItemType.LogoShow:
+						return new PlaylistQueueItem
+						{
+							IsCommand = true,
+							CommandType = "LogoShow",
+							CommandValue = pItem.CommandValue ?? "",
+							Title = $"▶ Logo Show: {System.IO.Path.GetFileName(pItem.CommandValue ?? "")}",
+							Artist = "",
+							Duration = TimeSpan.Zero,
+							Type = PlaylistItemType.Other,
+							ScheduledTime = DateTime.Now,
+							IsFromPlaylist = true
+						};
+
+					case AirPlaylistItemType.LogoHide:
+						return new PlaylistQueueItem
+						{
+							IsCommand = true,
+							CommandType = "LogoHide",
+							CommandValue = pItem.CommandValue ?? "",
+							Title = $"▶ Logo Hide: {System.IO.Path.GetFileName(pItem.CommandValue ?? "")}",
+							Artist = "",
+							Duration = TimeSpan.Zero,
+							Type = PlaylistItemType.Other,
+							ScheduledTime = DateTime.Now,
+							IsFromPlaylist = true
+						};
+
 					default:
 						Log($"[ConvertPlaylistItem] Tipo non gestito: {pItem.Type}");
 						return null;
@@ -4052,6 +4091,49 @@ namespace AirDirector.Controls
 			if (nextIndex >= 0 && nextIndex < _items.Count)
 				return _items[nextIndex];
 			return null;
+		}
+
+		/// <summary>
+		/// Restituisce il primo item NON-command dopo _currentPlayingIndex.
+		/// Usato dal pre-buffer per non tentare il pre-buffer di un Command.
+		/// </summary>
+		public PlaylistQueueItem GetNextPlayableItem()
+		{
+			for (int i = _currentPlayingIndex + 1; i < _items.Count; i++)
+			{
+				if (!_items[i].IsCommand)
+					return _items[i];
+			}
+			return null;
+		}
+
+		/// <summary>
+		/// Rimuove tutti i Command item consecutivi all'inizio della coda (index 0),
+		/// esegue ciascuno (lancia CommandExecutionRequested) e si ferma al primo
+		/// item non-command. Non ferma mai la riproduzione in corso.
+		/// Deve essere chiamato SOLO quando _currentPlayingIndex == -1 o 0 è già
+		/// stato rimosso (cioè il "prossimo" da riprodurre è all'index 0).
+		/// </summary>
+		public void DrainAndExecuteCommandsAtFront()
+		{
+			while (_items.Count > 0 && _items[0].IsCommand)
+			{
+				var cmd = _items[0];
+				_items.RemoveAt(0);
+				Log($"[DrainCommands] Esecuzione comando: {cmd.CommandType} → {cmd.CommandValue}");
+				try
+				{
+					CommandExecutionRequested?.Invoke(this, new CommandExecutionEventArgs(cmd.CommandType, cmd.CommandValue));
+				}
+				catch (Exception ex)
+				{
+					Log($"[DrainCommands] Errore esecuzione comando: {ex.Message}");
+				}
+			}
+			RecalculateScheduledTimes();
+			UpdateScrollBar();
+			this.Invalidate();
+			NotifyQueueCountChanged();
 		}
 
 		public PlaylistQueueItem GetLastPlayedItem()
@@ -4179,6 +4261,9 @@ namespace AirDirector.Controls
         public string VideoFilePath { get; set; }
         public string VideoSource { get; set; }      // "StaticVideo", "BufferVideo", "NDISource"
         public string NDISourceName { get; set; }
+		public bool IsCommand { get; set; }
+		public string CommandType { get; set; }
+		public string CommandValue { get; set; }
 
         public string ItemType
 		{
@@ -4226,7 +4311,22 @@ namespace AirDirector.Controls
             VideoFilePath = string.Empty;
             VideoSource = string.Empty;
             NDISourceName = string.Empty;
+			IsCommand = false;
+			CommandType = string.Empty;
+			CommandValue = string.Empty;
         }
+	}
+
+	public class CommandExecutionEventArgs : EventArgs
+	{
+		public string CommandType { get; }
+		public string CommandValue { get; }
+
+		public CommandExecutionEventArgs(string type, string value)
+		{
+			CommandType = type;
+			CommandValue = value;
+		}
 	}
 
 	public class AirDirectorPlaylistItem

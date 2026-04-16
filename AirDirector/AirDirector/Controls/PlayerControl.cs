@@ -836,7 +836,12 @@ namespace AirDirector.Controls
             if (items.Count > 1)
             {
                 ClearWaveformImmediate();
-                var nextItem = items[1];
+                var nextItem = _playlistQueue.GetNextPlayableItem();
+                if (nextItem == null)
+                {
+                    Log($"[OnMixPointReached] Nessun prossimo item riproducibile (solo comandi in coda)");
+                    return;
+                }
 
                 try
                 {
@@ -913,6 +918,7 @@ namespace AirDirector.Controls
                         _isPlayerAActive = !_isPlayerAActive;
 
                         _playlistQueue.RemoveItem(0);
+                        DrainAndExecuteCommands();
                         _playlistQueue.SetCurrentPlaying(0);
 
                         _mixCheckTimer.Stop();
@@ -988,6 +994,7 @@ namespace AirDirector.Controls
                         _isPlayerAActive = !_isPlayerAActive;
 
                         _playlistQueue.RemoveItem(0);
+                        DrainAndExecuteCommands();
                         _playlistQueue.SetCurrentPlaying(0);
 
                         LoadTrackInfo(nextItem);
@@ -2217,6 +2224,7 @@ namespace AirDirector.Controls
             {
                 if (_playlistQueue != null && _playlistQueue.GetItemCount() > 0)
                 {
+                    DrainAndExecuteCommands();
                     var items = _playlistQueue.GetAllItems();
                     if (items.Count > 0)
                     {
@@ -2258,6 +2266,24 @@ namespace AirDirector.Controls
             NextRequested?.Invoke(this, EventArgs.Empty);
         }
 
+        /// <summary>
+        /// Scarta ed esegue tutti i Command item che si trovano all'inizio della coda
+        /// (dopo aver già rimosso l'item finito). Non stoppa mai la riproduzione corrente.
+        /// </summary>
+        private void DrainAndExecuteCommands()
+        {
+            if (_playlistQueue == null)
+                return;
+
+            if (InvokeRequired)
+            {
+                try { Invoke((Action)DrainAndExecuteCommands); } catch { }
+                return;
+            }
+
+            _playlistQueue.DrainAndExecuteCommandsAtFront();
+        }
+
         private void ClearWaveformImmediate()
         {
             // Abort generazione in corso
@@ -2291,6 +2317,7 @@ namespace AirDirector.Controls
             {
                 Stop();
                 _playlistQueue.RemoveItem(0);
+                DrainAndExecuteCommands();
 
                 var nextItems = _playlistQueue.GetAllItems();
                 if (nextItems.Count > 0)
@@ -2330,6 +2357,7 @@ namespace AirDirector.Controls
             _fadeOutTimer.Start();
 
             _playlistQueue.RemoveItem(0);
+            DrainAndExecuteCommands();
 
             var queueItems = _playlistQueue.GetAllItems();
             if (queueItems.Count > 0)
@@ -2438,6 +2466,7 @@ namespace AirDirector.Controls
             if (_playlistQueue != null && _playlistQueue.GetItemCount() > 0)
             {
                 _playlistQueue.RemoveItem(0);
+                DrainAndExecuteCommands();
 
                 var items = _playlistQueue.GetAllItems();
                 if (items.Count > 0)

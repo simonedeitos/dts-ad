@@ -459,6 +459,7 @@ namespace AirDirector.Forms
             playlistQueue.ClockChanged += PlaylistQueue_ClockChanged;
             playlistQueue.ReportUpdated += PlaylistQueue_ReportUpdated;
             playlistQueue.ItemsAdded += PlaylistQueue_ItemsAdded;
+            playlistQueue.CommandExecutionRequested += PlaylistQueueControl_CommandExecutionRequested;
 
             if (ConfigurationControl.GetAutoStartMode())
             {
@@ -531,6 +532,26 @@ namespace AirDirector.Forms
                 UpdateStatus(LanguageManager.GetString("MainForm.TrackFinishedManual", "Brano finito - Player in stop (modalità MANUALE)"));
             }
             catch { }
+        }
+
+        private void PlaylistQueueControl_CommandExecutionRequested(object sender, CommandExecutionEventArgs e)
+        {
+            try
+            {
+                switch (e.CommandType)
+                {
+                    case "LogoShow":
+                        CGRenderer.ShowAdditionalLogo(e.CommandValue);
+                        break;
+                    case "LogoHide":
+                        CGRenderer.HideAdditionalLogo(e.CommandValue);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainForm] CommandExecution error: {ex.Message}");
+            }
         }
 
         // ═══════════════════════════════════════════════════════════
