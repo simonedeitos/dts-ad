@@ -582,7 +582,7 @@ namespace AirDirector.Forms
             if (menuStrip.Items[0] is ToolStripMenuItem menuFile) { menuFile.Text = LanguageManager.GetString("MainForm.MenuFile", "File"); if (menuFile.DropDownItems.Count > 0) menuFile.DropDownItems[0].Text = LanguageManager.GetString("MainForm.MenuExit", "Esci"); }
             if (menuStrip.Items[1] is ToolStripMenuItem menuView) { menuView.Text = LanguageManager.GetString("MainForm.MenuView", "Visualizza"); if (menuView.DropDownItems.Count > 0) menuView.DropDownItems[0].Text = "⏱ " + LanguageManager.GetString("MainForm.MenuTimers", "Timers"); }
             if (menuStrip.Items[2] is ToolStripMenuItem menuPlaylist) { menuPlaylist.Text = LanguageManager.GetString("MainForm.MenuPlaylist", "Playlist"); if (menuPlaylist.DropDownItems.Count > 0) menuPlaylist.DropDownItems[0].Text = "🎶 " + LanguageManager.GetString("MainForm.OpenPlaylistEditor", "Editor Playlist"); if (menuPlaylist.DropDownItems.Count > 1) menuPlaylist.DropDownItems[1].Text = "📻 " + LanguageManager.GetString("MainForm.LoadPlaylistOnAir", "Carica Playlist OnAir"); }
-            if (menuStrip.Items[3] is ToolStripMenuItem menuTools) { menuTools.Text = LanguageManager.GetString("MainForm.MenuTools", "Strumenti"); if (menuTools.DropDownItems.Count > 0) { menuTools.DropDownItems[0].Text = "🎤 " + LanguageManager.GetString("MainForm.MenuArtistAliases", "Gestione Alias Artisti"); if (menuTools.DropDownItems.Count > 2) menuTools.DropDownItems[2].Text = "🔧 " + LanguageManager.GetString("MainForm.MenuDatabaseModifications", "Modifiche Database"); if (menuTools.DropDownItems.Count > 4) menuTools.DropDownItems[4].Text = "⚙️ " + LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"); if (menuTools.DropDownItems.Count > 6) menuTools.DropDownItems[6].Text = "💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"); if (menuTools.DropDownItems.Count > 8) menuTools.DropDownItems[8].Text = "🔑 " + LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"); } }
+            if (menuStrip.Items[3] is ToolStripMenuItem menuTools) { menuTools.Text = LanguageManager.GetString("MainForm.MenuTools", "Strumenti"); if (menuTools.DropDownItems.Count > 0) { menuTools.DropDownItems[0].Text = "🎤 " + LanguageManager.GetString("MainForm.MenuArtistAliases", "Gestione Alias Artisti"); if (menuTools.DropDownItems.Count > 1) menuTools.DropDownItems[1].Text = "🌐 " + LanguageManager.GetString("MainForm.MenuStreamingManager", "Gestione Streaming"); if (menuTools.DropDownItems.Count > 3) menuTools.DropDownItems[3].Text = "🔧 " + LanguageManager.GetString("MainForm.MenuDatabaseModifications", "Modifiche Database"); if (menuTools.DropDownItems.Count > 5) menuTools.DropDownItems[5].Text = "⚙️ " + LanguageManager.GetString("MainForm.MenuSettings", "Impostazioni"); if (menuTools.DropDownItems.Count > 7) menuTools.DropDownItems[7].Text = "💾 " + LanguageManager.GetString("MainForm.MenuBackup", "Backup Manuale Database"); if (menuTools.DropDownItems.Count > 9) menuTools.DropDownItems[9].Text = "🔑 " + LanguageManager.GetString("MainForm.MenuLicense", "Gestione Licenza"); } }
             if (menuStrip.Items[4] is ToolStripMenuItem menuReport) { menuReport.Text = LanguageManager.GetString("MainForm.MenuReport", "Report"); if (menuReport.DropDownItems.Count > 0) menuReport.DropDownItems[0].Text = "📊 " + LanguageManager.GetString("MainForm.MenuViewReport", "Visualizza Report"); if (menuReport.DropDownItems.Count > 1) menuReport.DropDownItems[1].Text = "📻 " + LanguageManager.GetString("MainForm.MenuBroadcastHistory", "Storico Trasmesso"); if (menuReport.DropDownItems.Count > 2) menuReport.DropDownItems[2].Text = "📊 " + LanguageManager.GetString("MainForm.MenuMusicStatistics", "Statistiche Musica"); }
             if (menuStrip.Items[5] is ToolStripMenuItem menuHelp) { menuHelp.Text = LanguageManager.GetString("MainForm.MenuHelp", "Aiuto"); if (menuHelp.DropDownItems.Count > 0) menuHelp.DropDownItems[0].Text = "ℹ️ " + LanguageManager.GetString("MainForm.MenuAbout", "Informazioni"); }
         }
@@ -733,6 +733,7 @@ namespace AirDirector.Forms
             menuStrip.Items.Add(menuPlaylist);
             ToolStripMenuItem menuTools= new ToolStripMenuItem(LanguageManager.GetString("MainForm.MenuTools", "Strumenti"));
             menuTools.DropDownItems.Add("🎤 " + LanguageManager.GetString("MainForm.MenuArtistAliases", "Gestione Alias Artisti"), null, MenuArtistAliases_Click);
+            menuTools.DropDownItems.Add("🌐 " + LanguageManager.GetString("MainForm.MenuStreamingManager", "Gestione Streaming"), null, MenuStreamingManager_Click);
             menuTools.DropDownItems.Add(new ToolStripSeparator());
             menuTools.DropDownItems.Add("🔧 " + LanguageManager.GetString("MainForm.MenuDatabaseModifications", "Modifiche Database"), null, MenuDatabaseModifications_Click);
             menuTools.DropDownItems.Add(new ToolStripSeparator());
@@ -919,6 +920,14 @@ namespace AirDirector.Forms
         private void MenuArtistAliases_Click(object sender, EventArgs e)
         {
             using (var form = new ArtistAliasManagerForm())
+            {
+                form.ShowDialog(this);
+            }
+        }
+
+        private void MenuStreamingManager_Click(object sender, EventArgs e)
+        {
+            using (var form = new StreamingManagerForm())
             {
                 form.ShowDialog(this);
             }

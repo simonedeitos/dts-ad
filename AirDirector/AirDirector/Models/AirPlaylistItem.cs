@@ -10,7 +10,11 @@ namespace AirDirector.Models
         Track,      // Brano musicale dall'archivio
         Clip,       // Jingle/clip dall'archivio
         Category,   // Regola: categoria (risolto a runtime)
-        Genre       // Regola: genere (risolto a runtime)
+        Genre,      // Regola: genere (risolto a runtime)
+        URLStreaming,
+        ExternalAudio,
+        LogoShow,
+        LogoHide
     }
 
     /// <summary>
@@ -33,6 +37,10 @@ namespace AirDirector.Models
         public int YearFrom { get; set; }
         public int YearTo { get; set; }
         public TimeSpan ScheduledTime { get; set; } // Orario calcolato
+        public string StreamDuration { get; set; }
+        public string CommandValue { get; set; }
+        public string AssociatedBufferPath { get; set; }
+        public string AssociatedVideoPath { get; set; }
 
         public AirPlaylistItem()
         {
@@ -48,6 +56,10 @@ namespace AirDirector.Models
             YearFrom = 1900;
             YearTo = DateTime.Now.Year;
             ScheduledTime = TimeSpan.Zero;
+            StreamDuration = "01:00:00";
+            CommandValue = string.Empty;
+            AssociatedBufferPath = string.Empty;
+            AssociatedVideoPath = string.Empty;
         }
 
         /// <summary>
@@ -103,6 +115,14 @@ namespace AirDirector.Models
                         return $"{source} - {string.Join(", ", parts)}";
                     return CategoryName ?? "";
                 }
+                case AirPlaylistItemType.URLStreaming:
+                    return $"Streaming: {Title}";
+                case AirPlaylistItemType.ExternalAudio:
+                    return $"Audio: {System.IO.Path.GetFileName(FilePath ?? "")}";
+                case AirPlaylistItemType.LogoShow:
+                    return $"Logo Show: {CommandValue}";
+                case AirPlaylistItemType.LogoHide:
+                    return $"Logo Hide: {CommandValue}";
                 default:
                     return string.Empty;
             }
@@ -119,6 +139,10 @@ namespace AirDirector.Models
                 case AirPlaylistItemType.Clip:     return "🔔";
                 case AirPlaylistItemType.Category: return "📁";
                 case AirPlaylistItemType.Genre:    return "🎸";
+                case AirPlaylistItemType.URLStreaming: return "🌐";
+                case AirPlaylistItemType.ExternalAudio: return "🎵";
+                case AirPlaylistItemType.LogoShow: return "🟢";
+                case AirPlaylistItemType.LogoHide: return "🔴";
                 default:                           return "❓";
             }
         }

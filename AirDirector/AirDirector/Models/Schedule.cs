@@ -13,7 +13,9 @@ namespace AirDirector.Models
         {
             PlayClock,      // Riproduce un clock
             PlayAudio,      // Riproduce un file audio singolo
-            PlayMiniPLS     // Riproduce una sequenza MiniPLS
+            PlayMiniPLS,    // Riproduce una sequenza MiniPLS
+            LogoShow,
+            LogoHide
         }
 
         public int ID { get; set; }
