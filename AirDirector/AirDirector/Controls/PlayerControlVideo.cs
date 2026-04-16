@@ -1232,13 +1232,53 @@ namespace AirDirector.Controls
             });
         }
 
-        private void SkipToNext() { if (_playlistQueue == null || _playlistQueue.GetItemCount() < 2) { Stop(); return; } SafeInvoke(() => { _mixCheckTimer.Stop(); _updateTimer.Stop(); }); Interlocked.Exchange(ref _mixTriggeredFlag, 1); _positionMs = 0; _playlistQueue.RemoveItem(0); var items = _playlistQueue.GetAllItems(); if (items.Count > 0) { _playlistQueue.SetCurrentPlaying(0); LoadAndPlay(items[0]); } else Stop(); }
+        private void DrainAndExecuteCommands()
+        {
+            _playlistQueue?.DrainAndExecuteCommandsAtFront();
+        }
+
+        private void SkipToNext()
+        {
+            if (_playlistQueue == null || _playlistQueue.GetItemCount() < 2) { Stop(); return; }
+            SafeInvoke(() => { _mixCheckTimer.Stop(); _updateTimer.Stop(); });
+            Interlocked.Exchange(ref _mixTriggeredFlag, 1);
+            _positionMs = 0;
+            _playlistQueue.RemoveItem(0);
+            DrainAndExecuteCommands();
+            var items = _playlistQueue.GetAllItems();
+            if (items.Count > 0)
+            {
+                _playlistQueue.SetCurrentPlaying(0);
+                LoadAndPlay(items[0]);
+            }
+            else Stop();
+        }
 
         // ═══════════════════════════════════════════════════════════
         // MIX
         // ═══════════════════════════════════════════════════════════
         private void MixCheckTimer_Tick(object s, EventArgs e) { if (!_isPlaying || _isPaused) return; if (_activeDeck == null || !_activeDeck.IsPlaying) return; if (_autoMode && _markerMIX > 0 && _positionMs >= _markerMIX) { if (TryTriggerMix()) { _mixCheckTimer.Stop(); OnMixReached(); } } }
-        private void OnMixReached() { if (_playlistQueue == null) return; _mixCheckTimer.Stop(); int gen = _mixGeneration; var items = _playlistQueue.GetAllItems(); if (items.Count <= 1) { Log("[MIX] No next"); return; } if (gen != _mixGeneration) return; _mixGeneration++; Log("[MIX] → " + (items[1].Title ?? "?")); _playlistQueue.RemoveItem(0); _playlistQueue.SetCurrentPlaying(0); var next = _playlistQueue.GetAllItems(); if (next.Count > 0) LoadAndPlay(next[0]); MixPointReached?.Invoke(this, EventArgs.Empty); }
+        private void OnMixReached()
+        {
+            if (_playlistQueue == null) return;
+            _mixCheckTimer.Stop();
+            int gen = _mixGeneration;
+            var items = _playlistQueue.GetAllItems();
+            if (items.Count <= 1) { Log("[MIX] No next"); return; }
+            if (gen != _mixGeneration) return;
+            _mixGeneration++;
+            if (_playlistQueue.GetNextPlayableItem() == null) { Log("[MIX] No next playable"); return; }
+            _playlistQueue.RemoveItem(0);
+            DrainAndExecuteCommands();
+            var next = _playlistQueue.GetAllItems();
+            if (next.Count > 0)
+            {
+                Log("[MIX] → " + (next[0].Title ?? "?"));
+                _playlistQueue.SetCurrentPlaying(0);
+                LoadAndPlay(next[0]);
+            }
+            MixPointReached?.Invoke(this, EventArgs.Empty);
+        }
         private void OnTrackEnded() { _isPlaying = false; _updateTimer.Stop(); _mixCheckTimer.Stop(); _blinkTimer.Stop(); if (_autoMode) OnMixReached(); else { TrackEndedInManualMode?.Invoke(this, EventArgs.Empty); ClearPlayer(); } }
         public void SeekTo(TimeSpan pos) { if (!_isPlaying) return; _commandQueue.Enqueue(() => { var d = _activeDeck; if (d == null || d.Type == DeckType.WebStream) return; try { if (d.Type == DeckType.VideoClip) d.VlcPlayer.Time = (long)pos.TotalMilliseconds; else if (d.FileReader != null) d.FileReader.CurrentTime = pos; d.Ring.Reset(); d.WarmupDone = false; _positionMs = (int)pos.TotalMilliseconds; _audioDelay.Reset(); } catch { } }); }
 
