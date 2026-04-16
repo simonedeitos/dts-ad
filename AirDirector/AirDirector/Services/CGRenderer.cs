@@ -918,15 +918,17 @@ namespace AirDirector.Services
 
             foreach (var logo in _additionalLogos)
             {
-                if (logo == null || string.IsNullOrWhiteSpace(logo.ImagePath) || !File.Exists(logo.ImagePath))
+                if (logo == null)
                     continue;
-                var logoPath = logo.ImagePath.Trim();
+                var logoPath = logo.ImagePath?.Trim();
+                if (string.IsNullOrWhiteSpace(logoPath) || !File.Exists(logoPath))
+                    continue;
                 if (!_visibleAdditionalLogos.Contains(logoPath))
                     continue;
 
                 try
                 {
-                    using (var image = Image.FromFile(logo.ImagePath))
+                    using (var image = Image.FromFile(logoPath))
                     {
                         float logoScale = logo.Scale > 0f ? logo.Scale : 1.0f;
                         int drawW = Math.Max(1, (int)(image.Width * logoScale));
