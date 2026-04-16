@@ -1177,6 +1177,22 @@ namespace AirDirector.Controls
                         }
                         break;
 
+                    case "LogoShow":
+                        if (!string.IsNullOrWhiteSpace(schedule.ClockName))
+                        {
+                            CGRenderer.ShowAdditionalLogo(schedule.ClockName);
+                            Log($"[ExecuteSchedule] ✅ LogoShow: {schedule.ClockName}");
+                        }
+                        break;
+
+                    case "LogoHide":
+                        if (!string.IsNullOrWhiteSpace(schedule.ClockName))
+                        {
+                            CGRenderer.HideAdditionalLogo(schedule.ClockName);
+                            Log($"[ExecuteSchedule] ✅ LogoHide: {schedule.ClockName}");
+                        }
+                        break;
+
                     default:
                         Log($"[ExecuteSchedule] ?? Tipo sconosciuto: {schedule.Type}");
                         break;
@@ -3894,6 +3910,70 @@ namespace AirDirector.Controls
 							return GetRandomClipByGenre(genreName);
 						return GetRandomMusicByGenre(genreName, pItem.YearFilterEnabled, pItem.YearFrom, pItem.YearTo);
 					}
+
+                    case AirPlaylistItemType.URLStreaming:
+                    {
+                        TimeSpan duration = TimeSpan.FromMinutes(60);
+                        if (!string.IsNullOrWhiteSpace(pItem.StreamDuration) &&
+                            TimeSpan.TryParse(pItem.StreamDuration, out TimeSpan parsedDuration))
+                        {
+                            duration = parsedDuration;
+                        }
+
+                        string associatedVideo = !string.IsNullOrWhiteSpace(pItem.AssociatedVideoPath) ? pItem.AssociatedVideoPath : (pItem.AssociatedBufferPath ?? "");
+                        string associatedVideoSource = string.IsNullOrWhiteSpace(associatedVideo)
+                            ? ""
+                            : (string.IsNullOrWhiteSpace(pItem.AssociatedVideoPath) ? "BufferVideo" : "StaticVideo");
+
+                        var streamingItem = new PlaylistQueueItem
+                        {
+                            Type = PlaylistItemType.Other,
+                            ScheduledTime = DateTime.Now,
+                            Artist = "",
+                            Title = $"WebStreaming - {pItem.Title}",
+                            Duration = duration,
+                            Intro = TimeSpan.Zero,
+                            FilePath = pItem.FilePath ?? "",
+                            MarkerIN = 0,
+                            MarkerINTRO = 0,
+                            MarkerMIX = 0,
+                            MarkerOUT = 0,
+                            VideoFilePath = associatedVideo,
+                            VideoSource = associatedVideoSource
+                        };
+                        return streamingItem;
+                    }
+
+                    case AirPlaylistItemType.ExternalAudio:
+                    {
+                        if (string.IsNullOrWhiteSpace(pItem.FilePath) || !File.Exists(pItem.FilePath))
+                        {
+                            Log($"[ConvertPlaylistItem] ExternalAudio non trovato: {pItem.FilePath}");
+                            return null;
+                        }
+
+                        string associatedVideo = !string.IsNullOrWhiteSpace(pItem.AssociatedVideoPath) ? pItem.AssociatedVideoPath : (pItem.AssociatedBufferPath ?? "");
+                        string associatedVideoSource = string.IsNullOrWhiteSpace(associatedVideo)
+                            ? ""
+                            : (string.IsNullOrWhiteSpace(pItem.AssociatedVideoPath) ? "BufferVideo" : "StaticVideo");
+
+                        return new PlaylistQueueItem
+                        {
+                            Type = PlaylistItemType.Other,
+                            ScheduledTime = DateTime.Now,
+                            Artist = "",
+                            Title = string.IsNullOrWhiteSpace(pItem.Title) ? Path.GetFileNameWithoutExtension(pItem.FilePath) : pItem.Title,
+                            Duration = TimeSpan.FromSeconds(Math.Max(0, pItem.DurationSeconds)),
+                            Intro = TimeSpan.Zero,
+                            FilePath = pItem.FilePath,
+                            MarkerIN = 0,
+                            MarkerINTRO = 0,
+                            MarkerMIX = 0,
+                            MarkerOUT = 0,
+                            VideoFilePath = associatedVideo,
+                            VideoSource = associatedVideoSource
+                        };
+                    }
 
 					default:
 						Log($"[ConvertPlaylistItem] Tipo non gestito: {pItem.Type}");

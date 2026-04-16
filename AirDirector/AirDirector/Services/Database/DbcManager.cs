@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using CsvHelper;
 using CsvHelper.Configuration;
 using System.Globalization;
+using AirDirector.Models;
 
 namespace AirDirector.Services.Database
 {
@@ -152,6 +153,13 @@ namespace AirDirector.Services.Database
             {
                 SaveToCsvInternal(artistsPath, new List<ArtistAliasEntry>());
                 Console.WriteLine("[DbcManager] Artists.dbc creato");
+            }
+
+            string streamingPath = Path.Combine(DatabasePath, "Streaming.dbc");
+            if (!File.Exists(streamingPath))
+            {
+                SaveToCsvInternal(streamingPath, new List<StreamingEntry>());
+                Console.WriteLine("[DbcManager] Streaming.dbc creato");
             }
         }
 

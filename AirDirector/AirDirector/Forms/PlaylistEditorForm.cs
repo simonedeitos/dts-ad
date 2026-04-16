@@ -9,6 +9,7 @@ using AirDirector.Models;
 using AirDirector.Services.Database;
 using AirDirector.Services.Localization;
 using AirDirector.Themes;
+using Newtonsoft.Json;
 
 namespace AirDirector.Forms
 {
@@ -26,6 +27,9 @@ namespace AirDirector.Forms
         private List<string> _musicGenres;
         private List<string> _clipCategories;
         private List<string> _clipGenres;
+        private List<StreamingEntry> _streamingEntries;
+        private List<AdditionalLogo> _additionalLogos;
+        private bool _isRadioTVMode;
 
         // ── Left panel controls ──────────────────────────────────────────────
         private Label _lblHeader;
@@ -73,6 +77,24 @@ namespace AirDirector.Forms
         private NumericUpDown _numRuleYearTo;
         private Label _lblRuleFoundTracks;
         private Button _btnAddRule;
+        private RadioButton _radLogoCmdShow;
+        private RadioButton _radLogoCmdHide;
+        private ComboBox _cmbRuleLogo;
+        private Button _btnInsertLogoCmd;
+        private ComboBox _cmbPlaylistStreaming;
+        private MaskedTextBox _txtPlaylistStreamDuration;
+        private TextBox _txtPlaylistStreamingBuffer;
+        private Button _btnBrowsePlaylistStreamingBuffer;
+        private Button _btnInsertStreaming;
+        private TextBox _txtRuleAudioFile;
+        private Button _btnBrowseRuleAudioFile;
+        private CheckBox _chkRuleBufferVideo;
+        private TextBox _txtRuleBufferVideo;
+        private Button _btnBrowseRuleBufferVideo;
+        private CheckBox _chkRuleVideoMp4;
+        private TextBox _txtRuleVideoMp4;
+        private Button _btnBrowseRuleVideoMp4;
+        private Button _btnInsertAudio;
 
         // ── Drag & Drop ──────────────────────────────────────────────────────
         private int _dragSourceRow = -1;
@@ -97,6 +119,9 @@ namespace AirDirector.Forms
             _musicGenres = new List<string>();
             _clipCategories = new List<string>();
             _clipGenres = new List<string>();
+            _streamingEntries = new List<StreamingEntry>();
+            _additionalLogos = new List<AdditionalLogo>();
+            _isRadioTVMode = ConfigurationControl.IsRadioTVMode();
 
             LoadAvailableData();
             InitializeComponent();
@@ -152,6 +177,22 @@ namespace AirDirector.Forms
                 _clipGenres = clipGenres.OrderBy(g => g).ToList();
             }
             catch { _allClipEntries = new List<ClipEntry>(); }
+
+            try { _streamingEntries = DbcManager.LoadFromCsv<StreamingEntry>("Streaming.dbc"); }
+            catch { _streamingEntries = new List<StreamingEntry>(); }
+
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\AirDirector\CG", false))
+                {
+                    string json = key?.GetValue("AdditionalLogosJson", "[]")?.ToString() ?? "[]";
+                    _additionalLogos = JsonConvert.DeserializeObject<List<AdditionalLogo>>(json) ?? new List<AdditionalLogo>();
+                }
+            }
+            catch
+            {
+                _additionalLogos = new List<AdditionalLogo>();
+            }
         }
 
         // ══════════════════════════════════════════════════════════════════
@@ -618,6 +659,97 @@ namespace AirDirector.Forms
             _btnAddRule.Left = 16; _btnAddRule.Top = y; _btnAddRule.Width = 220; _btnAddRule.Height = 34;
             _btnAddRule.Click += BtnAddRule_Click;
             page.Controls.Add(_btnAddRule);
+            y += 48;
+
+            // Logo commands (RadioTV only)
+            GroupBox grpLogoCmd = new GroupBox
+            {
+                Text = LanguageManager.GetString("PlaylistEditor.InsertLogoCmd", "Inserisci Comando Logo"),
+                ForeColor = Color.White,
+                Left = 16,
+                Top = y,
+                Width = 620,
+                Height = 90,
+                Visible = _isRadioTVMode
+            };
+            _radLogoCmdShow = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.LogoShowCmd", "Mostra Logo"), Left = 12, Top = 28, AutoSize = true, Checked = true, ForeColor = Color.White };
+            _radLogoCmdHide = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.LogoHideCmd", "Nascondi Logo"), Left = 140, Top = 28, AutoSize = true, ForeColor = Color.White };
+            _cmbRuleLogo = new ComboBox { Left = 260, Top = 25, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
+            foreach (var logo in _additionalLogos) _cmbRuleLogo.Items.Add(logo);
+            if (_cmbRuleLogo.Items.Count > 0) _cmbRuleLogo.SelectedIndex = 0;
+            _btnInsertLogoCmd = CreateButton(LanguageManager.GetString("PlaylistEditor.InsertLogoCmd", "Inserisci Comando Logo"), Color.FromArgb(33, 150, 83));
+            _btnInsertLogoCmd.Left = 490; _btnInsertLogoCmd.Top = 22; _btnInsertLogoCmd.Width = 120; _btnInsertLogoCmd.Height = 30;
+            _btnInsertLogoCmd.Click += BtnInsertLogoCmd_Click;
+            grpLogoCmd.Controls.AddRange(new Control[] { _radLogoCmdShow, _radLogoCmdHide, _cmbRuleLogo, _btnInsertLogoCmd });
+            page.Controls.Add(grpLogoCmd);
+            y += grpLogoCmd.Visible ? 100 : 0;
+
+            GroupBox grpStreaming = new GroupBox
+            {
+                Text = LanguageManager.GetString("PlaylistEditor.InsertStreaming", "Inserisci Streaming"),
+                ForeColor = Color.White,
+                Left = 16,
+                Top = y,
+                Width = 620,
+                Height = _isRadioTVMode ? 130 : 95
+            };
+            grpStreaming.Controls.Add(new Label { Text = LanguageManager.GetString("ScheduleEditor.URLStreaming", "URL Streaming") + ":", Left = 12, Top = 28, Width = 85, ForeColor = Color.White });
+            _cmbPlaylistStreaming = new ComboBox { Left = 100, Top = 24, Width = 290, DropDownStyle = ComboBoxStyle.DropDownList };
+            foreach (var stream in _streamingEntries) _cmbPlaylistStreaming.Items.Add(stream);
+            if (_cmbPlaylistStreaming.Items.Count > 0) _cmbPlaylistStreaming.SelectedIndex = 0;
+            grpStreaming.Controls.Add(_cmbPlaylistStreaming);
+            grpStreaming.Controls.Add(new Label { Text = LanguageManager.GetString("PlaylistEditor.StreamingDuration", "Durata:"), Left = 400, Top = 28, Width = 55, ForeColor = Color.White });
+            _txtPlaylistStreamDuration = new MaskedTextBox { Left = 460, Top = 24, Width = 80, Mask = "00:00:00", Text = "010000" };
+            grpStreaming.Controls.Add(_txtPlaylistStreamDuration);
+
+            _txtPlaylistStreamingBuffer = new TextBox { Left = 130, Top = 57, Width = 410, Visible = _isRadioTVMode };
+            _btnBrowsePlaylistStreamingBuffer = new Button { Text = "📁", Left = 545, Top = 56, Width = 30, Height = 24, Visible = _isRadioTVMode };
+            _btnBrowsePlaylistStreamingBuffer.Click += (s, e) => BrowseFileInto(_txtPlaylistStreamingBuffer, LanguageManager.GetString("PlaylistEditor.SelectBufferFile", "Seleziona file buffer video"), "Video|*.mp4;*.mov;*.avi;*.mkv;*.wmv|All files|*.*");
+            grpStreaming.Controls.Add(new Label { Text = "File Buffer Video:", Left = 12, Top = 60, Width = 115, ForeColor = Color.White, Visible = _isRadioTVMode });
+            grpStreaming.Controls.Add(_txtPlaylistStreamingBuffer);
+            grpStreaming.Controls.Add(_btnBrowsePlaylistStreamingBuffer);
+
+            _btnInsertStreaming = CreateButton(LanguageManager.GetString("PlaylistEditor.InsertStreamingBtn", "Inserisci Streaming in Playlist"), Color.FromArgb(33, 150, 83));
+            _btnInsertStreaming.Left = 390; _btnInsertStreaming.Top = _isRadioTVMode ? 88 : 56; _btnInsertStreaming.Width = 220; _btnInsertStreaming.Height = 30;
+            _btnInsertStreaming.Click += BtnInsertStreaming_Click;
+            grpStreaming.Controls.Add(_btnInsertStreaming);
+            page.Controls.Add(grpStreaming);
+            y += grpStreaming.Height + 10;
+
+            GroupBox grpAudio = new GroupBox
+            {
+                Text = LanguageManager.GetString("PlaylistEditor.InsertAudio", "Inserisci Audio"),
+                ForeColor = Color.White,
+                Left = 16,
+                Top = y,
+                Width = 620,
+                Height = _isRadioTVMode ? 170 : 95
+            };
+            grpAudio.Controls.Add(new Label { Text = LanguageManager.GetString("PlaylistEditor.SelectAudioFile", "Seleziona file audio") + ":", Left = 12, Top = 28, Width = 110, ForeColor = Color.White });
+            _txtRuleAudioFile = new TextBox { Left = 125, Top = 24, Width = 415 };
+            _btnBrowseRuleAudioFile = new Button { Text = "📁", Left = 545, Top = 24, Width = 30, Height = 24 };
+            _btnBrowseRuleAudioFile.Click += (s, e) => BrowseFileInto(_txtRuleAudioFile, LanguageManager.GetString("PlaylistEditor.SelectAudioFile", "Seleziona file audio"), "Audio|*.mp3;*.wav;*.wma;*.aac;*.flac|All files|*.*");
+            grpAudio.Controls.AddRange(new Control[] { _txtRuleAudioFile, _btnBrowseRuleAudioFile });
+
+            _chkRuleBufferVideo = new CheckBox { Left = 12, Top = 58, Width = 200, Text = LanguageManager.GetString("PlaylistEditor.AddBufferVideo", "Aggiungi File Buffer Video"), ForeColor = Color.White, Visible = _isRadioTVMode };
+            _chkRuleBufferVideo.CheckedChanged += (s, e) => UpdateRuleVideoOptions();
+            _txtRuleBufferVideo = new TextBox { Left = 220, Top = 56, Width = 320, Visible = false };
+            _btnBrowseRuleBufferVideo = new Button { Text = "📁", Left = 545, Top = 56, Width = 30, Height = 24, Visible = false };
+            _btnBrowseRuleBufferVideo.Click += (s, e) => BrowseFileInto(_txtRuleBufferVideo, LanguageManager.GetString("PlaylistEditor.SelectBufferFile", "Seleziona file buffer video"), "Video|*.mp4;*.mov;*.avi;*.mkv;*.wmv|All files|*.*");
+            grpAudio.Controls.AddRange(new Control[] { _chkRuleBufferVideo, _txtRuleBufferVideo, _btnBrowseRuleBufferVideo });
+
+            _chkRuleVideoMp4 = new CheckBox { Left = 12, Top = 88, Width = 280, Text = LanguageManager.GetString("PlaylistEditor.AddVideoMP4", "Aggiungi File Video MP4 (non da archivio)"), ForeColor = Color.White, Visible = _isRadioTVMode };
+            _chkRuleVideoMp4.CheckedChanged += (s, e) => UpdateRuleVideoOptions();
+            _txtRuleVideoMp4 = new TextBox { Left = 300, Top = 86, Width = 240, Visible = false };
+            _btnBrowseRuleVideoMp4 = new Button { Text = "📁", Left = 545, Top = 86, Width = 30, Height = 24, Visible = false };
+            _btnBrowseRuleVideoMp4.Click += (s, e) => BrowseFileInto(_txtRuleVideoMp4, LanguageManager.GetString("PlaylistEditor.SelectVideoFile", "Seleziona file video"), "MP4|*.mp4|All files|*.*");
+            grpAudio.Controls.AddRange(new Control[] { _chkRuleVideoMp4, _txtRuleVideoMp4, _btnBrowseRuleVideoMp4 });
+
+            _btnInsertAudio = CreateButton(LanguageManager.GetString("PlaylistEditor.InsertAudioBtn", "Inserisci Audio in Playlist"), Color.FromArgb(33, 150, 83));
+            _btnInsertAudio.Left = 390; _btnInsertAudio.Top = _isRadioTVMode ? 122 : 56; _btnInsertAudio.Width = 220; _btnInsertAudio.Height = 30;
+            _btnInsertAudio.Click += BtnInsertAudio_Click;
+            grpAudio.Controls.Add(_btnInsertAudio);
+            page.Controls.Add(grpAudio);
 
             UpdateRuleControls();
             return page;
@@ -703,6 +835,13 @@ namespace AirDirector.Forms
             if (_btnAddClip != null) _btnAddClip.Text = LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "+ Aggiungi");
             if (_btnAddRule != null) _btnAddRule.Text = LanguageManager.GetString("PlaylistEditor.AddRuleToPlaylist", "+ Aggiungi Regola");
             if (_btnDeletePlaylist != null) _btnDeletePlaylist.Text = LanguageManager.GetString("PlaylistEditor.DeletePlaylist", "Elimina");
+            if (_btnInsertLogoCmd != null) _btnInsertLogoCmd.Text = LanguageManager.GetString("PlaylistEditor.InsertLogoCmd", "Inserisci Comando Logo");
+            if (_radLogoCmdShow != null) _radLogoCmdShow.Text = LanguageManager.GetString("PlaylistEditor.LogoShowCmd", "Mostra Logo");
+            if (_radLogoCmdHide != null) _radLogoCmdHide.Text = LanguageManager.GetString("PlaylistEditor.LogoHideCmd", "Nascondi Logo");
+            if (_btnInsertStreaming != null) _btnInsertStreaming.Text = LanguageManager.GetString("PlaylistEditor.InsertStreamingBtn", "Inserisci Streaming in Playlist");
+            if (_btnInsertAudio != null) _btnInsertAudio.Text = LanguageManager.GetString("PlaylistEditor.InsertAudioBtn", "Inserisci Audio in Playlist");
+            if (_chkRuleBufferVideo != null) _chkRuleBufferVideo.Text = LanguageManager.GetString("PlaylistEditor.AddBufferVideo", "Aggiungi File Buffer Video");
+            if (_chkRuleVideoMp4 != null) _chkRuleVideoMp4.Text = LanguageManager.GetString("PlaylistEditor.AddVideoMP4", "Aggiungi File Video MP4 (non da archivio)");
             if (_tabArchive != null && _tabArchive.TabPages.Count >= 4)
             {
                 _tabArchive.TabPages[0].Text = LanguageManager.GetString("PlaylistEditor.TabMusic", "🎵 Music");
@@ -1026,7 +1165,11 @@ namespace AirDirector.Forms
                     YearTo = item.YearTo,
                     RuleSourceType = item.RuleSourceType,
                     RuleCategoryName = item.RuleCategoryName,
-                    RuleGenreName = item.RuleGenreName
+                    RuleGenreName = item.RuleGenreName,
+                    StreamDuration = item.StreamDuration,
+                    CommandValue = item.CommandValue,
+                    AssociatedBufferPath = item.AssociatedBufferPath,
+                    AssociatedVideoPath = item.AssociatedVideoPath
                 };
                 _playlist.Items.Insert(insertIndex++, newItem);
             }
@@ -1410,6 +1553,103 @@ namespace AirDirector.Forms
         // ══════════════════════════════════════════════════════════════════
         // RULES TAB
         // ══════════════════════════════════════════════════════════════════
+
+        private void BrowseFileInto(TextBox target, string title, string filter)
+        {
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Title = title;
+                ofd.Filter = filter;
+                if (ofd.ShowDialog(this) == DialogResult.OK)
+                    target.Text = ofd.FileName;
+            }
+        }
+
+        private void UpdateRuleVideoOptions()
+        {
+            if (!_isRadioTVMode)
+                return;
+
+            if (_chkRuleBufferVideo != null && _chkRuleVideoMp4 != null)
+            {
+                if (_chkRuleBufferVideo.Checked && _chkRuleVideoMp4.Checked)
+                {
+                    if (ReferenceEquals(ActiveControl, _chkRuleBufferVideo))
+                        _chkRuleVideoMp4.Checked = false;
+                    else
+                        _chkRuleBufferVideo.Checked = false;
+                }
+            }
+
+            bool showBuffer = _chkRuleBufferVideo?.Checked == true;
+            bool showVideo = _chkRuleVideoMp4?.Checked == true;
+            if (_txtRuleBufferVideo != null) _txtRuleBufferVideo.Visible = showBuffer;
+            if (_btnBrowseRuleBufferVideo != null) _btnBrowseRuleBufferVideo.Visible = showBuffer;
+            if (_txtRuleVideoMp4 != null) _txtRuleVideoMp4.Visible = showVideo;
+            if (_btnBrowseRuleVideoMp4 != null) _btnBrowseRuleVideoMp4.Visible = showVideo;
+        }
+
+        private void BtnInsertLogoCmd_Click(object sender, EventArgs e)
+        {
+            var selectedLogo = _cmbRuleLogo?.SelectedItem as AdditionalLogo;
+            if (selectedLogo == null)
+                return;
+
+            var item = new AirPlaylistItem
+            {
+                Type = _radLogoCmdShow?.Checked == true ? AirPlaylistItemType.LogoShow : AirPlaylistItemType.LogoHide,
+                CommandValue = selectedLogo.ImagePath,
+                Title = Path.GetFileName(selectedLogo.ImagePath),
+                DurationSeconds = 0
+            };
+
+            _playlist.Items.Add(item);
+            MarkChanged();
+            RefreshEditorGrid();
+        }
+
+        private void BtnInsertStreaming_Click(object sender, EventArgs e)
+        {
+            var selected = _cmbPlaylistStreaming?.SelectedItem as StreamingEntry;
+            if (selected == null)
+                return;
+
+            TimeSpan duration = TimeSpan.FromHours(1);
+            TimeSpan.TryParse((_txtPlaylistStreamDuration?.Text ?? "01:00:00").Trim(), out duration);
+
+            var item = new AirPlaylistItem
+            {
+                Type = AirPlaylistItemType.URLStreaming,
+                Title = selected.Name,
+                FilePath = selected.URL,
+                StreamDuration = duration.ToString(@"hh\:mm\:ss"),
+                DurationSeconds = (int)duration.TotalSeconds,
+                AssociatedBufferPath = _isRadioTVMode ? (_txtPlaylistStreamingBuffer?.Text ?? "") : ""
+            };
+            _playlist.Items.Add(item);
+            MarkChanged();
+            RefreshEditorGrid();
+        }
+
+        private void BtnInsertAudio_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(_txtRuleAudioFile?.Text))
+                return;
+
+            var item = new AirPlaylistItem
+            {
+                Type = AirPlaylistItemType.ExternalAudio,
+                FilePath = _txtRuleAudioFile.Text.Trim(),
+                Title = Path.GetFileNameWithoutExtension(_txtRuleAudioFile.Text.Trim()),
+                DurationSeconds = 0,
+                AssociatedBufferPath = (_chkRuleBufferVideo?.Checked == true) ? (_txtRuleBufferVideo?.Text ?? "") : "",
+                AssociatedVideoPath = (_chkRuleVideoMp4?.Checked == true) ? (_txtRuleVideoMp4?.Text ?? "") : ""
+            };
+
+            _playlist.Items.Add(item);
+            MarkChanged();
+            RefreshEditorGrid();
+        }
 
         private void OnRuleSourceChanged()
         {

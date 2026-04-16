@@ -1,9 +1,13 @@
-﻿using Microsoft.Win32;
+using AirDirector.Models;
+using Microsoft.Win32;
+using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace AirDirector.Services
@@ -52,6 +56,8 @@ namespace AirDirector.Services
         private static int _logoSize = 150;
         private static int _logoMargin = 20;
         private static Bitmap _logoBitmap = null;
+        private static List<AdditionalLogo> _additionalLogos = new List<AdditionalLogo>();
+        private static HashSet<string> _hiddenAdditionalLogos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // ═══════════════════════════════════════════════════════════
         // CLOCK SETTINGS
@@ -112,6 +118,24 @@ namespace AirDirector.Services
             LoadLogo();
         }
 
+        public static void ShowAdditionalLogo(string logoImagePath)
+        {
+            if (string.IsNullOrWhiteSpace(logoImagePath))
+                return;
+
+            _hiddenAdditionalLogos.Remove(logoImagePath.Trim());
+            SaveAdditionalLogoVisibility();
+        }
+
+        public static void HideAdditionalLogo(string logoImagePath)
+        {
+            if (string.IsNullOrWhiteSpace(logoImagePath))
+                return;
+
+            _hiddenAdditionalLogos.Add(logoImagePath.Trim());
+            SaveAdditionalLogoVisibility();
+        }
+
         private static void LoadSettings()
         {
             try
@@ -159,6 +183,8 @@ namespace AirDirector.Services
                     _logoOpacity = GetRegInt(key, "LogoOpacity", 100);
                     _logoSize = GetRegInt(key, "LogoSize", 150);
                     _logoMargin = GetRegInt(key, "LogoMargin", 20);
+                    _additionalLogos = ParseAdditionalLogos(GetRegString(key, "AdditionalLogosJson", "[]"));
+                    _hiddenAdditionalLogos = ParseHiddenAdditionalLogos(GetRegString(key, "AdditionalLogosHidden", ""));
 
                     // Clock
                     _clockEnabled = GetRegInt(key, "ClockEnabled", 1) == 1;
@@ -220,6 +246,40 @@ namespace AirDirector.Services
             {
                 Console.WriteLine($"[CGRenderer] Logo load error: {ex.Message}");
             }
+        }
+
+        private static List<AdditionalLogo> ParseAdditionalLogos(string json)
+        {
+            try
+            {
+                var logos = JsonConvert.DeserializeObject<List<AdditionalLogo>>(json ?? "[]");
+                return logos ?? new List<AdditionalLogo>();
+            }
+            catch
+            {
+                return new List<AdditionalLogo>();
+            }
+        }
+
+        private static HashSet<string> ParseHiddenAdditionalLogos(string serialized)
+        {
+            return new HashSet<string>(
+                (serialized ?? "")
+                    .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.Trim()),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static void SaveAdditionalLogoVisibility()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\AirDirector\CG"))
+                {
+                    key?.SetValue("AdditionalLogosHidden", string.Join(";", _hiddenAdditionalLogos));
+                }
+            }
+            catch { }
         }
 
         private static string GetRegString(RegistryKey key, string name, string def)
@@ -300,6 +360,7 @@ namespace AirDirector.Services
 
             // Render elements in order (back to front)
             if (_logoEnabled) RenderLogo(g, w, h);
+            RenderAdditionalLogos(g, w, h);
             if (_clockEnabled) RenderClock(g, w, h);
 
             // Render based on item type
@@ -820,6 +881,58 @@ namespace AirDirector.Services
         // ═══════════════════════════════════════════════════════════
         // RENDER SPOT LABEL
         // ═══════════════════════════════════════════════════════════
+        private static void RenderAdditionalLogos(Graphics g, int w, int h)
+        {
+            if (_additionalLogos == null || _additionalLogos.Count == 0)
+                return;
+
+            foreach (var logo in _additionalLogos)
+            {
+                if (logo == null || string.IsNullOrWhiteSpace(logo.ImagePath) || !File.Exists(logo.ImagePath))
+                    continue;
+                if (_hiddenAdditionalLogos.Contains(logo.ImagePath))
+                    continue;
+
+                try
+                {
+                    using (var image = Image.FromFile(logo.ImagePath))
+                    {
+                        int x = 0;
+                        int y = 0;
+                        int marginX = Math.Max(0, logo.MarginX);
+                        int marginY = Math.Max(0, logo.MarginY);
+
+                        switch (logo.Position)
+                        {
+                            case "TopLeft":
+                                x = marginX; y = marginY; break;
+                            case "TopCenter":
+                                x = (w - image.Width) / 2; y = marginY; break;
+                            case "TopRight":
+                                x = w - image.Width - marginX; y = marginY; break;
+                            case "MiddleLeft":
+                                x = marginX; y = (h - image.Height) / 2; break;
+                            case "MiddleCenter":
+                                x = (w - image.Width) / 2; y = (h - image.Height) / 2; break;
+                            case "MiddleRight":
+                                x = w - image.Width - marginX; y = (h - image.Height) / 2; break;
+                            case "BottomLeft":
+                                x = marginX; y = h - image.Height - marginY; break;
+                            case "BottomCenter":
+                                x = (w - image.Width) / 2; y = h - image.Height - marginY; break;
+                            case "BottomRight":
+                                x = w - image.Width - marginX; y = h - image.Height - marginY; break;
+                            default:
+                                x = marginX; y = h - image.Height - marginY; break;
+                        }
+
+                        g.DrawImage(image, x, y, image.Width, image.Height);
+                    }
+                }
+                catch { }
+            }
+        }
+
         private static void RenderSpotLabel(Graphics g, int w, int h)
         {
             using (Font f = new Font("Segoe UI", _spotLabelFontSize, FontStyle.Bold))
@@ -847,7 +960,16 @@ namespace AirDirector.Services
                         y = _spotLabelMarginY;
                         break;
                     case "Bottom":
+                    case "BottomCenter":
                         x = (w - boxW) / 2;
+                        y = h - boxH - _spotLabelMarginY;
+                        break;
+                    case "BottomLeft":
+                        x = _spotLabelMarginX;
+                        y = h - boxH - _spotLabelMarginY;
+                        break;
+                    case "BottomRight":
+                        x = w - boxW - _spotLabelMarginX;
                         y = h - boxH - _spotLabelMarginY;
                         break;
                 }

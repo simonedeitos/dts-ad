@@ -241,7 +241,9 @@ namespace AirDirector.Controls
                          schedule.Type == "PlayAudio" ? "🎵" :
                          (schedule.Type == "PlayMiniPLS" || schedule.Type == "PlayPlaylist") ? "📋" :
                          schedule.Type == "TimeSignal" ? "⏰" :
-                         schedule.Type == "URLStreaming" ? "🌐" : "📄";
+                         schedule.Type == "URLStreaming" ? "🌐" :
+                         schedule.Type == "LogoShow" ? "🟢" :
+                         schedule.Type == "LogoHide" ? "🔴" : "📄";
 
             string target = "";
             if (schedule.Type == "PlayClock")
@@ -258,6 +260,10 @@ namespace AirDirector.Controls
             {
                 var urlParts = schedule.ClockName?.Split('|');
                 target = urlParts?.Length > 0 ? urlParts[0] : "";
+            }
+            else if (schedule.Type == "LogoShow" || schedule.Type == "LogoHide")
+            {
+                target = System.IO.Path.GetFileName(schedule.ClockName ?? "");
             }
 
             Label lblTitle = new Label
