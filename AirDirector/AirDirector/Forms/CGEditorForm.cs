@@ -1745,19 +1745,19 @@ namespace AirDirector.Forms
         {
             Logo = logo ?? new AdditionalLogo();
             Text = LanguageManager.GetString("CGEditor.AdditionalLogosEdit", "Edit Logo");
-            Size = new Size(520, 280);
+            Size = new Size(520, 310);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MaximizeBox = false;
             MinimizeBox = false;
 
-            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosName", "Name") + ":", Left = 12, Top = 20, Width = 70 });
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosName", "Name") + ":", Left = 12, Top = 21, Width = 70 });
             _txtName = new TextBox { Left = 80, Top = 18, Width = 398, Text = Logo.Name ?? "" };
             Controls.Add(_txtName);
 
-            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosPath", "Path") + ":", Left = 12, Top = 55, Width = 70 });
-            _txtPath = new TextBox { Left = 80, Top = 53, Width = 350, Text = Logo.ImagePath ?? "" };
-            var btnBrowse = new Button { Text = "...", Left = 438, Top = 52, Width = 40 };
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosPath", "Path") + ":", Left = 12, Top = 65, Width = 70 });
+            _txtPath = new TextBox { Left = 80, Top = 62, Width = 350, Text = Logo.ImagePath ?? "" };
+            var btnBrowse = new Button { Text = "...", Left = 438, Top = 61, Width = 40 };
             btnBrowse.Click += (s, e) =>
             {
                 using (System.Windows.Forms.OpenFileDialog ofd = new System.Windows.Forms.OpenFileDialog())
@@ -1770,11 +1770,11 @@ namespace AirDirector.Forms
             Controls.Add(_txtPath);
             Controls.Add(btnBrowse);
 
-            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosPosition", "Position") + ":", Left = 12, Top = 90, Width = 70 });
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosPosition", "Position") + ":", Left = 12, Top = 109, Width = 70 });
             _cmbPosition = new ComboBox
             {
                 Left = 80,
-                Top = 88,
+                Top = 106,
                 Width = 170,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
@@ -1787,29 +1787,29 @@ namespace AirDirector.Forms
             _cmbPosition.SelectedItem = _cmbPosition.Items.Contains(Logo.Position) ? Logo.Position : "BottomLeft";
             Controls.Add(_cmbPosition);
 
-            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosMarginX", "Margin X") + ":", Left = 12, Top = 125, Width = 70 });
-            _numMarginX = new NumericUpDown { Left = 80, Top = 123, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginX };
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosMarginX", "Margin X") + ":", Left = 12, Top = 153, Width = 70 });
+            _numMarginX = new NumericUpDown { Left = 80, Top = 150, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginX };
             Controls.Add(_numMarginX);
 
-            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosMarginY", "Margin Y") + ":", Left = 190, Top = 125, Width = 70 });
-            _numMarginY = new NumericUpDown { Left = 260, Top = 123, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginY };
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosMarginY", "Margin Y") + ":", Left = 190, Top = 153, Width = 70 });
+            _numMarginY = new NumericUpDown { Left = 260, Top = 150, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginY };
             Controls.Add(_numMarginY);
 
-            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosScale", "Scale") + ":", Left = 12, Top = 160, Width = 70 });
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosScale", "Scale") + ":", Left = 12, Top = 197, Width = 70 });
             _numScale = new NumericUpDown
             {
                 Left = 80,
-                Top = 158,
+                Top = 194,
                 Width = 90,
-                Minimum = 0.1M,
-                Maximum = 10.0M,
-                Increment = 0.1M,
-                DecimalPlaces = 1,
-                Value = Math.Max(0.1M, Math.Min(10.0M, (decimal)(Logo.Scale > 0f ? Logo.Scale : 1.0f)))
+                Minimum = 10M,
+                Maximum = 1000M,
+                Increment = 5M,
+                Value = Math.Max(10M, Math.Min(1000M, (decimal)Math.Round((Logo.Scale > 0f ? Logo.Scale : 1.0f) * 100f)))
             };
             Controls.Add(_numScale);
+            Controls.Add(new Label { Text = "%", Left = 176, Top = 197, Width = 15 });
 
-            Button btnOk = new Button { Text = LanguageManager.GetString("Common.Save", "Save"), Left = 320, Top = 200, Width = 75, DialogResult = DialogResult.OK };
+            Button btnOk = new Button { Text = LanguageManager.GetString("Common.Save", "Save"), Left = 320, Top = 250, Width = 75, DialogResult = DialogResult.OK };
             btnOk.Click += (s, e) =>
             {
                 if (string.IsNullOrWhiteSpace(_txtPath.Text))
@@ -1823,11 +1823,11 @@ namespace AirDirector.Forms
                 Logo.Position = _cmbPosition.SelectedItem?.ToString() ?? "BottomLeft";
                 Logo.MarginX = (int)_numMarginX.Value;
                 Logo.MarginY = (int)_numMarginY.Value;
-                Logo.Scale = (float)_numScale.Value;
+                Logo.Scale = (float)_numScale.Value / 100f;
             };
             Controls.Add(btnOk);
 
-            Button btnCancel = new Button { Text = LanguageManager.GetString("Common.Cancel", "Cancel"), Left = 403, Top = 200, Width = 75, DialogResult = DialogResult.Cancel };
+            Button btnCancel = new Button { Text = LanguageManager.GetString("Common.Cancel", "Cancel"), Left = 403, Top = 250, Width = 75, DialogResult = DialogResult.Cancel };
             Controls.Add(btnCancel);
 
             AcceptButton = btnOk;
