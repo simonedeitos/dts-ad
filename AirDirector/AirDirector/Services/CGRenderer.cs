@@ -81,6 +81,9 @@ namespace AirDirector.Services
         private static int _spotLabelFontSize = 14;
         private static int _spotLabelMarginX = 20;
         private static int _spotLabelMarginY = 20;
+        private static bool _hideAdditionalLogosDuringAdv = false;
+        private static bool _advTextDelayEnabled = false;
+        private static int _advTextDelay = 0;
 
         // ═══════════════════════════════════════════════════════════
         // CURRENT STATE
@@ -101,6 +104,9 @@ namespace AirDirector.Services
         private static bool _hasShownInitialTitle = false;
         private static DateTime _animStartTime = DateTime.MinValue;
         private static DateTime _animOutStartTime = DateTime.MinValue;
+        private static bool _isAdvModeActive = false;
+        private static DateTime _advModeStartTime = DateTime.MinValue;
+        private static HashSet<string> _advTemporarilyHiddenAdditionalLogos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private const float ANIM_DURATION_SEC = 0.5f;
 
@@ -223,6 +229,9 @@ namespace AirDirector.Services
                     _spotLabelFontSize = GetRegInt(key, "SpotLabelFontSize", 14);
                     _spotLabelMarginX = GetRegInt(key, "SpotLabelMarginX", 20);
                     _spotLabelMarginY = GetRegInt(key, "SpotLabelMarginY", 20);
+                    _hideAdditionalLogosDuringAdv = GetRegInt(key, "HideAdditionalLogosDuringAdv", 0) == 1;
+                    _advTextDelayEnabled = GetRegInt(key, "AdvTextDelayEnabled", 0) == 1;
+                    _advTextDelay = GetRegInt(key, "AdvTextDelay", 0);
 
                     _settingsLoaded = true;
                 }
@@ -385,6 +394,8 @@ namespace AirDirector.Services
 
         private static void RenderAllElements(Graphics g, int w, int h)
         {
+            UpdateAdvModeState();
+
             // Update animation states
             UpdateAnimationState();
 
@@ -396,7 +407,7 @@ namespace AirDirector.Services
             // Render based on item type
             if (_currentItemType == "Spot" || _currentItemType == "ADV")
             {
-                if (_spotLabelEnabled) RenderSpotLabel(g, w, h);
+                if (_spotLabelEnabled && ShouldRenderSpotLabel()) RenderSpotLabel(g, w, h);
             }
             else if (_currentItemType == "Music")
             {
@@ -925,6 +936,8 @@ namespace AirDirector.Services
                     continue;
                 if (!_visibleAdditionalLogos.Contains(logoPath))
                     continue;
+                if (_isAdvModeActive && _hideAdditionalLogosDuringAdv && _advTemporarilyHiddenAdditionalLogos.Contains(logoPath))
+                    continue;
 
                 try
                 {
@@ -967,6 +980,36 @@ namespace AirDirector.Services
                 }
                 catch { }
             }
+        }
+
+        private static void UpdateAdvModeState()
+        {
+            bool isAdvNow = _currentItemType == "Spot" || _currentItemType == "ADV";
+
+            if (isAdvNow && !_isAdvModeActive)
+            {
+                _isAdvModeActive = true;
+                _advModeStartTime = DateTime.Now;
+
+                if (_hideAdditionalLogosDuringAdv)
+                    _advTemporarilyHiddenAdditionalLogos = new HashSet<string>(_visibleAdditionalLogos, StringComparer.OrdinalIgnoreCase);
+                else
+                    _advTemporarilyHiddenAdditionalLogos.Clear();
+            }
+            else if (!isAdvNow && _isAdvModeActive)
+            {
+                _isAdvModeActive = false;
+                _advModeStartTime = DateTime.MinValue;
+                _advTemporarilyHiddenAdditionalLogos.Clear();
+            }
+        }
+
+        private static bool ShouldRenderSpotLabel()
+        {
+            if (!_advTextDelayEnabled || !_isAdvModeActive || _advTextDelay <= 0 || _advModeStartTime == DateTime.MinValue)
+                return true;
+
+            return (DateTime.Now - _advModeStartTime).TotalMilliseconds >= _advTextDelay;
         }
 
         private static void RenderSpotLabel(Graphics g, int w, int h)

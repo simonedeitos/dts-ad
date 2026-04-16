@@ -81,6 +81,9 @@ namespace AirDirector.Forms
         private int _spotLabelFontSize = 14;
         private int _spotLabelMarginX = 20;
         private int _spotLabelMarginY = 20;
+        private bool _hideAdditionalLogosDuringAdv = false;
+        private bool _advTextDelayEnabled = false;
+        private int _advTextDelay = 0;
         private List<AdditionalLogo> _additionalLogos = new List<AdditionalLogo>();
         private bool _showAdditionalLogosInPreview = false;
 
@@ -96,7 +99,7 @@ namespace AirDirector.Forms
         private float _previewAnimProgress = 1f;
         private float _previewProgressBar = 0.65f;
         private bool _previewShowPersistentInfo = true;
-        private bool _previewShowSpotLabel = true;
+        private bool _previewShowSpotLabel = false;
         private DateTime _animStartTime = DateTime.MinValue;
 
         // Video dimensions for correct aspect ratio
@@ -250,8 +253,8 @@ namespace AirDirector.Forms
             // Toggle Spot Label preview
             CheckBox chkPreviewSpot = new CheckBox
             {
-                Text = "Preview ADV",
-                Checked = true,
+                Text = LanguageManager.GetString("CGEditor.PreviewAdv", "Preview ADV"),
+                Checked = _previewShowSpotLabel,
                 Location = new Point(btnX, tabTop + 150),
                 AutoSize = true,
                 ForeColor = Color.White
@@ -583,7 +586,7 @@ namespace AirDirector.Forms
             // Row 1: Enable
             CheckBox chkEnabled = new CheckBox
             {
-                Text = "Show label during Spot/Advertising playback",
+                Text = LanguageManager.GetString("CGEditor.ShowAdvLabel", "Show label during Spot/Advertising playback"),
                 Checked = _spotLabelEnabled,
                 Location = new Point(10, y),
                 AutoSize = true,
@@ -660,6 +663,58 @@ namespace AirDirector.Forms
             tab.Controls.Add(chkBgEnabled);
 
             AddLabelAndColorPicker(tab, "", 270, y, 0, _spotLabelBgColor, (c) => { _spotLabelBgColor = c; _previewPanel.Invalidate(); }, true);
+
+            y += 35;
+
+            CheckBox chkHideAdditionalLogosDuringAdv = new CheckBox
+            {
+                Text = LanguageManager.GetString("CGEditor.HideAdditionalLogosDuringAdv", "Hide additional logos during advertising"),
+                Checked = _hideAdditionalLogosDuringAdv,
+                Location = new Point(10, y),
+                AutoSize = true,
+                ForeColor = Color.White
+            };
+            chkHideAdditionalLogosDuringAdv.CheckedChanged += (s, e) => _hideAdditionalLogosDuringAdv = chkHideAdditionalLogosDuringAdv.Checked;
+            tab.Controls.Add(chkHideAdditionalLogosDuringAdv);
+
+            y += 30;
+
+            CheckBox chkAdvTextDelayEnabled = new CheckBox
+            {
+                Text = LanguageManager.GetString("CGEditor.AdvTextDelayEnabled", "Enable delay before showing \"Advertising\" label"),
+                Checked = _advTextDelayEnabled,
+                Location = new Point(10, y),
+                AutoSize = true,
+                ForeColor = Color.White
+            };
+            tab.Controls.Add(chkAdvTextDelayEnabled);
+
+            NumericUpDown numAdvTextDelay = new NumericUpDown
+            {
+                Location = new Point(410, y - 3),
+                Size = new Size(80, 25),
+                Minimum = 0,
+                Maximum = 60000,
+                Value = Math.Max(0, Math.Min(60000, _advTextDelay)),
+                Enabled = _advTextDelayEnabled
+            };
+            numAdvTextDelay.ValueChanged += (s, e) => _advTextDelay = (int)numAdvTextDelay.Value;
+            tab.Controls.Add(numAdvTextDelay);
+
+            Label lblAdvTextDelay = new Label
+            {
+                Text = LanguageManager.GetString("CGEditor.AdvTextDelayMs", "Delay (ms):"),
+                Location = new Point(330, y),
+                AutoSize = true,
+                ForeColor = Color.LightGray
+            };
+            tab.Controls.Add(lblAdvTextDelay);
+
+            chkAdvTextDelayEnabled.CheckedChanged += (s, e) =>
+            {
+                _advTextDelayEnabled = chkAdvTextDelayEnabled.Checked;
+                numAdvTextDelay.Enabled = _advTextDelayEnabled;
+            };
 
             _tabControl.TabPages.Add(tab);
         }
@@ -1620,6 +1675,10 @@ namespace AirDirector.Forms
                     _spotLabelFontSize = GetRegInt(key, "SpotLabelFontSize", 14);
                     _spotLabelMarginX = GetRegInt(key, "SpotLabelMarginX", 20);
                     _spotLabelMarginY = GetRegInt(key, "SpotLabelMarginY", 20);
+                    _hideAdditionalLogosDuringAdv = GetRegBool(key, "HideAdditionalLogosDuringAdv", false);
+                    _advTextDelayEnabled = GetRegBool(key, "AdvTextDelayEnabled", false);
+                    _advTextDelay = GetRegInt(key, "AdvTextDelay", 0);
+                    _previewShowSpotLabel = GetRegBool(key, "ShowAdvPreview", false);
                     _showAdditionalLogosInPreview = GetRegBool(key, "ShowAdditionalLogosInPreview", false);
                     _additionalLogos = JsonConvert.DeserializeObject<List<AdditionalLogo>>(GetRegString(key, "AdditionalLogosJson", "[]")) ?? new List<AdditionalLogo>();
                 }
@@ -1685,6 +1744,10 @@ namespace AirDirector.Forms
                     key.SetValue("SpotLabelFontSize", _spotLabelFontSize);
                     key.SetValue("SpotLabelMarginX", _spotLabelMarginX);
                     key.SetValue("SpotLabelMarginY", _spotLabelMarginY);
+                    key.SetValue("HideAdditionalLogosDuringAdv", _hideAdditionalLogosDuringAdv ? 1 : 0);
+                    key.SetValue("AdvTextDelayEnabled", _advTextDelayEnabled ? 1 : 0);
+                    key.SetValue("AdvTextDelay", _advTextDelay);
+                    key.SetValue("ShowAdvPreview", _previewShowSpotLabel ? 1 : 0);
                     key.SetValue("ShowAdditionalLogosInPreview", _showAdditionalLogosInPreview ? 1 : 0);
                     key.SetValue("AdditionalLogosJson", JsonConvert.SerializeObject(_additionalLogos ?? new List<AdditionalLogo>()));
                 }
@@ -1752,11 +1815,11 @@ namespace AirDirector.Forms
             MinimizeBox = false;
 
             Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosName", "Name") + ":", Left = 12, Top = 21, Width = 70 });
-            _txtName = new TextBox { Left = 80, Top = 18, Width = 398, Text = Logo.Name ?? "" };
+            _txtName = new TextBox { Left = 100, Top = 18, Width = 378, Text = Logo.Name ?? "" };
             Controls.Add(_txtName);
 
             Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosPath", "Path") + ":", Left = 12, Top = 65, Width = 70 });
-            _txtPath = new TextBox { Left = 80, Top = 62, Width = 350, Text = Logo.ImagePath ?? "" };
+            _txtPath = new TextBox { Left = 100, Top = 62, Width = 330, Text = Logo.ImagePath ?? "" };
             var btnBrowse = new Button { Text = "...", Left = 438, Top = 61, Width = 40 };
             btnBrowse.Click += (s, e) =>
             {
@@ -1773,7 +1836,7 @@ namespace AirDirector.Forms
             Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosPosition", "Position") + ":", Left = 12, Top = 109, Width = 70 });
             _cmbPosition = new ComboBox
             {
-                Left = 80,
+                Left = 100,
                 Top = 106,
                 Width = 170,
                 DropDownStyle = ComboBoxStyle.DropDownList
@@ -1788,17 +1851,17 @@ namespace AirDirector.Forms
             Controls.Add(_cmbPosition);
 
             Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosMarginX", "Margin X") + ":", Left = 12, Top = 153, Width = 70 });
-            _numMarginX = new NumericUpDown { Left = 80, Top = 150, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginX };
+            _numMarginX = new NumericUpDown { Left = 100, Top = 150, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginX };
             Controls.Add(_numMarginX);
 
             Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosMarginY", "Margin Y") + ":", Left = 190, Top = 153, Width = 70 });
-            _numMarginY = new NumericUpDown { Left = 260, Top = 150, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginY };
+            _numMarginY = new NumericUpDown { Left = 280, Top = 150, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginY };
             Controls.Add(_numMarginY);
 
             Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosScale", "Scale") + ":", Left = 12, Top = 197, Width = 70 });
             _numScale = new NumericUpDown
             {
-                Left = 80,
+                Left = 100,
                 Top = 194,
                 Width = 90,
                 Minimum = 10M,
@@ -1807,9 +1870,9 @@ namespace AirDirector.Forms
                 Value = Math.Max(10M, Math.Min(1000M, (decimal)Math.Round((Logo.Scale > 0f ? Logo.Scale : 1.0f) * 100f)))
             };
             Controls.Add(_numScale);
-            Controls.Add(new Label { Text = "%", Left = 176, Top = 197, Width = 15 });
+            Controls.Add(new Label { Text = "%", Left = 196, Top = 197, Width = 15 });
 
-            Button btnOk = new Button { Text = LanguageManager.GetString("Common.Save", "Save"), Left = 320, Top = 250, Width = 75, DialogResult = DialogResult.OK };
+            Button btnOk = new Button { Text = LanguageManager.GetString("Common.Save", "Save"), Left = 310, Top = 240, Width = 75, DialogResult = DialogResult.OK };
             btnOk.Click += (s, e) =>
             {
                 if (string.IsNullOrWhiteSpace(_txtPath.Text))
@@ -1827,7 +1890,7 @@ namespace AirDirector.Forms
             };
             Controls.Add(btnOk);
 
-            Button btnCancel = new Button { Text = LanguageManager.GetString("Common.Cancel", "Cancel"), Left = 403, Top = 250, Width = 75, DialogResult = DialogResult.Cancel };
+            Button btnCancel = new Button { Text = LanguageManager.GetString("Common.Cancel", "Cancel"), Left = 393, Top = 240, Width = 75, DialogResult = DialogResult.Cancel };
             Controls.Add(btnCancel);
 
             AcceptButton = btnOk;
