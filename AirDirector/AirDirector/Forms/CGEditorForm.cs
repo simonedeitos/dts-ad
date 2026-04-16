@@ -138,7 +138,7 @@ namespace AirDirector.Forms
         private void InitializeComponent()
         {
             this.Text = LanguageManager.GetString("CGEditor.Title", "CG Editor - Character Generator");
-            this.Size = new Size(1050, 820);
+            this.Size = new Size(1050, 870);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -180,7 +180,7 @@ namespace AirDirector.Forms
             _tabControl = new TabControl
             {
                 Location = new Point(20, tabTop),
-                Size = new Size(850, 220),
+                Size = new Size(850, 270),
                 Font = new Font("Segoe UI", 9)
             };
             this.Controls.Add(_tabControl);
@@ -680,12 +680,12 @@ namespace AirDirector.Forms
                 Location = new Point(10, 10),
                 Size = new Size(800, 150)
             };
-            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosName", "Name"), 180);
-            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosPath", "Path"), 340);
-            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosPosition", "Position"), 140);
-            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosMarginX", "Margin X"), 90);
-            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosMarginY", "Margin Y"), 90);
-            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosScale", "Scale"), 90);
+            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosName", "Name"), 120);
+            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosPath", "Path"), 300);
+            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosPosition", "Position"), 110);
+            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosMarginX", "Margin X"), 80);
+            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosMarginY", "Margin Y"), 80);
+            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosScale", "Scale"), 80);
             tab.Controls.Add(_lvAdditionalLogos);
 
             Button btnAdd = new Button
