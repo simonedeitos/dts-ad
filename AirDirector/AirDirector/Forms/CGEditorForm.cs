@@ -82,6 +82,7 @@ namespace AirDirector.Forms
         private int _spotLabelMarginX = 20;
         private int _spotLabelMarginY = 20;
         private List<AdditionalLogo> _additionalLogos = new List<AdditionalLogo>();
+        private bool _showAdditionalLogosInPreview = false;
 
         // UI Controls
         private Panel _previewPanel;
@@ -679,10 +680,12 @@ namespace AirDirector.Forms
                 Location = new Point(10, 10),
                 Size = new Size(800, 150)
             };
+            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosName", "Name"), 180);
             _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosPath", "Path"), 340);
             _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosPosition", "Position"), 140);
             _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosMarginX", "Margin X"), 90);
             _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosMarginY", "Margin Y"), 90);
+            _lvAdditionalLogos.Columns.Add(LanguageManager.GetString("CGEditor.AdditionalLogosScale", "Scale"), 90);
             tab.Controls.Add(_lvAdditionalLogos);
 
             Button btnAdd = new Button
@@ -712,6 +715,21 @@ namespace AirDirector.Forms
             btnRemove.Click += BtnRemoveAdditionalLogo_Click;
             tab.Controls.Add(btnRemove);
 
+            CheckBox chkShowInPreview = new CheckBox
+            {
+                Text = LanguageManager.GetString("CGEditor.ShowAdditionalLogosInPreview", "Show logos in preview"),
+                Checked = _showAdditionalLogosInPreview,
+                Location = new Point(10, 210),
+                AutoSize = true,
+                ForeColor = Color.White
+            };
+            chkShowInPreview.CheckedChanged += (s, e) =>
+            {
+                _showAdditionalLogosInPreview = chkShowInPreview.Checked;
+                _previewPanel.Invalidate();
+            };
+            tab.Controls.Add(chkShowInPreview);
+
             RefreshAdditionalLogoList();
             _tabControl.TabPages.Add(tab);
         }
@@ -724,10 +742,12 @@ namespace AirDirector.Forms
             _lvAdditionalLogos.Items.Clear();
             foreach (var logo in _additionalLogos)
             {
-                var item = new ListViewItem(logo.ImagePath ?? "");
+                var item = new ListViewItem(logo.Name ?? "");
+                item.SubItems.Add(logo.ImagePath ?? "");
                 item.SubItems.Add(logo.Position ?? "BottomLeft");
                 item.SubItems.Add(logo.MarginX.ToString());
                 item.SubItems.Add(logo.MarginY.ToString());
+                item.SubItems.Add((logo.Scale > 0f ? logo.Scale : 1.0f).ToString("0.0#"));
                 item.Tag = logo;
                 _lvAdditionalLogos.Items.Add(item);
             }
@@ -755,18 +775,22 @@ namespace AirDirector.Forms
 
             var clone = new AdditionalLogo
             {
+                Name = selected.Name,
                 ImagePath = selected.ImagePath,
                 Position = selected.Position,
                 MarginX = selected.MarginX,
-                MarginY = selected.MarginY
+                MarginY = selected.MarginY,
+                Scale = selected.Scale
             };
 
             if (EditAdditionalLogo(clone, false))
             {
+                selected.Name = clone.Name;
                 selected.ImagePath = clone.ImagePath;
                 selected.Position = clone.Position;
                 selected.MarginX = clone.MarginX;
                 selected.MarginY = clone.MarginY;
+                selected.Scale = clone.Scale;
                 RefreshAdditionalLogoList();
                 _previewPanel.Invalidate();
             }
@@ -808,10 +832,12 @@ namespace AirDirector.Forms
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return false;
 
+                logo.Name = dialog.Logo.Name;
                 logo.ImagePath = dialog.Logo.ImagePath;
                 logo.Position = dialog.Logo.Position;
                 logo.MarginX = dialog.Logo.MarginX;
                 logo.MarginY = dialog.Logo.MarginY;
+                logo.Scale = dialog.Logo.Scale;
                 return true;
             }
         }
@@ -990,15 +1016,25 @@ namespace AirDirector.Forms
 
         private void DrawAdditionalLogos(Graphics g, int w, int h)
         {
+            if (!_showAdditionalLogosInPreview)
+                return;
+
             foreach (var logo in _additionalLogos)
             {
-                if (logo == null || string.IsNullOrWhiteSpace(logo.ImagePath) || !File.Exists(logo.ImagePath))
+                if (logo == null)
+                    continue;
+
+                string logoPath = logo.ImagePath?.Trim();
+                if (string.IsNullOrWhiteSpace(logoPath) || !File.Exists(logoPath))
                     continue;
 
                 try
                 {
-                    using (var img = Image.FromFile(logo.ImagePath))
+                    using (var img = Image.FromFile(logoPath))
                     {
+                        float logoScale = logo.Scale > 0f ? logo.Scale : 1.0f;
+                        int drawW = Math.Max(1, (int)(img.Width * logoScale));
+                        int drawH = Math.Max(1, (int)(img.Height * logoScale));
                         int x = 0;
                         int y = 0;
                         int marginX = Math.Max(0, logo.MarginX);
@@ -1007,18 +1043,18 @@ namespace AirDirector.Forms
                         switch (logo.Position)
                         {
                             case "TopLeft": x = marginX; y = marginY; break;
-                            case "TopCenter": x = (w - img.Width) / 2; y = marginY; break;
-                            case "TopRight": x = w - img.Width - marginX; y = marginY; break;
-                            case "MiddleLeft": x = marginX; y = (h - img.Height) / 2; break;
-                            case "MiddleCenter": x = (w - img.Width) / 2; y = (h - img.Height) / 2; break;
-                            case "MiddleRight": x = w - img.Width - marginX; y = (h - img.Height) / 2; break;
-                            case "BottomLeft": x = marginX; y = h - img.Height - marginY; break;
-                            case "BottomCenter": x = (w - img.Width) / 2; y = h - img.Height - marginY; break;
-                            case "BottomRight": x = w - img.Width - marginX; y = h - img.Height - marginY; break;
-                            default: x = marginX; y = h - img.Height - marginY; break;
+                            case "TopCenter": x = (w - drawW) / 2; y = marginY; break;
+                            case "TopRight": x = w - drawW - marginX; y = marginY; break;
+                            case "MiddleLeft": x = marginX; y = (h - drawH) / 2; break;
+                            case "MiddleCenter": x = (w - drawW) / 2; y = (h - drawH) / 2; break;
+                            case "MiddleRight": x = w - drawW - marginX; y = (h - drawH) / 2; break;
+                            case "BottomLeft": x = marginX; y = h - drawH - marginY; break;
+                            case "BottomCenter": x = (w - drawW) / 2; y = h - drawH - marginY; break;
+                            case "BottomRight": x = w - drawW - marginX; y = h - drawH - marginY; break;
+                            default: x = marginX; y = h - drawH - marginY; break;
                         }
 
-                        g.DrawImage(img, x, y, img.Width, img.Height);
+                        g.DrawImage(img, x, y, drawW, drawH);
                     }
                 }
                 catch { }
@@ -1584,6 +1620,7 @@ namespace AirDirector.Forms
                     _spotLabelFontSize = GetRegInt(key, "SpotLabelFontSize", 14);
                     _spotLabelMarginX = GetRegInt(key, "SpotLabelMarginX", 20);
                     _spotLabelMarginY = GetRegInt(key, "SpotLabelMarginY", 20);
+                    _showAdditionalLogosInPreview = GetRegBool(key, "ShowAdditionalLogosInPreview", false);
                     _additionalLogos = JsonConvert.DeserializeObject<List<AdditionalLogo>>(GetRegString(key, "AdditionalLogosJson", "[]")) ?? new List<AdditionalLogo>();
                 }
             }
@@ -1648,6 +1685,7 @@ namespace AirDirector.Forms
                     key.SetValue("SpotLabelFontSize", _spotLabelFontSize);
                     key.SetValue("SpotLabelMarginX", _spotLabelMarginX);
                     key.SetValue("SpotLabelMarginY", _spotLabelMarginY);
+                    key.SetValue("ShowAdditionalLogosInPreview", _showAdditionalLogosInPreview ? 1 : 0);
                     key.SetValue("AdditionalLogosJson", JsonConvert.SerializeObject(_additionalLogos ?? new List<AdditionalLogo>()));
                 }
             }
@@ -1695,25 +1733,31 @@ namespace AirDirector.Forms
 
     internal class AdditionalLogoEditForm : Form
     {
+        private readonly TextBox _txtName;
         private readonly TextBox _txtPath;
         private readonly ComboBox _cmbPosition;
         private readonly NumericUpDown _numMarginX;
         private readonly NumericUpDown _numMarginY;
+        private readonly NumericUpDown _numScale;
         public AdditionalLogo Logo { get; }
 
         public AdditionalLogoEditForm(AdditionalLogo logo)
         {
             Logo = logo ?? new AdditionalLogo();
             Text = LanguageManager.GetString("CGEditor.AdditionalLogosEdit", "Edit Logo");
-            Size = new Size(520, 240);
+            Size = new Size(520, 280);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MaximizeBox = false;
             MinimizeBox = false;
 
-            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosPath", "Path") + ":", Left = 12, Top = 20, Width = 70 });
-            _txtPath = new TextBox { Left = 80, Top = 18, Width = 350, Text = Logo.ImagePath ?? "" };
-            var btnBrowse = new Button { Text = "...", Left = 438, Top = 17, Width = 40 };
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosName", "Name") + ":", Left = 12, Top = 20, Width = 70 });
+            _txtName = new TextBox { Left = 80, Top = 18, Width = 398, Text = Logo.Name ?? "" };
+            Controls.Add(_txtName);
+
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosPath", "Path") + ":", Left = 12, Top = 55, Width = 70 });
+            _txtPath = new TextBox { Left = 80, Top = 53, Width = 350, Text = Logo.ImagePath ?? "" };
+            var btnBrowse = new Button { Text = "...", Left = 438, Top = 52, Width = 40 };
             btnBrowse.Click += (s, e) =>
             {
                 using (System.Windows.Forms.OpenFileDialog ofd = new System.Windows.Forms.OpenFileDialog())
@@ -1726,11 +1770,11 @@ namespace AirDirector.Forms
             Controls.Add(_txtPath);
             Controls.Add(btnBrowse);
 
-            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosPosition", "Position") + ":", Left = 12, Top = 60, Width = 70 });
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosPosition", "Position") + ":", Left = 12, Top = 90, Width = 70 });
             _cmbPosition = new ComboBox
             {
                 Left = 80,
-                Top = 58,
+                Top = 88,
                 Width = 170,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
@@ -1743,15 +1787,29 @@ namespace AirDirector.Forms
             _cmbPosition.SelectedItem = _cmbPosition.Items.Contains(Logo.Position) ? Logo.Position : "BottomLeft";
             Controls.Add(_cmbPosition);
 
-            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosMarginX", "Margin X") + ":", Left = 12, Top = 95, Width = 70 });
-            _numMarginX = new NumericUpDown { Left = 80, Top = 93, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginX };
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosMarginX", "Margin X") + ":", Left = 12, Top = 125, Width = 70 });
+            _numMarginX = new NumericUpDown { Left = 80, Top = 123, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginX };
             Controls.Add(_numMarginX);
 
-            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosMarginY", "Margin Y") + ":", Left = 190, Top = 95, Width = 70 });
-            _numMarginY = new NumericUpDown { Left = 260, Top = 93, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginY };
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosMarginY", "Margin Y") + ":", Left = 190, Top = 125, Width = 70 });
+            _numMarginY = new NumericUpDown { Left = 260, Top = 123, Width = 90, Minimum = 0, Maximum = 5000, Value = Logo.MarginY };
             Controls.Add(_numMarginY);
 
-            Button btnOk = new Button { Text = LanguageManager.GetString("Common.Save", "Save"), Left = 320, Top = 140, Width = 75, DialogResult = DialogResult.OK };
+            Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosScale", "Scale") + ":", Left = 12, Top = 160, Width = 70 });
+            _numScale = new NumericUpDown
+            {
+                Left = 80,
+                Top = 158,
+                Width = 90,
+                Minimum = 0.1M,
+                Maximum = 10.0M,
+                Increment = 0.1M,
+                DecimalPlaces = 1,
+                Value = Math.Max(0.1M, Math.Min(10.0M, (decimal)(Logo.Scale > 0f ? Logo.Scale : 1.0f)))
+            };
+            Controls.Add(_numScale);
+
+            Button btnOk = new Button { Text = LanguageManager.GetString("Common.Save", "Save"), Left = 320, Top = 200, Width = 75, DialogResult = DialogResult.OK };
             btnOk.Click += (s, e) =>
             {
                 if (string.IsNullOrWhiteSpace(_txtPath.Text))
@@ -1760,14 +1818,16 @@ namespace AirDirector.Forms
                     return;
                 }
 
+                Logo.Name = _txtName.Text.Trim();
                 Logo.ImagePath = _txtPath.Text.Trim();
                 Logo.Position = _cmbPosition.SelectedItem?.ToString() ?? "BottomLeft";
                 Logo.MarginX = (int)_numMarginX.Value;
                 Logo.MarginY = (int)_numMarginY.Value;
+                Logo.Scale = (float)_numScale.Value;
             };
             Controls.Add(btnOk);
 
-            Button btnCancel = new Button { Text = LanguageManager.GetString("Common.Cancel", "Cancel"), Left = 403, Top = 140, Width = 75, DialogResult = DialogResult.Cancel };
+            Button btnCancel = new Button { Text = LanguageManager.GetString("Common.Cancel", "Cancel"), Left = 403, Top = 200, Width = 75, DialogResult = DialogResult.Cancel };
             Controls.Add(btnCancel);
 
             AcceptButton = btnOk;

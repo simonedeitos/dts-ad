@@ -57,7 +57,7 @@ namespace AirDirector.Services
         private static int _logoMargin = 20;
         private static Bitmap _logoBitmap = null;
         private static List<AdditionalLogo> _additionalLogos = new List<AdditionalLogo>();
-        private static HashSet<string> _hiddenAdditionalLogos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static HashSet<string> _visibleAdditionalLogos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // ═══════════════════════════════════════════════════════════
         // CLOCK SETTINGS
@@ -123,7 +123,7 @@ namespace AirDirector.Services
             if (string.IsNullOrWhiteSpace(logoImagePath))
                 return;
 
-            _hiddenAdditionalLogos.Remove(logoImagePath.Trim());
+            _visibleAdditionalLogos.Add(logoImagePath.Trim());
             SaveAdditionalLogoVisibility();
         }
 
@@ -132,7 +132,7 @@ namespace AirDirector.Services
             if (string.IsNullOrWhiteSpace(logoImagePath))
                 return;
 
-            _hiddenAdditionalLogos.Add(logoImagePath.Trim());
+            _visibleAdditionalLogos.Remove(logoImagePath.Trim());
             SaveAdditionalLogoVisibility();
         }
 
@@ -184,7 +184,26 @@ namespace AirDirector.Services
                     _logoSize = GetRegInt(key, "LogoSize", 150);
                     _logoMargin = GetRegInt(key, "LogoMargin", 20);
                     _additionalLogos = ParseAdditionalLogos(GetRegString(key, "AdditionalLogosJson", "[]"));
-                    _hiddenAdditionalLogos = ParseHiddenAdditionalLogos(GetRegString(key, "AdditionalLogosHidden", ""));
+                    _visibleAdditionalLogos = ParseAdditionalLogoPathSet(GetRegString(key, "AdditionalLogosVisible", ""));
+
+                    if (_visibleAdditionalLogos.Count == 0)
+                    {
+                        var legacyHiddenAdditionalLogos = ParseAdditionalLogoPathSet(GetRegString(key, "AdditionalLogosHidden", ""));
+                        if (legacyHiddenAdditionalLogos.Count > 0)
+                        {
+                            foreach (var logo in _additionalLogos)
+                            {
+                                if (logo == null || string.IsNullOrWhiteSpace(logo.ImagePath))
+                                    continue;
+
+                                var path = logo.ImagePath.Trim();
+                                if (!legacyHiddenAdditionalLogos.Contains(path))
+                                    _visibleAdditionalLogos.Add(path);
+                            }
+                        }
+                    }
+
+                    NormalizeVisibleAdditionalLogos();
 
                     // Clock
                     _clockEnabled = GetRegInt(key, "ClockEnabled", 1) == 1;
@@ -261,7 +280,7 @@ namespace AirDirector.Services
             }
         }
 
-        private static HashSet<string> ParseHiddenAdditionalLogos(string serialized)
+        private static HashSet<string> ParseAdditionalLogoPathSet(string serialized)
         {
             return new HashSet<string>(
                 (serialized ?? "")
@@ -270,13 +289,24 @@ namespace AirDirector.Services
                 StringComparer.OrdinalIgnoreCase);
         }
 
+        private static void NormalizeVisibleAdditionalLogos()
+        {
+            var availablePaths = new HashSet<string>(
+                _additionalLogos
+                    .Where(x => x != null && !string.IsNullOrWhiteSpace(x.ImagePath))
+                    .Select(x => x.ImagePath.Trim()),
+                StringComparer.OrdinalIgnoreCase);
+
+            _visibleAdditionalLogos.RemoveWhere(x => !availablePaths.Contains(x));
+        }
+
         private static void SaveAdditionalLogoVisibility()
         {
             try
             {
                 using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\AirDirector\CG"))
                 {
-                    key?.SetValue("AdditionalLogosHidden", string.Join(";", _hiddenAdditionalLogos));
+                    key?.SetValue("AdditionalLogosVisible", string.Join(";", _visibleAdditionalLogos));
                 }
             }
             catch { }
@@ -888,15 +918,21 @@ namespace AirDirector.Services
 
             foreach (var logo in _additionalLogos)
             {
-                if (logo == null || string.IsNullOrWhiteSpace(logo.ImagePath) || !File.Exists(logo.ImagePath))
+                if (logo == null)
                     continue;
-                if (_hiddenAdditionalLogos.Contains(logo.ImagePath))
+                var logoPath = logo.ImagePath?.Trim();
+                if (string.IsNullOrWhiteSpace(logoPath) || !File.Exists(logoPath))
+                    continue;
+                if (!_visibleAdditionalLogos.Contains(logoPath))
                     continue;
 
                 try
                 {
-                    using (var image = Image.FromFile(logo.ImagePath))
+                    using (var image = Image.FromFile(logoPath))
                     {
+                        float logoScale = logo.Scale > 0f ? logo.Scale : 1.0f;
+                        int drawW = Math.Max(1, (int)(image.Width * logoScale));
+                        int drawH = Math.Max(1, (int)(image.Height * logoScale));
                         int x = 0;
                         int y = 0;
                         int marginX = Math.Max(0, logo.MarginX);
@@ -907,26 +943,26 @@ namespace AirDirector.Services
                             case "TopLeft":
                                 x = marginX; y = marginY; break;
                             case "TopCenter":
-                                x = (w - image.Width) / 2; y = marginY; break;
+                                x = (w - drawW) / 2; y = marginY; break;
                             case "TopRight":
-                                x = w - image.Width - marginX; y = marginY; break;
+                                x = w - drawW - marginX; y = marginY; break;
                             case "MiddleLeft":
-                                x = marginX; y = (h - image.Height) / 2; break;
+                                x = marginX; y = (h - drawH) / 2; break;
                             case "MiddleCenter":
-                                x = (w - image.Width) / 2; y = (h - image.Height) / 2; break;
+                                x = (w - drawW) / 2; y = (h - drawH) / 2; break;
                             case "MiddleRight":
-                                x = w - image.Width - marginX; y = (h - image.Height) / 2; break;
+                                x = w - drawW - marginX; y = (h - drawH) / 2; break;
                             case "BottomLeft":
-                                x = marginX; y = h - image.Height - marginY; break;
+                                x = marginX; y = h - drawH - marginY; break;
                             case "BottomCenter":
-                                x = (w - image.Width) / 2; y = h - image.Height - marginY; break;
+                                x = (w - drawW) / 2; y = h - drawH - marginY; break;
                             case "BottomRight":
-                                x = w - image.Width - marginX; y = h - image.Height - marginY; break;
+                                x = w - drawW - marginX; y = h - drawH - marginY; break;
                             default:
-                                x = marginX; y = h - image.Height - marginY; break;
+                                x = marginX; y = h - drawH - marginY; break;
                         }
 
-                        g.DrawImage(image, x, y, image.Width, image.Height);
+                        g.DrawImage(image, x, y, drawW, drawH);
                     }
                 }
                 catch { }
