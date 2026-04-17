@@ -145,9 +145,9 @@ namespace AirDirector.Forms
         {
             string[] logoPaths = new[]
             {
-                Path.Combine(Application.StartupPath, "Assets", "logo.png"),
+                Path.Combine(Application.StartupPath, "Resources", "logo.png"),
                 Path.Combine(Application.StartupPath, "logo.png"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "logo.png")
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "logo.png")
             };
 
             foreach (string path in logoPaths)
@@ -177,7 +177,7 @@ namespace AirDirector.Forms
         {
             string[] bgPaths = new[]
             {
-                Path.Combine(Application.StartupPath, "Assets", "splash_bg.png"),
+                Path.Combine(Application.StartupPath, "Resources", "splash_bg.png"),
                 Path.Combine(Application.StartupPath, "splash_bg.png")
             };
 
