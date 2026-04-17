@@ -219,11 +219,14 @@ namespace AirDirector.Forms
                 Text = LanguageManager.GetString("License_DemoLimits", "Limiti Modalità Demo:") + "  " +
                        LanguageManager.GetString("License_DemoMusic", "50 brani") + "  •  " +
                        LanguageManager.GetString("License_DemoClips", "15 clips") + "  •  " +
-                       LanguageManager.GetString("License_DemoEncoders", "1 encoder"),
+                       LanguageManager.GetString("License_DemoEncoders", "1 encoder") + Environment.NewLine +
+                       LanguageManager.GetString("License_DemoClocks", "2 clock") + "  •  " +
+                       LanguageManager.GetString("License_DemoSchedules", "2 schedulazioni") + "  •  " +
+                       LanguageManager.GetString("License_DemoDownloaderSchedules", "1 schedulazione downloader"),
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = Color.FromArgb(180, 180, 180),
                 Location = new Point(margin, demoInfoTop),
-                Size = new Size(580, 22),
+                Size = new Size(580, 40),
                 TextAlign = ContentAlignment.MiddleCenter
             };
             this.Controls.Add(lblDemoInfo);

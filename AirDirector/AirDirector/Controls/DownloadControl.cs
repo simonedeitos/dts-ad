@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using AirDirector.Models;
 using AirDirector.Services.Core;
 using AirDirector.Services.Database;
+using AirDirector.Services.Licensing;
 using AirDirector.Services.Localization;
 using AirDirector.Themes;
 using AirDirector.Forms;
@@ -961,6 +962,16 @@ namespace AirDirector.Controls
 
         private void BtnAddTask_Click(object sender, EventArgs e)
         {
+            if (LicenseManager.IsDemoMode() && !DemoLimits.CanAddDownloaderSchedule(_downloadTasks.Count, false))
+            {
+                MessageBox.Show(
+                    LanguageManager.GetString("Demo.DownloaderScheduleLimitMessage", "Hai raggiunto il limite demo di 1 schedulazione nel Downloader.\n\nAttiva la licenza completa per crearne altre."),
+                    LanguageManager.GetString("Archive.DemoLimitTitle", "Limite Demo Raggiunto"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
             using (var taskEditor = new TaskEditorForm(null))
             {
                 if (taskEditor.ShowDialog() == DialogResult.OK)

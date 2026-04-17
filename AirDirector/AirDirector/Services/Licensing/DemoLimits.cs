@@ -11,6 +11,9 @@
 
         // Limiti streaming
         public const int MAX_ENCODERS = 1;
+        public const int MAX_CLOCKS = 2;
+        public const int MAX_SCHEDULES = 2;
+        public const int MAX_DOWNLOADER_SCHEDULES = 1;
 
         // Messaggi
         public const string MSG_MUSIC_LIMIT = "Hai raggiunto il limite di 50 brani musicali in modalità demo.\n\nAttiva una licenza per rimuovere questo limite.";
@@ -57,6 +60,33 @@
         {
             if (isLicensed) return true;
             return currentCount < MAX_ENCODERS;
+        }
+
+        /// <summary>
+        /// Verifica se si può aggiungere un clock
+        /// </summary>
+        public static bool CanAddClock(int currentCount, bool isLicensed)
+        {
+            if (isLicensed) return true;
+            return currentCount < MAX_CLOCKS;
+        }
+
+        /// <summary>
+        /// Verifica se si può aggiungere una schedulazione
+        /// </summary>
+        public static bool CanAddSchedule(int currentCount, bool isLicensed)
+        {
+            if (isLicensed) return true;
+            return currentCount < MAX_SCHEDULES;
+        }
+
+        /// <summary>
+        /// Verifica se si può aggiungere una schedulazione downloader
+        /// </summary>
+        public static bool CanAddDownloaderSchedule(int currentCount, bool isLicensed)
+        {
+            if (isLicensed) return true;
+            return currentCount < MAX_DOWNLOADER_SCHEDULES;
         }
     }
 }
