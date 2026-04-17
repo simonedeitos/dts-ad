@@ -71,6 +71,9 @@
     <Compile Update="Forms\ClockEditorForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Forms\CommandManagerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Forms\CompositionSettingsForm.cs">
       <SubType>Form</SubType>
     </Compile>
