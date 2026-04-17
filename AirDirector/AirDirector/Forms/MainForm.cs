@@ -398,7 +398,6 @@ namespace AirDirector.Forms
                 BackColor = AppTheme.BgDark
             };
             logoPanel.Controls.Add(logoPictureBox);
-            playerPanel.Controls.Add(logoPanel);
 
             Panel playerHostPanel = new Panel
             {
@@ -407,6 +406,7 @@ namespace AirDirector.Forms
                 BackColor = AppTheme.BgDark
             };
             playerPanel.Controls.Add(playerHostPanel);
+            playerPanel.Controls.Add(logoPanel);
 
             this.Resize += (s, e) => UpdateLogoPanelWidth();
             LoadMainLogo();
