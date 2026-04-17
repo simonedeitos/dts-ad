@@ -25,10 +25,12 @@ namespace AirDirector.Forms
         private readonly Button _btnEdit;
         private readonly Button _btnDelete;
         private readonly Button _btnClose;
+        private readonly TabPage _tabHttp;
+        private readonly TabPage _tabUdp;
+        private readonly TabPage _tabLogo;
 
         public CommandManagerForm()
         {
-            Text = "📡 " + LanguageManager.GetString("CommandManager.Title", "Gestione Comandi");
             StartPosition = FormStartPosition.CenterParent;
             Size = new Size(920, 560);
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -47,10 +49,13 @@ namespace AirDirector.Forms
             _gridUdp = BuildGrid();
             _gridLogo = BuildGrid();
 
-            _tabs.TabPages.Add(BuildTab(LanguageManager.GetString("CommandManager.TabHttp", "Comandi HTTP"), _gridHttp));
-            _tabs.TabPages.Add(BuildTab(LanguageManager.GetString("CommandManager.TabUdp", "Comandi UDP"), _gridUdp));
+            _tabHttp = BuildTab("", _gridHttp);
+            _tabs.TabPages.Add(_tabHttp);
+            _tabUdp = BuildTab("", _gridUdp);
+            _tabs.TabPages.Add(_tabUdp);
+            _tabLogo = BuildTab("", _gridLogo);
             if (_isRadioTVMode)
-                _tabs.TabPages.Add(BuildTab(LanguageManager.GetString("CommandManager.TabLogo", "Logo Addizionale"), _gridLogo));
+                _tabs.TabPages.Add(_tabLogo);
 
             var panelButtons = new FlowLayoutPanel
             {
@@ -78,7 +83,45 @@ namespace AirDirector.Forms
 
             Controls.Add(_tabs);
             Controls.Add(panelButtons);
+
+            LanguageManager.LanguageChanged += OnLanguageChanged;
+            FormClosed += (s, e) => LanguageManager.LanguageChanged -= OnLanguageChanged;
+
+            ApplyLanguage();
             ReloadGrids();
+        }
+
+        private void OnLanguageChanged(object sender, EventArgs e)
+        {
+            ApplyLanguage();
+        }
+
+        private void ApplyLanguage()
+        {
+            Text = "📡 " + LanguageManager.GetString("CommandManager.Title", "Gestione Comandi");
+            _tabHttp.Text = LanguageManager.GetString("CommandManager.TabHttp", "Comandi HTTP");
+            _tabUdp.Text = LanguageManager.GetString("CommandManager.TabUdp", "Comandi UDP");
+            _tabLogo.Text = LanguageManager.GetString("CommandManager.TabLogo", "Logo Addizionale");
+            _btnClose.Text = LanguageManager.GetString("CommandManager.Close", "Chiudi");
+            _btnDelete.Text = LanguageManager.GetString("CommandManager.Delete", "Elimina");
+            _btnEdit.Text = LanguageManager.GetString("CommandManager.Edit", "Modifica");
+            _btnNew.Text = LanguageManager.GetString("CommandManager.New", "Nuovo");
+
+            if (_gridHttp.Columns.Count >= 2)
+            {
+                _gridHttp.Columns[0].HeaderText = LanguageManager.GetString("CommandManager.Name", "Nome");
+                _gridHttp.Columns[1].HeaderText = LanguageManager.GetString("CommandManager.String", "Stringa");
+            }
+            if (_gridUdp.Columns.Count >= 2)
+            {
+                _gridUdp.Columns[0].HeaderText = LanguageManager.GetString("CommandManager.Name", "Nome");
+                _gridUdp.Columns[1].HeaderText = LanguageManager.GetString("CommandManager.String", "Stringa");
+            }
+            if (_gridLogo.Columns.Count >= 2)
+            {
+                _gridLogo.Columns[0].HeaderText = LanguageManager.GetString("CommandManager.Name", "Nome");
+                _gridLogo.Columns[1].HeaderText = LanguageManager.GetString("CommandManager.String", "Stringa");
+            }
         }
 
         private DataGridView BuildGrid()
@@ -255,19 +298,40 @@ namespace AirDirector.Forms
             MaximizeBox = false;
             MinimizeBox = false;
 
-            Controls.Add(new Label { Left = 12, Top = 20, Width = 130, Text = LanguageManager.GetString("CommandManager.EnterName", "Nome Comando:") });
-            _txtName = new TextBox { Left = 150, Top = 18, Width = 440, Text = _entry.Name ?? "" };
+            var lblName = new Label
+            {
+                Left = 12,
+                Top = 20,
+                AutoSize = true,
+                Text = LanguageManager.GetString("CommandManager.EnterName", "Nome Comando:")
+            };
+            Controls.Add(lblName);
+
+            int inputLeft = Math.Max(160, lblName.Right + 12);
+            int inputWidth = Math.Max(240, ClientSize.Width - inputLeft - 20);
+
+            _txtName = new TextBox { Left = inputLeft, Top = 18, Width = inputWidth, Text = _entry.Name ?? "" };
             Controls.Add(_txtName);
 
             if (_type == "Logo" && isRadioTVMode)
             {
-                _radLogoShow = new RadioButton { Left = 150, Top = 56, Width = 120, Text = LanguageManager.GetString("CommandManager.LogoShow", "Mostra Logo"), Checked = !string.Equals(_entry.Type, LogoHideType, StringComparison.OrdinalIgnoreCase) };
-                _radLogoHide = new RadioButton { Left = 280, Top = 56, Width = 140, Text = LanguageManager.GetString("CommandManager.LogoHide", "Nascondi Logo"), Checked = string.Equals(_entry.Type, LogoHideType, StringComparison.OrdinalIgnoreCase) };
+                _radLogoShow = new RadioButton { Left = inputLeft, Top = 56, AutoSize = true, Text = LanguageManager.GetString("CommandManager.LogoShow", "Mostra Logo"), Checked = !string.Equals(_entry.Type, LogoHideType, StringComparison.OrdinalIgnoreCase) };
+                _radLogoHide = new RadioButton { Left = _radLogoShow.Right + 20, Top = 56, AutoSize = true, Text = LanguageManager.GetString("CommandManager.LogoHide", "Nascondi Logo"), Checked = string.Equals(_entry.Type, LogoHideType, StringComparison.OrdinalIgnoreCase) };
                 Controls.Add(_radLogoShow);
                 Controls.Add(_radLogoHide);
 
-                Controls.Add(new Label { Left = 12, Top = 92, Width = 130, Text = LanguageManager.GetString("CommandManager.SelectLogo", "Logo:") });
-                _cmbLogo = new ComboBox { Left = 150, Top = 90, Width = 440, DropDownStyle = ComboBoxStyle.DropDownList };
+                var lblLogo = new Label
+                {
+                    Left = 12,
+                    Top = 92,
+                    AutoSize = true,
+                    Text = LanguageManager.GetString("CommandManager.SelectLogo", "Logo:")
+                };
+                Controls.Add(lblLogo);
+
+                int logoInputLeft = Math.Max(inputLeft, lblLogo.Right + 12);
+                int logoInputWidth = Math.Max(240, ClientSize.Width - logoInputLeft - 20);
+                _cmbLogo = new ComboBox { Left = logoInputLeft, Top = 90, Width = logoInputWidth, DropDownStyle = ComboBoxStyle.DropDownList };
                 LoadAdditionalLogos();
                 foreach (var logo in _logos)
                     _cmbLogo.Items.Add(logo);
@@ -279,19 +343,29 @@ namespace AirDirector.Forms
             }
             else
             {
-                Controls.Add(new Label { Left = 12, Top = 56, Width = 130, Text = LanguageManager.GetString("CommandManager.EnterString", "Stringa:") });
-                _txtCommand = new TextBox { Left = 150, Top = 54, Width = 440, Text = _entry.CommandString ?? "" };
+                var lblString = new Label
+                {
+                    Left = 12,
+                    Top = 56,
+                    AutoSize = true,
+                    Text = LanguageManager.GetString("CommandManager.EnterString", "Stringa:")
+                };
+                Controls.Add(lblString);
+
+                int stringInputLeft = Math.Max(inputLeft, lblString.Right + 12);
+                int stringInputWidth = Math.Max(240, ClientSize.Width - stringInputLeft - 20);
+                _txtCommand = new TextBox { Left = stringInputLeft, Top = 54, Width = stringInputWidth, Text = _entry.CommandString ?? "" };
                 Controls.Add(_txtCommand);
                 _radLogoShow = null;
                 _radLogoHide = null;
                 _cmbLogo = null;
             }
 
-            var btnSave = new Button { Left = 430, Top = 160, Width = 75, Text = LanguageManager.GetString("Common.Save", "Salva"), DialogResult = DialogResult.OK };
+            var btnSave = new Button { Left = ClientSize.Width - 160, Top = 160, Width = 75, Text = LanguageManager.GetString("Common.Save", "Salva"), DialogResult = DialogResult.OK };
             btnSave.Click += BtnSave_Click;
             Controls.Add(btnSave);
 
-            var btnCancel = new Button { Left = 515, Top = 160, Width = 75, Text = LanguageManager.GetString("Common.Cancel", "Annulla"), DialogResult = DialogResult.Cancel };
+            var btnCancel = new Button { Left = ClientSize.Width - 75, Top = 160, Width = 75, Text = LanguageManager.GetString("Common.Cancel", "Annulla"), DialogResult = DialogResult.Cancel };
             Controls.Add(btnCancel);
 
             AcceptButton = btnSave;
@@ -319,7 +393,11 @@ namespace AirDirector.Forms
         {
             if (string.IsNullOrWhiteSpace(_txtName.Text))
             {
-                MessageBox.Show(LanguageManager.GetString("CommandManager.ErrorEmptyName", "Il nome non può essere vuoto."));
+                MessageBox.Show(
+                    LanguageManager.GetString("CommandManager.ErrorEmptyName", "Il nome non può essere vuoto."),
+                    LanguageManager.GetString("Common.Error", "Errore"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
                 DialogResult = DialogResult.None;
                 return;
             }
@@ -329,7 +407,11 @@ namespace AirDirector.Forms
                 var selectedLogo = _cmbLogo?.SelectedItem as AdditionalLogo;
                 if (selectedLogo == null)
                 {
-                    MessageBox.Show(LanguageManager.GetString("CommandManager.ErrorEmptyLogo", "Seleziona un logo."));
+                    MessageBox.Show(
+                        LanguageManager.GetString("CommandManager.ErrorEmptyLogo", "Seleziona un logo."),
+                        LanguageManager.GetString("Common.Error", "Errore"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                     DialogResult = DialogResult.None;
                     return;
                 }
@@ -341,7 +423,11 @@ namespace AirDirector.Forms
             {
                 if (string.IsNullOrWhiteSpace(_txtCommand?.Text))
                 {
-                    MessageBox.Show(LanguageManager.GetString("CommandManager.ErrorEmptyString", "La stringa non può essere vuota."));
+                    MessageBox.Show(
+                        LanguageManager.GetString("CommandManager.ErrorEmptyString", "La stringa non può essere vuota."),
+                        LanguageManager.GetString("Common.Error", "Errore"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                     DialogResult = DialogResult.None;
                     return;
                 }

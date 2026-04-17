@@ -929,6 +929,22 @@ namespace AirDirector.Forms
         // ═══════════════════════════════════════════════════════════
         // HELPER:  Add Label + ComboBox
         // ═══════════════════════════════════════════════════════════
+        private int GetControlLeft(TabPage tab, string labelText, int x, int baseLabelWidth)
+        {
+            const int labelToControlGap = 12;
+            const int maxDynamicExtra = 80;
+
+            int measuredLabelWidth = 0;
+            if (!string.IsNullOrEmpty(labelText))
+            {
+                measuredLabelWidth = TextRenderer.MeasureText(labelText, tab.Font).Width;
+            }
+
+            int dynamicExtra = Math.Max(0, measuredLabelWidth - baseLabelWidth);
+            dynamicExtra = Math.Min(maxDynamicExtra, dynamicExtra);
+            return x + baseLabelWidth + dynamicExtra + labelToControlGap;
+        }
+
         private void AddLabelAndCombo(TabPage tab, string labelText, int x, int y, int labelWidth, int comboWidth, string[] items, int selectedIndex, Action<int> onChange)
         {
             if (!string.IsNullOrEmpty(labelText))
@@ -937,9 +953,10 @@ namespace AirDirector.Forms
                 tab.Controls.Add(lbl);
             }
 
+            int controlLeft = GetControlLeft(tab, labelText, x, labelWidth);
             ComboBox cmb = new ComboBox
             {
-                Location = new Point(x + labelWidth, y - 3),
+                Location = new Point(controlLeft, y - 3),
                 Size = new Size(comboWidth, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
@@ -958,9 +975,10 @@ namespace AirDirector.Forms
             Label lbl = new Label { Text = labelText, Location = new Point(x, y), AutoSize = true, ForeColor = Color.LightGray };
             tab.Controls.Add(lbl);
 
+            int controlLeft = GetControlLeft(tab, labelText, x, labelWidth);
             NumericUpDown num = new NumericUpDown
             {
-                Location = new Point(x + labelWidth, y - 3),
+                Location = new Point(controlLeft, y - 3),
                 Size = new Size(numWidth, 25),
                 Minimum = min,
                 Maximum = max,
@@ -981,9 +999,10 @@ namespace AirDirector.Forms
                 tab.Controls.Add(lbl);
             }
 
+            int controlLeft = GetControlLeft(tab, labelText, x, labelWidth);
             Panel pnl = new Panel
             {
-                Location = new Point(x + labelWidth, y - 2),
+                Location = new Point(controlLeft, y - 2),
                 Size = new Size(30, 20),
                 BackColor = Color.FromArgb(color.R, color.G, color.B),
                 BorderStyle = BorderStyle.FixedSingle,
