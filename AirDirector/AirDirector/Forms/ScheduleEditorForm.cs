@@ -3,7 +3,6 @@ using AirDirector.Controls;
 using AirDirector.Services.Database;
 using AirDirector.Services.Localization;
 using AirDirector.Themes;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -21,12 +20,11 @@ namespace AirDirector.Forms
         private List<string> _playlistFiles = new List<string>();
         private bool _isRadioTVMode;
         private List<StreamingEntry> _streamingEntries = new List<StreamingEntry>();
-        private List<AdditionalLogo> _additionalLogos = new List<AdditionalLogo>();
+        private List<CommandEntry> _commandEntries = new List<CommandEntry>();
         private ComboBox _cmbStreamingArchive;
-        private RadioButton _radLogoShow;
-        private RadioButton _radLogoHide;
-        private ComboBox _cmbLogoSelect;
-        private Label _lblLogoSelect;
+        private RadioButton _radCommand;
+        private ComboBox _cmbCommandSelect;
+        private Label _lblCommandSelect;
 
         public ScheduleEditorForm(ScheduleEntry schedule, List<ClockEntry> clocks)
         {
@@ -103,14 +101,11 @@ namespace AirDirector.Forms
             if (lblStreamURL != null)
                 lblStreamURL.Text = LanguageManager.GetString("ScheduleEditor.StreamURL", "URL:");
 
-            if (_radLogoShow != null)
-                _radLogoShow.Text = "🟢 " + LanguageManager.GetString("ScheduleEditor.LogoShow", "Show Logo");
+            if (_radCommand != null)
+                _radCommand.Text = "📡 " + LanguageManager.GetString("ScheduleEditor.Command", "Comando");
 
-            if (_radLogoHide != null)
-                _radLogoHide.Text = "🔴 " + LanguageManager.GetString("ScheduleEditor.LogoHide", "Hide Logo");
-
-            if (_lblLogoSelect != null)
-                _lblLogoSelect.Text = LanguageManager.GetString("ScheduleEditor.SelectLogo", "Logo:");
+            if (_lblCommandSelect != null)
+                _lblCommandSelect.Text = LanguageManager.GetString("ScheduleEditor.SelectCommand", "Comando:");
 
             if (lblStreamDuration != null)
                 lblStreamDuration.Text = LanguageManager.GetString("ScheduleEditor.StreamDuration", "Durata:");
@@ -176,7 +171,7 @@ namespace AirDirector.Forms
         {
             txtName.Text = _schedule.Name;
             LoadStreamingArchive();
-            LoadAdditionalLogosArchive();
+            LoadCommandsArchive();
 
             cmbClock.Items.Clear();
             foreach (var clock in _clocks)
@@ -202,10 +197,8 @@ namespace AirDirector.Forms
                 radTimeSignal.Checked = true;
             else if (_schedule.Type == "URLStreaming")
                 radURLStreaming.Checked = true;
-            else if (_schedule.Type == "LogoShow")
-                _radLogoShow.Checked = true;
-            else if (_schedule.Type == "LogoHide")
-                _radLogoHide.Checked = true;
+            else if (_schedule.Type == "LogoShow" || _schedule.Type == "LogoHide" || _schedule.Type == "HTTP" || _schedule.Type == "UDP")
+                _radCommand.Checked = true;
 
             txtAudioFile.Text = _schedule.AudioFilePath;
 
@@ -273,12 +266,27 @@ namespace AirDirector.Forms
                 txtStreamDuration.Text = "01:00:00";
             }
 
-            if ((_schedule.Type == "LogoShow" || _schedule.Type == "LogoHide") && !string.IsNullOrWhiteSpace(_schedule.ClockName))
+            if ((_schedule.Type == "LogoShow" || _schedule.Type == "LogoHide" || _schedule.Type == "HTTP" || _schedule.Type == "UDP") &&
+                !string.IsNullOrWhiteSpace(_schedule.ClockName))
             {
-                int logoIndex = _additionalLogos.FindIndex(l =>
-                    string.Equals(l.ImagePath, _schedule.ClockName, StringComparison.OrdinalIgnoreCase));
-                if (logoIndex >= 0 && _cmbLogoSelect.Items.Count > logoIndex)
-                    _cmbLogoSelect.SelectedIndex = logoIndex;
+                int commandIndex = _commandEntries.FindIndex(c =>
+                    string.Equals(c.Type, _schedule.Type, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(c.CommandString, _schedule.ClockName, StringComparison.OrdinalIgnoreCase));
+                if (commandIndex < 0)
+                {
+                    var legacy = new CommandEntry
+                    {
+                        ID = 0,
+                        Name = $"[Legacy] {_schedule.Type} - {_schedule.ClockName}",
+                        Type = _schedule.Type,
+                        CommandString = _schedule.ClockName
+                    };
+                    _commandEntries.Insert(0, legacy);
+                    _cmbCommandSelect?.Items.Insert(0, legacy);
+                    commandIndex = 0;
+                }
+                if (commandIndex >= 0 && _cmbCommandSelect != null && _cmbCommandSelect.Items.Count > commandIndex)
+                    _cmbCommandSelect.SelectedIndex = commandIndex;
             }
 
             txtVideoBufferPath.Text = _schedule.VideoBufferPath ?? "";
@@ -314,10 +322,10 @@ namespace AirDirector.Forms
             txtStreamDuration.Enabled = radURLStreaming.Checked;
             lblStreamURL.Enabled = radURLStreaming.Checked;
             lblStreamDuration.Enabled = radURLStreaming.Checked;
-            if (_cmbLogoSelect != null)
-                _cmbLogoSelect.Enabled = (_radLogoShow?.Checked == true || _radLogoHide?.Checked == true);
-            if (_lblLogoSelect != null)
-                _lblLogoSelect.Enabled = (_radLogoShow?.Checked == true || _radLogoHide?.Checked == true);
+            if (_cmbCommandSelect != null)
+                _cmbCommandSelect.Enabled = (_radCommand?.Checked == true);
+            if (_lblCommandSelect != null)
+                _lblCommandSelect.Enabled = (_radCommand?.Checked == true);
         }
 
         private void BtnBrowseAudio_Click(object sender, EventArgs e)
@@ -481,10 +489,10 @@ namespace AirDirector.Forms
                 return;
             }
 
-            if ((_radLogoShow?.Checked == true || _radLogoHide?.Checked == true) && (_cmbLogoSelect?.SelectedItem == null))
+            if ((_radCommand?.Checked == true) && (_cmbCommandSelect?.SelectedItem == null))
             {
                 MessageBox.Show(
-                    LanguageManager.GetString("ScheduleEditor.SelectLogo", "Logo:"),
+                    LanguageManager.GetString("ScheduleEditor.SelectCommand", "Comando:"),
                     LanguageManager.GetString("Common.Error", "Errore"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -543,17 +551,11 @@ namespace AirDirector.Forms
                 _schedule.AudioFilePath = "";
                 _schedule.MiniPLSID = 0;
             }
-            else if (_radLogoShow?.Checked == true)
+            else if (_radCommand?.Checked == true)
             {
-                _schedule.Type = "LogoShow";
-                _schedule.ClockName = (_cmbLogoSelect?.SelectedItem as AdditionalLogo)?.ImagePath ?? "";
-                _schedule.AudioFilePath = "";
-                _schedule.MiniPLSID = 0;
-            }
-            else if (_radLogoHide?.Checked == true)
-            {
-                _schedule.Type = "LogoHide";
-                _schedule.ClockName = (_cmbLogoSelect?.SelectedItem as AdditionalLogo)?.ImagePath ?? "";
+                var selectedCommand = _cmbCommandSelect?.SelectedItem as CommandEntry;
+                _schedule.Type = selectedCommand?.Type ?? "";
+                _schedule.ClockName = selectedCommand?.CommandString ?? "";
                 _schedule.AudioFilePath = "";
                 _schedule.MiniPLSID = 0;
             }
@@ -615,56 +617,41 @@ namespace AirDirector.Forms
             };
             grpAction.Controls.Add(_cmbStreamingArchive);
 
-            _radLogoShow = new RadioButton
+            _radCommand = new RadioButton
             {
-                Name = "radLogoShow",
+                Name = "radCommand",
                 Location = new Point(170, 115),
-                Size = new Size(180, 25),
-                Visible = false
+                Size = new Size(180, 25)
             };
-            _radLogoShow.CheckedChanged += RadAction_CheckedChanged;
-            grpAction.Controls.Add(_radLogoShow);
+            _radCommand.CheckedChanged += RadAction_CheckedChanged;
+            grpAction.Controls.Add(_radCommand);
 
-            _radLogoHide = new RadioButton
+            _lblCommandSelect = new Label
             {
-                Name = "radLogoHide",
-                Location = new Point(170, 145),
-                Size = new Size(180, 25),
-                Visible = false
-            };
-            _radLogoHide.CheckedChanged += RadAction_CheckedChanged;
-            grpAction.Controls.Add(_radLogoHide);
-
-            _lblLogoSelect = new Label
-            {
-                Name = "lblLogoSelect",
+                Name = "lblCommandSelect",
                 Location = new Point(360, 117),
-                Size = new Size(45, 20),
-                ForeColor = Color.Black,
-                Visible = false
+                Size = new Size(80, 20),
+                ForeColor = Color.Black
             };
-            grpAction.Controls.Add(_lblLogoSelect);
+            grpAction.Controls.Add(_lblCommandSelect);
 
-            _cmbLogoSelect = new ComboBox
+            _cmbCommandSelect = new ComboBox
             {
-                Name = "cmbLogoSelect",
+                Name = "cmbCommandSelect",
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Enabled = false,
                 Font = cmbClock.Font,
-                Location = new Point(410, 115),
-                Size = new Size(230, 23),
-                Visible = false
+                Location = new Point(445, 115),
+                Size = new Size(195, 23)
             };
-            grpAction.Controls.Add(_cmbLogoSelect);
+            grpAction.Controls.Add(_cmbCommandSelect);
         }
 
         private void ApplyModeVisibility()
         {
-            bool showLogoCommands = _isRadioTVMode;
-            if (_radLogoShow != null) _radLogoShow.Visible = showLogoCommands;
-            if (_radLogoHide != null) _radLogoHide.Visible = showLogoCommands;
-            if (_cmbLogoSelect != null) _cmbLogoSelect.Visible = showLogoCommands;
-            if (_lblLogoSelect != null) _lblLogoSelect.Visible = showLogoCommands;
+            if (_radCommand != null) _radCommand.Visible = true;
+            if (_cmbCommandSelect != null) _cmbCommandSelect.Visible = true;
+            if (_lblCommandSelect != null) _lblCommandSelect.Visible = true;
         }
 
         private void LoadStreamingArchive()
@@ -676,26 +663,13 @@ namespace AirDirector.Forms
                 _cmbStreamingArchive.Items.Add(stream);
         }
 
-        private void LoadAdditionalLogosArchive()
+        private void LoadCommandsArchive()
         {
-            _additionalLogos.Clear();
-            try
-            {
-                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\AirDirector\CG", false))
-                {
-                    string logosJson = key?.GetValue("AdditionalLogosJson", "[]")?.ToString() ?? "[]";
-                    _additionalLogos = JsonConvert.DeserializeObject<List<AdditionalLogo>>(logosJson) ?? new List<AdditionalLogo>();
-                }
-            }
-            catch
-            {
-                _additionalLogos = new List<AdditionalLogo>();
-            }
-
-            _cmbLogoSelect?.Items.Clear();
-            if (_cmbLogoSelect == null) return;
-            foreach (var logo in _additionalLogos)
-                _cmbLogoSelect.Items.Add(logo);
+            _commandEntries = DbcManager.LoadFromCsv<CommandEntry>("Commands.dbc");
+            _cmbCommandSelect?.Items.Clear();
+            if (_cmbCommandSelect == null) return;
+            foreach (var command in _commandEntries)
+                _cmbCommandSelect.Items.Add(command);
         }
     }
 }

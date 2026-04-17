@@ -161,6 +161,13 @@ namespace AirDirector.Services.Database
                 SaveToCsvInternal(streamingPath, new List<StreamingEntry>());
                 Console.WriteLine("[DbcManager] Streaming.dbc creato");
             }
+
+            string commandsPath = Path.Combine(DatabasePath, "Commands.dbc");
+            if (!File.Exists(commandsPath))
+            {
+                SaveToCsvInternal(commandsPath, new List<CommandEntry>());
+                Console.WriteLine("[DbcManager] Commands.dbc creato");
+            }
         }
 
         public static List<T> LoadFromCsv<T>(string fileName)

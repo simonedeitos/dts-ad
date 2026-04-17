@@ -73,7 +73,7 @@ namespace AirDirector.Forms
         // SPOT/ADV LABEL SETTINGS
         // ═══════════════════════════════════════════════════════════
         private bool _spotLabelEnabled = true;
-        private string _spotLabelText = "ADVERTISING";
+        private string _spotLabelText = LanguageManager.GetString("CGEditor.DefaultAdvText", "PUBBLICITÀ");
         private string _spotLabelPosition = "TopLeft";
         private Color _spotLabelBgColor = Color.FromArgb(200, 255, 0, 0);
         private Color _spotLabelTextColor = Color.White;
@@ -154,7 +154,7 @@ namespace AirDirector.Forms
             // ═══════════════════════════════════════════════════════════
             Label lblPreview = new Label
             {
-                Text = "PREVIEW",
+                Text = LanguageManager.GetString("CGEditor.Preview", "ANTEPRIMA"),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 ForeColor = Color.Gray,
                 Location = new Point(20, 10),
@@ -202,7 +202,7 @@ namespace AirDirector.Forms
 
             Button btnSaveApply = new Button
             {
-                Text = "💾 Save & Apply",
+                Text = "💾 " + LanguageManager.GetString("CGEditor.SaveApply", "Salva e Applica"),
                 Font = new Font("Segoe UI", 11, FontStyle.Bold),
                 Size = new Size(130, 45),
                 Location = new Point(btnX, tabTop),
@@ -217,7 +217,7 @@ namespace AirDirector.Forms
 
             Button btnCancel = new Button
             {
-                Text = "Cancel",
+                Text = LanguageManager.GetString("Common.Cancel", "Annulla"),
                 Font = new Font("Segoe UI", 10),
                 Size = new Size(130, 40),
                 Location = new Point(btnX, tabTop + 55),
@@ -232,7 +232,7 @@ namespace AirDirector.Forms
 
             Button btnResetPreview = new Button
             {
-                Text = "🔄 Reset Preview",
+                Text = "🔄 " + LanguageManager.GetString("CGEditor.ResetPreview", "Reset Anteprima"),
                 Font = new Font("Segoe UI", 9),
                 Size = new Size(130, 35),
                 Location = new Point(btnX, tabTop + 105),
@@ -268,7 +268,7 @@ namespace AirDirector.Forms
         // ═══════════════════════════════════════════════════════════
         private void CreateLowerThirdTab()
         {
-            TabPage tab = new TabPage("📺 Track Title");
+            TabPage tab = new TabPage("📺 " + LanguageManager.GetString("CGEditor.TabTrackTitle", "Titolo Brano"));
             tab.BackColor = Color.FromArgb(40, 40, 40);
             tab.ForeColor = Color.White;
             tab.Padding = new Padding(5);
@@ -278,7 +278,7 @@ namespace AirDirector.Forms
             // Row 1: Enable, Position, Animation, Layout
             CheckBox chkEnabled = new CheckBox
             {
-                Text = "Enabled",
+                Text = LanguageManager.GetString("CGEditor.Enabled", "Abilitato"),
                 Checked = _lowerThirdEnabled,
                 Location = new Point(10, y),
                 AutoSize = true,
@@ -287,36 +287,50 @@ namespace AirDirector.Forms
             chkEnabled.CheckedChanged += (s, e) => { _lowerThirdEnabled = chkEnabled.Checked; _previewPanel.Invalidate(); };
             tab.Controls.Add(chkEnabled);
 
-            AddLabelAndCombo(tab, "Position:", 100, y, 55, 95,
-                new[] { "Bottom Left", "Bottom Center", "Bottom Right" },
+            AddLabelAndCombo(tab, LanguageManager.GetString("CGEditor.Position", "Posizione") + ":", 100, y, 55, 95,
+                new[] {
+                    LanguageManager.GetString("CGEditor.BottomLeft", "Basso Sinistra"),
+                    LanguageManager.GetString("CGEditor.BottomCenter", "Basso Centro"),
+                    LanguageManager.GetString("CGEditor.BottomRight", "Basso Destra")
+                },
                 _lowerThirdPosition == "BottomLeft" ? 0 : (_lowerThirdPosition == "BottomCenter" ? 1 : 2),
                 (idx) => { _lowerThirdPosition = idx == 0 ? "BottomLeft" : (idx == 1 ? "BottomCenter" : "BottomRight"); _previewPanel.Invalidate(); });
 
-            AddLabelAndCombo(tab, "Animation:", 310, y, 65, 90,
-                new[] { "Slide Left", "Slide Right", "Slide Up", "Fade In", "Zoom In" },
+            AddLabelAndCombo(tab, LanguageManager.GetString("CGEditor.Animation", "Animazione") + ":", 310, y, 65, 90,
+                new[] {
+                    LanguageManager.GetString("CGEditor.SlideLeft", "Scorri Sinistra"),
+                    LanguageManager.GetString("CGEditor.SlideRight", "Scorri Destra"),
+                    LanguageManager.GetString("CGEditor.SlideUp", "Scorri Su"),
+                    LanguageManager.GetString("CGEditor.FadeIn", "Dissolvenza"),
+                    LanguageManager.GetString("CGEditor.ZoomIn", "Zoom In")
+                },
                 GetAnimationIndex(_lowerThirdAnimation),
                 (idx) => { _lowerThirdAnimation = GetAnimationName(idx); _previewAnimProgress = 0f; _animStartTime = DateTime.Now; });
 
-            AddLabelAndCombo(tab, "Layout:", 520, y, 45, 100,
-                new[] { "Single Line", "Title Above", "Artist Above" },
+            AddLabelAndCombo(tab, LanguageManager.GetString("CGEditor.Layout", "Layout") + ":", 520, y, 45, 100,
+                new[] {
+                    LanguageManager.GetString("CGEditor.SingleLine", "Linea Singola"),
+                    LanguageManager.GetString("CGEditor.TitleAbove", "Titolo Sopra"),
+                    LanguageManager.GetString("CGEditor.ArtistAbove", "Artista Sopra")
+                },
                 _lowerThirdLayout == "SingleLine" ? 0 : (_lowerThirdLayout == "TitleAbove" ? 1 : 2),
                 (idx) => { _lowerThirdLayout = idx == 0 ? "SingleLine" : (idx == 1 ? "TitleAbove" : "ArtistAbove"); _previewPanel.Invalidate(); });
 
             y += 30;
 
             // Row 2: Delay, Duration, Margins
-            AddLabelAndNumeric(tab, "Delay (s):", 10, y, 60, 50, 0, 30, _lowerThirdDelayStart, (v) => _lowerThirdDelayStart = v);
-            AddLabelAndNumeric(tab, "Duration (s):", 140, y, 75, 50, 1, 60, _lowerThirdDuration, (v) => _lowerThirdDuration = v);
-            AddLabelAndNumeric(tab, "Margin X:", 290, y, 60, 50, 0, 500, _lowerThirdMarginX, (v) => { _lowerThirdMarginX = v; _previewPanel.Invalidate(); });
-            AddLabelAndNumeric(tab, "Margin Y:", 420, y, 60, 50, 0, 500, _lowerThirdMarginY, (v) => { _lowerThirdMarginY = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.DelaySeconds", "Ritardo (s)") + ":", 10, y, 60, 50, 0, 30, _lowerThirdDelayStart, (v) => _lowerThirdDelayStart = v);
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.DurationSeconds", "Durata (s)") + ":", 140, y, 75, 50, 1, 60, _lowerThirdDuration, (v) => _lowerThirdDuration = v);
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.MarginX", "Margine X") + ":", 290, y, 60, 50, 0, 500, _lowerThirdMarginX, (v) => { _lowerThirdMarginX = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.MarginY", "Margine Y") + ":", 420, y, 60, 50, 0, 500, _lowerThirdMarginY, (v) => { _lowerThirdMarginY = v; _previewPanel.Invalidate(); });
 
             y += 30;
 
             // Row 3: Font sizes and font family
-            AddLabelAndNumeric(tab, "Title Size:", 10, y, 65, 50, 12, 72, _lowerThirdTitleFontSize, (v) => { _lowerThirdTitleFontSize = v; _previewPanel.Invalidate(); });
-            AddLabelAndNumeric(tab, "Artist Size:", 145, y, 65, 50, 12, 72, _lowerThirdArtistFontSize, (v) => { _lowerThirdArtistFontSize = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.TitleSize", "Dimensione Titolo") + ":", 10, y, 65, 50, 12, 72, _lowerThirdTitleFontSize, (v) => { _lowerThirdTitleFontSize = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.ArtistSize", "Dimensione Artista") + ":", 145, y, 65, 50, 12, 72, _lowerThirdArtistFontSize, (v) => { _lowerThirdArtistFontSize = v; _previewPanel.Invalidate(); });
 
-            Label lblFont = new Label { Text = "Font:", Location = new Point(290, y), AutoSize = true, ForeColor = Color.LightGray };
+            Label lblFont = new Label { Text = LanguageManager.GetString("CGEditor.Font", "Font") + ":", Location = new Point(290, y), AutoSize = true, ForeColor = Color.LightGray };
             tab.Controls.Add(lblFont);
 
             ComboBox cmbFont = new ComboBox
@@ -337,15 +351,19 @@ namespace AirDirector.Forms
             y += 30;
 
             // Row 4: Colors
-            AddLabelAndColorPicker(tab, "Background:", 10, y, 75, _lowerThirdBgColor, (c) => { _lowerThirdBgColor = c; _previewPanel.Invalidate(); }, true);
-            AddLabelAndColorPicker(tab, "Text:", 150, y, 35, _lowerThirdTextColor, (c) => { _lowerThirdTextColor = c; _previewPanel.Invalidate(); });
-            AddLabelAndColorPicker(tab, "Accent Bar:", 260, y, 70, _lowerThirdAccentColor, (c) => { _lowerThirdAccentColor = c; _previewPanel.Invalidate(); });
+            AddLabelAndColorPicker(tab, LanguageManager.GetString("CGEditor.Background", "Sfondo") + ":", 10, y, 75, _lowerThirdBgColor, (c) => { _lowerThirdBgColor = c; _previewPanel.Invalidate(); }, true);
+            AddLabelAndColorPicker(tab, LanguageManager.GetString("CGEditor.Text", "Testo") + ":", 150, y, 35, _lowerThirdTextColor, (c) => { _lowerThirdTextColor = c; _previewPanel.Invalidate(); });
+            AddLabelAndColorPicker(tab, LanguageManager.GetString("CGEditor.AccentBar", "Barra Accento") + ":", 260, y, 70, _lowerThirdAccentColor, (c) => { _lowerThirdAccentColor = c; _previewPanel.Invalidate(); });
 
             y += 30;
 
             // Row 5: Entrance Theme
-            AddLabelAndCombo(tab, "Entrance Theme:", 10, y, 100, 210,
-                new[] { "Theme 1 - Classic", "Theme 2 - Staggered", "Theme 3 - Cinematic" },
+            AddLabelAndCombo(tab, LanguageManager.GetString("CGEditor.EntranceTheme", "Tema Ingresso") + ":", 10, y, 100, 210,
+                new[] {
+                    LanguageManager.GetString("CGEditor.ThemeClassic", "Tema 1 - Classico"),
+                    LanguageManager.GetString("CGEditor.ThemeStaggered", "Tema 2 - Scaglionato"),
+                    LanguageManager.GetString("CGEditor.ThemeCinematic", "Tema 3 - Cinematografico")
+                },
                 _lowerThirdEntranceTheme - 1,
                 (idx) => { _lowerThirdEntranceTheme = idx + 1; _previewAnimProgress = 0f; _animStartTime = DateTime.Now; _previewPanel.Invalidate(); });
 
@@ -354,7 +372,7 @@ namespace AirDirector.Forms
             // Row 6: Show at end options
             CheckBox chkShowEnd = new CheckBox
             {
-                Text = "Show also at track end",
+                Text = LanguageManager.GetString("CGEditor.ShowAlsoAtEnd", "Mostra anche a fine brano"),
                 Checked = _lowerThirdShowAtEnd,
                 Location = new Point(10, y),
                 AutoSize = true,
@@ -363,8 +381,8 @@ namespace AirDirector.Forms
             chkShowEnd.CheckedChanged += (s, e) => _lowerThirdShowAtEnd = chkShowEnd.Checked;
             tab.Controls.Add(chkShowEnd);
 
-            AddLabelAndNumeric(tab, "Sec.  before end:", 200, y, 100, 50, 5, 60, _lowerThirdEndOffset, (v) => _lowerThirdEndOffset = v);
-            AddLabelAndNumeric(tab, "Duration:", 380, y, 55, 50, 1, 30, _lowerThirdEndDuration, (v) => _lowerThirdEndDuration = v);
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.SecondsBeforeEnd", "Sec. prima della fine") + ":", 200, y, 100, 50, 5, 60, _lowerThirdEndOffset, (v) => _lowerThirdEndOffset = v);
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.Duration", "Durata") + ":", 380, y, 55, 50, 1, 30, _lowerThirdEndDuration, (v) => _lowerThirdEndDuration = v);
 
             _tabControl.TabPages.Add(tab);
         }
@@ -374,7 +392,7 @@ namespace AirDirector.Forms
         // ═══════════════════════════════════════════════════════════
         private void CreatePersistentInfoTab()
         {
-            TabPage tab = new TabPage("📊 Persistent Info");
+            TabPage tab = new TabPage("📊 " + LanguageManager.GetString("CGEditor.TabPersistentInfo", "Info Persistenti"));
             tab.BackColor = Color.FromArgb(40, 40, 40);
             tab.ForeColor = Color.White;
             tab.Padding = new Padding(5);
@@ -383,7 +401,7 @@ namespace AirDirector.Forms
 
             CheckBox chkEnabled = new CheckBox
             {
-                Text = "Show persistent info bar (Artist - Title with progress bar) after initial display",
+                Text = LanguageManager.GetString("CGEditor.PersistentInfoDescription", "Mostra barra info persistente (Artista - Titolo con barra progresso) dopo la visualizzazione iniziale"),
                 Checked = _persistentInfoEnabled,
                 Location = new Point(10, y),
                 AutoSize = true,
@@ -395,26 +413,25 @@ namespace AirDirector.Forms
             y += 35;
 
             // Row 2: Colors and size
-            AddLabelAndColorPicker(tab, "Progress Bar Color:", 10, y, 115, _progressBarColor, (c) => { _progressBarColor = c; _previewPanel.Invalidate(); });
-            AddLabelAndNumeric(tab, "Font Size:", 220, y, 60, 50, 10, 36, _persistentInfoFontSize, (v) => { _persistentInfoFontSize = v; _previewPanel.Invalidate(); });
+            AddLabelAndColorPicker(tab, LanguageManager.GetString("CGEditor.ProgressBarColor", "Colore Barra Progresso") + ":", 10, y, 115, _progressBarColor, (c) => { _progressBarColor = c; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.FontSize", "Dimensione Font") + ":", 220, y, 60, 50, 10, 36, _persistentInfoFontSize, (v) => { _persistentInfoFontSize = v; _previewPanel.Invalidate(); });
 
             y += 35;
 
             // Row 3: Margins
-            AddLabelAndNumeric(tab, "Margin X (from left):", 10, y, 120, 60, 0, 500, _persistentInfoMarginX, (v) => { _persistentInfoMarginX = v; _previewPanel.Invalidate(); });
-            AddLabelAndNumeric(tab, "Margin Y (from top):", 250, y, 120, 60, 0, 500, _persistentInfoMarginY, (v) => { _persistentInfoMarginY = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.MarginXFromLeft", "Margine X (da sinistra)") + ":", 10, y, 120, 60, 0, 500, _persistentInfoMarginX, (v) => { _persistentInfoMarginX = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.MarginYFromTop", "Margine Y (dall'alto)") + ":", 250, y, 120, 60, 0, 500, _persistentInfoMarginY, (v) => { _persistentInfoMarginY = v; _previewPanel.Invalidate(); });
 
             y += 35;
 
             // Row 4: Hide before end
-            AddLabelAndNumeric(tab, "Hide before track end (seconds):", 10, y, 195, 60, 0, 60, _persistentInfoHideBeforeEnd, (v) => _persistentInfoHideBeforeEnd = v);
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.HideBeforeTrackEnd", "Nascondi prima fine brano (secondi)") + ":", 10, y, 195, 60, 0, 60, _persistentInfoHideBeforeEnd, (v) => _persistentInfoHideBeforeEnd = v);
 
             y += 35;
 
             Label lblNote = new Label
             {
-                Text = "ℹ️ This bar appears in top-left corner after the main title animation finishes,\n" +
-                       "    and stays visible until N seconds before track end (or before end title appears).",
+                Text = LanguageManager.GetString("CGEditor.PersistentInfoNote", "ℹ️ Questa barra appare in alto a sinistra dopo l'animazione principale,\n    e resta visibile fino a N secondi prima della fine brano."),
                 Location = new Point(10, y),
                 Size = new Size(700, 35),
                 ForeColor = Color.Gray
@@ -429,7 +446,7 @@ namespace AirDirector.Forms
         // ═══════════════════════════════════════════════════════════
         private void CreateLogoTab()
         {
-            TabPage tab = new TabPage("🏷️ Logo");
+            TabPage tab = new TabPage("🏷️ " + LanguageManager.GetString("CGEditor.TabLogo", "Logo"));
             tab.BackColor = Color.FromArgb(40, 40, 40);
             tab.ForeColor = Color.White;
             tab.Padding = new Padding(5);
@@ -439,7 +456,7 @@ namespace AirDirector.Forms
             // Row 1: Enable and browse
             CheckBox chkEnabled = new CheckBox
             {
-                Text = "Show Logo",
+                Text = LanguageManager.GetString("CGEditor.ShowLogo", "Mostra Logo"),
                 Checked = _logoEnabled,
                 Location = new Point(10, y),
                 AutoSize = true,
@@ -450,7 +467,7 @@ namespace AirDirector.Forms
 
             Button btnBrowse = new Button
             {
-                Text = "📁 Browse...",
+                Text = "📁 " + LanguageManager.GetString("CGEditor.Browse", "Sfoglia..."),
                 Location = new Point(120, y - 3),
                 Size = new Size(90, 25),
                 BackColor = Color.FromArgb(60, 60, 60),
@@ -463,7 +480,7 @@ namespace AirDirector.Forms
 
             Label lblPath = new Label
             {
-                Text = string.IsNullOrEmpty(_logoPath) ? "(no logo selected)" : Path.GetFileName(_logoPath),
+                Text = string.IsNullOrEmpty(_logoPath) ? LanguageManager.GetString("CGEditor.NoLogoSelected", "(nessun logo selezionato)") : Path.GetFileName(_logoPath),
                 Location = new Point(220, y),
                 Size = new Size(250, 20),
                 ForeColor = Color.LightGray,
@@ -474,18 +491,23 @@ namespace AirDirector.Forms
             y += 35;
 
             // Row 2: Position, Size, Margin
-            AddLabelAndCombo(tab, "Position:", 10, y, 55, 110,
-                new[] { "Top Left", "Top Right", "Bottom Left", "Bottom Right" },
+            AddLabelAndCombo(tab, LanguageManager.GetString("CGEditor.Position", "Posizione") + ":", 10, y, 55, 110,
+                new[] {
+                    LanguageManager.GetString("CGEditor.TopLeft", "Alto Sinistra"),
+                    LanguageManager.GetString("CGEditor.TopRight", "Alto Destra"),
+                    LanguageManager.GetString("CGEditor.BottomLeft", "Basso Sinistra"),
+                    LanguageManager.GetString("CGEditor.BottomRight", "Basso Destra")
+                },
                 GetLogoPositionIndex(_logoPosition),
                 (idx) => { _logoPosition = GetLogoPositionName(idx); _previewPanel.Invalidate(); });
 
-            AddLabelAndNumeric(tab, "Size:", 200, y, 35, 60, 50, 400, _logoSize, (v) => { _logoSize = v; _previewPanel.Invalidate(); });
-            AddLabelAndNumeric(tab, "Margin:", 320, y, 50, 60, 0, 200, _logoMargin, (v) => { _logoMargin = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.Size", "Dimensione") + ":", 200, y, 35, 60, 50, 400, _logoSize, (v) => { _logoSize = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.Margin", "Margine") + ":", 320, y, 50, 60, 0, 200, _logoMargin, (v) => { _logoMargin = v; _previewPanel.Invalidate(); });
 
             y += 35;
 
             // Row 3: Opacity
-            Label lblOpacity = new Label { Text = "Opacity:", Location = new Point(10, y + 5), AutoSize = true, ForeColor = Color.LightGray };
+            Label lblOpacity = new Label { Text = LanguageManager.GetString("CGEditor.Opacity", "Opacità") + ":", Location = new Point(10, y + 5), AutoSize = true, ForeColor = Color.LightGray };
             tab.Controls.Add(lblOpacity);
 
             TrackBar trkOpacity = new TrackBar
@@ -518,7 +540,7 @@ namespace AirDirector.Forms
         // ═══════════════════════════════════════════════════════════
         private void CreateClockTab()
         {
-            TabPage tab = new TabPage("🕐 Clock");
+            TabPage tab = new TabPage("🕐 " + LanguageManager.GetString("CGEditor.TabClock", "Orologio"));
             tab.BackColor = Color.FromArgb(40, 40, 40);
             tab.ForeColor = Color.White;
             tab.Padding = new Padding(5);
@@ -528,7 +550,7 @@ namespace AirDirector.Forms
             // Row 1: Enable and position
             CheckBox chkEnabled = new CheckBox
             {
-                Text = "Show Clock (HH:mm)",
+                Text = LanguageManager.GetString("CGEditor.ShowClock", "Mostra Orologio (HH:mm)"),
                 Checked = _clockEnabled,
                 Location = new Point(10, y),
                 AutoSize = true,
@@ -539,7 +561,7 @@ namespace AirDirector.Forms
 
             CheckBox chkUnderLogo = new CheckBox
             {
-                Text = "Position under Logo",
+                Text = LanguageManager.GetString("CGEditor.PositionUnderLogo", "Posiziona sotto il logo"),
                 Checked = _clockUnderLogo,
                 Location = new Point(180, y),
                 AutoSize = true,
@@ -551,11 +573,11 @@ namespace AirDirector.Forms
             y += 35;
 
             // Row 2: Colors and size
-            AddLabelAndColorPicker(tab, "Text Color:", 10, y, 70, _clockColor, (c) => { _clockColor = c; _previewPanel.Invalidate(); });
+            AddLabelAndColorPicker(tab, LanguageManager.GetString("CGEditor.TextColor", "Colore Testo") + ":", 10, y, 70, _clockColor, (c) => { _clockColor = c; _previewPanel.Invalidate(); });
 
             CheckBox chkBgEnabled = new CheckBox
             {
-                Text = "Background:",
+                Text = LanguageManager.GetString("CGEditor.Background", "Sfondo") + ":",
                 Checked = _clockBgEnabled,
                 Location = new Point(160, y),
                 AutoSize = true,
@@ -566,7 +588,7 @@ namespace AirDirector.Forms
 
             AddLabelAndColorPicker(tab, "", 270, y, 0, _clockBgColor, (c) => { _clockBgColor = c; _previewPanel.Invalidate(); }, true);
 
-            AddLabelAndNumeric(tab, "Font Size:", 350, y, 65, 50, 12, 48, _clockFontSize, (v) => { _clockFontSize = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.FontSize", "Dimensione Font") + ":", 350, y, 65, 50, 12, 48, _clockFontSize, (v) => { _clockFontSize = v; _previewPanel.Invalidate(); });
 
             _tabControl.TabPages.Add(tab);
         }
@@ -576,7 +598,7 @@ namespace AirDirector.Forms
         // ═══════════════════════════════════════════════════════════
         private void CreateSpotTab()
         {
-            TabPage tab = new TabPage("📢 Advertising");
+            TabPage tab = new TabPage("📢 " + LanguageManager.GetString("CGEditor.TabAdvertising", "Pubblicità"));
             tab.BackColor = Color.FromArgb(40, 40, 40);
             tab.ForeColor = Color.White;
             tab.Padding = new Padding(5);
@@ -598,7 +620,7 @@ namespace AirDirector.Forms
             y += 30;
 
             // Row 2: Text and position
-            Label lblText = new Label { Text = "Label Text:", Location = new Point(10, y), AutoSize = true, ForeColor = Color.LightGray };
+            Label lblText = new Label { Text = LanguageManager.GetString("CGEditor.LabelText", "Testo Etichetta") + ":", Location = new Point(10, y), AutoSize = true, ForeColor = Color.LightGray };
             tab.Controls.Add(lblText);
 
             TextBox txtLabel = new TextBox
@@ -610,8 +632,15 @@ namespace AirDirector.Forms
             txtLabel.TextChanged += (s, e) => { _spotLabelText = txtLabel.Text; _previewPanel.Invalidate(); };
             tab.Controls.Add(txtLabel);
 
-            AddLabelAndCombo(tab, "Position:", 260, y, 55, 100,
-                new[] { "Top Left", "Top Center", "Top Right", "Bottom Left", "Bottom Center", "Bottom Right" },
+            AddLabelAndCombo(tab, LanguageManager.GetString("CGEditor.Position", "Posizione") + ":", 260, y, 55, 100,
+                new[] {
+                    LanguageManager.GetString("CGEditor.TopLeft", "Alto Sinistra"),
+                    LanguageManager.GetString("CGEditor.TopCenter", "Alto Centro"),
+                    LanguageManager.GetString("CGEditor.TopRight", "Alto Destra"),
+                    LanguageManager.GetString("CGEditor.BottomLeft", "Basso Sinistra"),
+                    LanguageManager.GetString("CGEditor.BottomCenter", "Basso Centro"),
+                    LanguageManager.GetString("CGEditor.BottomRight", "Basso Destra")
+                },
                 _spotLabelPosition switch
                 {
                     "TopLeft" => 0,
@@ -638,22 +667,22 @@ namespace AirDirector.Forms
                     _previewPanel.Invalidate();
                 });
 
-            AddLabelAndNumeric(tab, "Font Size:", 450, y, 60, 50, 8, 48, _spotLabelFontSize, (v) => { _spotLabelFontSize = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.FontSize", "Dimensione Font") + ":", 450, y, 60, 50, 8, 48, _spotLabelFontSize, (v) => { _spotLabelFontSize = v; _previewPanel.Invalidate(); });
 
             y += 30;
 
             // Row 3: Margins
-            AddLabelAndNumeric(tab, "Margin X:", 10, y, 60, 60, 0, 500, _spotLabelMarginX, (v) => { _spotLabelMarginX = v; _previewPanel.Invalidate(); });
-            AddLabelAndNumeric(tab, "Margin Y:", 160, y, 60, 60, 0, 500, _spotLabelMarginY, (v) => { _spotLabelMarginY = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.MarginX", "Margine X") + ":", 10, y, 60, 60, 0, 500, _spotLabelMarginX, (v) => { _spotLabelMarginX = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.MarginY", "Margine Y") + ":", 160, y, 60, 60, 0, 500, _spotLabelMarginY, (v) => { _spotLabelMarginY = v; _previewPanel.Invalidate(); });
 
             y += 30;
 
             // Row 4: Colors
-            AddLabelAndColorPicker(tab, "Text Color:", 10, y, 70, _spotLabelTextColor, (c) => { _spotLabelTextColor = c; _previewPanel.Invalidate(); });
+            AddLabelAndColorPicker(tab, LanguageManager.GetString("CGEditor.TextColor", "Colore Testo") + ":", 10, y, 70, _spotLabelTextColor, (c) => { _spotLabelTextColor = c; _previewPanel.Invalidate(); });
 
             CheckBox chkBgEnabled = new CheckBox
             {
-                Text = "Background:",
+                Text = LanguageManager.GetString("CGEditor.Background", "Sfondo") + ":",
                 Checked = _spotLabelBgEnabled,
                 Location = new Point(160, y),
                 AutoSize = true,
@@ -1667,7 +1696,7 @@ namespace AirDirector.Forms
                     _clockBgEnabled = GetRegBool(key, "ClockBgEnabled", true);
 
                     _spotLabelEnabled = GetRegBool(key, "SpotLabelEnabled", true);
-                    _spotLabelText = GetRegString(key, "SpotLabelText", "ADVERTISING");
+                    _spotLabelText = GetRegString(key, "SpotLabelText", LanguageManager.GetString("CGEditor.DefaultAdvText", "PUBBLICITÀ"));
                     _spotLabelPosition = GetRegString(key, "SpotLabelPosition", "TopLeft");
                     _spotLabelBgColor = Color.FromArgb(GetRegInt(key, "SpotLabelBgColor", Color.FromArgb(200, 255, 0, 0).ToArgb()));
                     _spotLabelTextColor = Color.FromArgb(GetRegInt(key, "SpotLabelTextColor", Color.White.ToArgb()));
@@ -1736,7 +1765,7 @@ namespace AirDirector.Forms
                     key.SetValue("ClockBgEnabled", _clockBgEnabled ? 1 : 0);
 
                     key.SetValue("SpotLabelEnabled", _spotLabelEnabled ? 1 : 0);
-                    key.SetValue("SpotLabelText", _spotLabelText ?? "ADVERTISING");
+                    key.SetValue("SpotLabelText", _spotLabelText ?? LanguageManager.GetString("CGEditor.DefaultAdvText", "PUBBLICITÀ"));
                     key.SetValue("SpotLabelPosition", _spotLabelPosition);
                     key.SetValue("SpotLabelBgColor", _spotLabelBgColor.ToArgb());
                     key.SetValue("SpotLabelTextColor", _spotLabelTextColor.ToArgb());
@@ -1820,12 +1849,12 @@ namespace AirDirector.Forms
 
             Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosPath", "Path") + ":", Left = 12, Top = 65, Width = 70 });
             _txtPath = new TextBox { Left = 100, Top = 62, Width = 330, Text = Logo.ImagePath ?? "" };
-            var btnBrowse = new Button { Text = "...", Left = 438, Top = 61, Width = 40 };
+            var btnBrowse = new Button { Text = LanguageManager.GetString("CGEditor.BrowseShort", "..."), Left = 438, Top = 61, Width = 40 };
             btnBrowse.Click += (s, e) =>
             {
                 using (System.Windows.Forms.OpenFileDialog ofd = new System.Windows.Forms.OpenFileDialog())
                 {
-                    ofd.Filter = "Images|*.png;*.jpg;*.jpeg";
+                    ofd.Filter = LanguageManager.GetString("CGEditor.ImagesFilter", "Immagini|*.png;*.jpg;*.jpeg");
                     if (ofd.ShowDialog(this) == DialogResult.OK)
                         _txtPath.Text = ofd.FileName;
                 }

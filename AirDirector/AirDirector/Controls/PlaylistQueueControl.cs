@@ -1181,7 +1181,7 @@ namespace AirDirector.Controls
                     case "LogoShow":
                         if (!string.IsNullOrWhiteSpace(schedule.ClockName))
                         {
-                            CGRenderer.ShowAdditionalLogo(schedule.ClockName);
+                            RequestCommandExecution("LogoShow", schedule.ClockName);
                             Log($"[ExecuteSchedule] ✅ LogoShow: {schedule.ClockName}");
                         }
                         break;
@@ -1189,8 +1189,24 @@ namespace AirDirector.Controls
                     case "LogoHide":
                         if (!string.IsNullOrWhiteSpace(schedule.ClockName))
                         {
-                            CGRenderer.HideAdditionalLogo(schedule.ClockName);
+                            RequestCommandExecution("LogoHide", schedule.ClockName);
                             Log($"[ExecuteSchedule] ✅ LogoHide: {schedule.ClockName}");
+                        }
+                        break;
+
+                    case "HTTP":
+                        if (!string.IsNullOrWhiteSpace(schedule.ClockName))
+                        {
+                            RequestCommandExecution("HTTP", schedule.ClockName);
+                            Log($"[ExecuteSchedule] ✅ HTTP: {schedule.ClockName}");
+                        }
+                        break;
+
+                    case "UDP":
+                        if (!string.IsNullOrWhiteSpace(schedule.ClockName))
+                        {
+                            RequestCommandExecution("UDP", schedule.ClockName);
+                            Log($"[ExecuteSchedule] ✅ UDP: {schedule.ClockName}");
                         }
                         break;
 
@@ -1730,6 +1746,9 @@ namespace AirDirector.Controls
                 Log($"╔════════════════════════════════════════════════════════════╗");
                 Log($"║  🎼 GENERAZIONE PLAYLIST DA CLOCK: {clockName,-30} ║");
                 Log($"╚════════════════════════════════════════════════════════════╝");
+                int artistSeparationHours = ConfigurationControl.GetArtistSeparation();
+                int hourlySeparationHours = ConfigurationControl.GetHourlySeparation();
+                Log($"[GenerateClock] 🔄 Regole separazione correnti: artista={artistSeparationHours}h, brano={hourlySeparationHours}h");
 
                 _queueSnapshotAtCreation.Clear();
                 DateTime now = DateTime.Now;
@@ -4014,6 +4033,34 @@ namespace AirDirector.Controls
 							IsFromPlaylist = true
 						};
 
+                    case AirPlaylistItemType.CommandHttp:
+                        return new PlaylistQueueItem
+                        {
+                            IsCommand = true,
+                            CommandType = "HTTP",
+                            CommandValue = pItem.CommandValue ?? "",
+                            Title = $"▶ HTTP: {pItem.Title}",
+                            Artist = "",
+                            Duration = TimeSpan.Zero,
+                            Type = PlaylistItemType.Other,
+                            ScheduledTime = DateTime.Now,
+                            IsFromPlaylist = true
+                        };
+
+                    case AirPlaylistItemType.CommandUdp:
+                        return new PlaylistQueueItem
+                        {
+                            IsCommand = true,
+                            CommandType = "UDP",
+                            CommandValue = pItem.CommandValue ?? "",
+                            Title = $"▶ UDP: {pItem.Title}",
+                            Artist = "",
+                            Duration = TimeSpan.Zero,
+                            Type = PlaylistItemType.Other,
+                            ScheduledTime = DateTime.Now,
+                            IsFromPlaylist = true
+                        };
+
 					default:
 						Log($"[ConvertPlaylistItem] Tipo non gestito: {pItem.Type}");
 						return null;
@@ -4121,20 +4168,25 @@ namespace AirDirector.Controls
 				var cmd = _items[0];
 				_items.RemoveAt(0);
 				Log($"[DrainCommands] Esecuzione comando: {cmd.CommandType} → {cmd.CommandValue}");
-				try
-				{
-					CommandExecutionRequested?.Invoke(this, new CommandExecutionEventArgs(cmd.CommandType, cmd.CommandValue));
-				}
-				catch (Exception ex)
-				{
-					Log($"[DrainCommands] Errore esecuzione comando: {ex.Message}");
-				}
+                RequestCommandExecution(cmd.CommandType, cmd.CommandValue);
 			}
 			RecalculateScheduledTimes();
 			UpdateScrollBar();
 			this.Invalidate();
 			NotifyQueueCountChanged();
 		}
+
+        private void RequestCommandExecution(string commandType, string commandValue)
+        {
+            try
+            {
+                CommandExecutionRequested?.Invoke(this, new CommandExecutionEventArgs(commandType, commandValue));
+            }
+            catch (Exception ex)
+            {
+                Log($"[CommandExecution] Errore esecuzione comando: {ex.Message}");
+            }
+        }
 
 		public PlaylistQueueItem GetLastPlayedItem()
 		{
