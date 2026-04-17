@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using System.Collections.Generic;
 using System.Linq;
 using AirDirector.Services.Database;
+using AirDirector.Services.Licensing;
 using AirDirector.Services.Localization;
 using AirDirector.Forms;
 using AirDirector.Themes;
@@ -144,6 +145,17 @@ namespace AirDirector.Controls
 
         private void BtnNew_Click(object sender, EventArgs e)
         {
+            var schedules = DbcManager.LoadFromCsv<ScheduleEntry>("Schedules.dbc");
+            if (LicenseManager.IsDemoMode() && !DemoLimits.CanAddSchedule(schedules.Count, false))
+            {
+                MessageBox.Show(
+                    LanguageManager.GetString("Demo.ScheduleLimitMessage", "Hai raggiunto il limite demo di 2 schedulazioni.\n\nAttiva la licenza completa per crearne altre."),
+                    LanguageManager.GetString("Archive.DemoLimitTitle", "Limite Demo Raggiunto"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
             var clocks = DbcManager.LoadFromCsv<ClockEntry>("Clocks.dbc");
 
             if (clocks.Count == 0)
