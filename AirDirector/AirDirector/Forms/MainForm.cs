@@ -61,8 +61,6 @@ namespace AirDirector.Forms
         private Button btnSelectClock;
         private Button btnReloadSchedules;
         private Button btnClearQueue;
-        private Panel logoPanel;
-        private PictureBox logoPictureBox;
 
         public MainForm()
         {
@@ -381,36 +379,6 @@ namespace AirDirector.Forms
             };
             this.Controls.Add(playerPanel);
 
-            logoPanel = new Panel
-            {
-                Name = "logoPanel",
-                Dock = DockStyle.Left,
-                Width = 0,
-                BackColor = AppTheme.BgDark,
-                Padding = new Padding(10),
-                Visible = false
-            };
-            logoPictureBox = new PictureBox
-            {
-                Name = "logoPictureBox",
-                Dock = DockStyle.Fill,
-                SizeMode = PictureBoxSizeMode.Zoom,
-                BackColor = AppTheme.BgDark
-            };
-            logoPanel.Controls.Add(logoPictureBox);
-
-            Panel playerHostPanel = new Panel
-            {
-                Name = "playerHostPanel",
-                Dock = DockStyle.Fill,
-                BackColor = AppTheme.BgDark
-            };
-            playerPanel.Controls.Add(playerHostPanel);
-            playerPanel.Controls.Add(logoPanel);
-
-            this.Resize += (s, e) => UpdateLogoPanelWidth();
-            LoadMainLogo();
-
             // ═══════════════════════════════════════════════════════
             // SCELTA PLAYER IN BASE ALLA MODALITÀ
             // ═══════════════════════════════════════════════════════
@@ -437,7 +405,7 @@ namespace AirDirector.Forms
                     playlistQueue.SetPlayerStopped(!args.IsPlaying && !args.IsPaused);
                 };
 
-                playerHostPanel.Controls.Add(playerControlVideo);
+                playerPanel.Controls.Add(playerControlVideo);
             }
             else
             {
@@ -462,62 +430,11 @@ namespace AirDirector.Forms
                     playlistQueue.SetPlayerStopped(!args.IsPlaying && !args.IsPaused);
                 };
 
-                playerHostPanel.Controls.Add(playerControl);
+                playerPanel.Controls.Add(playerControl);
             }
 
             CreateMenuBar();
             CreateStatusBar();
-        }
-
-        private void UpdateLogoPanelWidth()
-        {
-            if (logoPanel == null)
-                return;
-
-            if (!logoPanel.Visible)
-            {
-                logoPanel.Width = 0;
-                return;
-            }
-
-            logoPanel.Width = Math.Max(120, Math.Min(320, this.ClientSize.Width / 5));
-        }
-
-        private void LoadMainLogo()
-        {
-            if (logoPanel == null || logoPictureBox == null)
-                return;
-
-            string logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "logo.png");
-            if (!File.Exists(logoPath))
-            {
-                Console.WriteLine($"[MainForm] ℹ️ Logo non trovato: {logoPath} – verrà nascosto");
-                logoPictureBox.Image = null;
-                logoPanel.Visible = false;
-                logoPanel.Width = 0;
-                return;
-            }
-
-            try
-            {
-                Image? previousImage = logoPictureBox.Image;
-                logoPictureBox.Image = null;
-                previousImage?.Dispose();
-
-                using var fileStream = File.OpenRead(logoPath);
-                using var loaded = Image.FromStream(fileStream);
-                logoPictureBox.Image = new Bitmap(loaded);
-
-                logoPanel.Visible = true;
-                UpdateLogoPanelWidth();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[MainForm] ⚠️ Errore caricamento logo: {logoPath} - {ex.Message}");
-                logoPictureBox.Image = null;
-                logoPanel.Visible = false;
-                logoPanel.Width = 0;
-            }
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -664,11 +581,6 @@ namespace AirDirector.Forms
                 // Dispose del player attivo
                 playerControl?.Dispose();
                 playerControlVideo?.Dispose();
-                if (logoPictureBox?.Image != null)
-                {
-                    logoPictureBox.Image.Dispose();
-                    logoPictureBox.Image = null;
-                }
             }
             base.Dispose(disposing);
         }
