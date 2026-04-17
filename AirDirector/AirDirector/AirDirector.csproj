@@ -24,6 +24,12 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Resources\**\*.*" Condition="Exists('Resources')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <UsingTask TaskName="IncrementVersionTask" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
       <VersionFile ParameterType="System.String" Required="true" />
