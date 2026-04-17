@@ -208,8 +208,8 @@ namespace AirDirector.Forms
 
             Button btnSaveApply = new Button
             {
-                Text = "💾 " + LanguageManager.GetString("CGEditor.SaveApply", "Salva e Applica"),
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                Text = "" + LanguageManager.GetString("CGEditor.SaveApply", "Salva e Applica"),
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 Size = new Size(130, 45),
                 Location = new Point(btnX, tabTop),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -326,20 +326,20 @@ namespace AirDirector.Forms
 
             // Row 2: Delay, Duration, Margins
             AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.DelaySeconds", "Ritardo (s)") + ":", 10, y, 60, 50, 0, 30, _lowerThirdDelayStart, (v) => _lowerThirdDelayStart = v);
-            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.DurationSeconds", "Durata (s)") + ":", 140, y, 75, 50, 1, 60, _lowerThirdDuration, (v) => _lowerThirdDuration = v);
-            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.MarginX", "Margine X") + ":", 290, y, 60, 50, 0, 500, _lowerThirdMarginX, (v) => { _lowerThirdMarginX = v; _previewPanel.Invalidate(); });
-            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.MarginY", "Margine Y") + ":", 420, y, 60, 50, 0, 500, _lowerThirdMarginY, (v) => { _lowerThirdMarginY = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.DurationSeconds", "Durata (s)") + ":", 160, y, 75, 50, 1, 60, _lowerThirdDuration, (v) => _lowerThirdDuration = v);
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.MarginX", "Margine X") + ":", 320, y, 60, 50, 0, 500, _lowerThirdMarginX, (v) => { _lowerThirdMarginX = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.MarginY", "Margine Y") + ":", 460, y, 60, 50, 0, 500, _lowerThirdMarginY, (v) => { _lowerThirdMarginY = v; _previewPanel.Invalidate(); });
 
             y += 30;
 
             // Row 3: Font sizes and font family
             AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.TitleSize", "Dimensione Titolo") + ":", 10, y, 65, 50, 12, 72, _lowerThirdTitleFontSize, (v) => { _lowerThirdTitleFontSize = v; _previewPanel.Invalidate(); });
-            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.ArtistSize", "Dimensione Artista") + ":", 145, y, 65, 50, 12, 72, _lowerThirdArtistFontSize, (v) => { _lowerThirdArtistFontSize = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.ArtistSize", "Dimensione Artista") + ":", 200, y, 65, 50, 12, 72, _lowerThirdArtistFontSize, (v) => { _lowerThirdArtistFontSize = v; _previewPanel.Invalidate(); });
 
-            Label lblFont = new Label { Text = LanguageManager.GetString("CGEditor.Font", "Font") + ":", Location = new Point(290, y), AutoSize = true, ForeColor = Color.LightGray };
+            Label lblFont = new Label { Text = LanguageManager.GetString("CGEditor.Font", "Font") + ":", Location = new Point(420, y), AutoSize = true, ForeColor = Color.LightGray };
             tab.Controls.Add(lblFont);
 
-            int fontComboLeft = GetControlLeft(tab, lblFont.Text, 290, 35);
+            int fontComboLeft = GetControlLeft(tab, lblFont.Text, 420, 35);
             ComboBox cmbFont = new ComboBox
             {
                 Location = new Point(fontComboLeft, y - 3),
@@ -389,7 +389,7 @@ namespace AirDirector.Forms
             tab.Controls.Add(chkShowEnd);
 
             AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.SecondsBeforeEnd", "Sec. prima della fine") + ":", 200, y, 100, 50, 5, 60, _lowerThirdEndOffset, (v) => _lowerThirdEndOffset = v);
-            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.Duration", "Durata") + ":", 380, y, 55, 50, 1, 30, _lowerThirdEndDuration, (v) => _lowerThirdEndDuration = v);
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.Duration", "Durata") + ":", 440, y, 55, 50, 1, 30, _lowerThirdEndDuration, (v) => _lowerThirdEndDuration = v);
 
             _tabControl.TabPages.Add(tab);
         }
@@ -498,7 +498,7 @@ namespace AirDirector.Forms
             y += 35;
 
             // Row 2: Position, Size, Margin
-            AddLabelAndCombo(tab, LanguageManager.GetString("CGEditor.Position", "Posizione") + ":", 10, y, 55, 110,
+            AddLabelAndCombo(tab, LanguageManager.GetString("CGEditor.Position", "Posizione") + ":", 15, y, 55, 110,
                 new[] {
                     LanguageManager.GetString("CGEditor.TopLeft", "Alto Sinistra"),
                     LanguageManager.GetString("CGEditor.TopRight", "Alto Destra"),
@@ -508,8 +508,8 @@ namespace AirDirector.Forms
                 GetLogoPositionIndex(_logoPosition),
                 (idx) => { _logoPosition = GetLogoPositionName(idx); _previewPanel.Invalidate(); });
 
-            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.Size", "Dimensione") + ":", 200, y, 35, 60, 50, 400, _logoSize, (v) => { _logoSize = v; _previewPanel.Invalidate(); });
-            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.Margin", "Margine") + ":", 320, y, 50, 60, 0, 200, _logoMargin, (v) => { _logoMargin = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.Size", "Dimensione") + ":", 250, y, 35, 60, 50, 400, _logoSize, (v) => { _logoSize = v; _previewPanel.Invalidate(); });
+            AddLabelAndNumeric(tab, LanguageManager.GetString("CGEditor.Margin", "Margine") + ":", 420, y, 50, 60, 0, 200, _logoMargin, (v) => { _logoMargin = v; _previewPanel.Invalidate(); });
 
             y += 35;
 
@@ -689,12 +689,12 @@ namespace AirDirector.Forms
             {
                 Text = _spotLabelText,
                 Location = new Point(labelTextLeft, y - 3),
-                Size = new Size(150, 25)
+                Size = new Size(145, 25)
             };
             txtLabel.TextChanged += (s, e) => { _spotLabelText = txtLabel.Text; _previewPanel.Invalidate(); };
             tab.Controls.Add(txtLabel);
 
-            AddLabelAndCombo(tab, LanguageManager.GetString("CGEditor.Position", "Posizione") + ":", 260, y, 55, 100,
+            AddLabelAndCombo(tab, LanguageManager.GetString("CGEditor.Position", "Posizione") + ":", 265, y, 55, 100,
                 new[] {
                     LanguageManager.GetString("CGEditor.TopLeft", "Alto Sinistra"),
                     LanguageManager.GetString("CGEditor.TopCenter", "Alto Centro"),
