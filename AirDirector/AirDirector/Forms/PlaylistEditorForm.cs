@@ -9,7 +9,6 @@ using AirDirector.Models;
 using AirDirector.Services.Database;
 using AirDirector.Services.Localization;
 using AirDirector.Themes;
-using Newtonsoft.Json;
 
 namespace AirDirector.Forms
 {
@@ -28,7 +27,7 @@ namespace AirDirector.Forms
         private List<string> _clipCategories;
         private List<string> _clipGenres;
         private List<StreamingEntry> _streamingEntries;
-        private List<AdditionalLogo> _additionalLogos;
+        private List<CommandEntry> _commandEntries;
         private bool _isRadioTVMode;
 
         // ── Left panel controls ──────────────────────────────────────────────
@@ -77,10 +76,8 @@ namespace AirDirector.Forms
         private NumericUpDown _numRuleYearTo;
         private Label _lblRuleFoundTracks;
         private Button _btnAddRule;
-        private RadioButton _radLogoCmdShow;
-        private RadioButton _radLogoCmdHide;
-        private ComboBox _cmbRuleLogo;
-        private Button _btnInsertLogoCmd;
+        private ComboBox _cmbRuleCommand;
+        private Button _btnInsertCommand;
         private ComboBox _cmbPlaylistStreaming;
         private MaskedTextBox _txtPlaylistStreamDuration;
         private TextBox _txtPlaylistStreamingBuffer;
@@ -120,7 +117,7 @@ namespace AirDirector.Forms
             _clipCategories = new List<string>();
             _clipGenres = new List<string>();
             _streamingEntries = new List<StreamingEntry>();
-            _additionalLogos = new List<AdditionalLogo>();
+            _commandEntries = new List<CommandEntry>();
             _isRadioTVMode = ConfigurationControl.IsRadioTVMode();
 
             LoadAvailableData();
@@ -181,18 +178,8 @@ namespace AirDirector.Forms
             try { _streamingEntries = DbcManager.LoadFromCsv<StreamingEntry>("Streaming.dbc"); }
             catch { _streamingEntries = new List<StreamingEntry>(); }
 
-            try
-            {
-                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\AirDirector\CG", false))
-                {
-                    string json = key?.GetValue("AdditionalLogosJson", "[]")?.ToString() ?? "[]";
-                    _additionalLogos = JsonConvert.DeserializeObject<List<AdditionalLogo>>(json) ?? new List<AdditionalLogo>();
-                }
-            }
-            catch
-            {
-                _additionalLogos = new List<AdditionalLogo>();
-            }
+            try { _commandEntries = DbcManager.LoadFromCsv<CommandEntry>("Commands.dbc"); }
+            catch { _commandEntries = new List<CommandEntry>(); }
         }
 
         // ══════════════════════════════════════════════════════════════════
@@ -661,28 +648,33 @@ namespace AirDirector.Forms
             page.Controls.Add(_btnAddRule);
             y += 48;
 
-            // Logo commands (RadioTV only)
-            GroupBox grpLogoCmd = new GroupBox
+            GroupBox grpCommands = new GroupBox
             {
-                Text = LanguageManager.GetString("PlaylistEditor.InsertLogoCmd", "Inserisci Comando Logo"),
+                Text = LanguageManager.GetString("PlaylistEditor.InsertCommand", "Inserisci Comando"),
                 ForeColor = Color.White,
                 Left = 16,
                 Top = y,
                 Width = 620,
-                Height = 90,
-                Visible = _isRadioTVMode
+                Height = 90
             };
-            _radLogoCmdShow = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.LogoShowCmd", "Mostra Logo"), Left = 12, Top = 28, AutoSize = true, Checked = true, ForeColor = Color.White };
-            _radLogoCmdHide = new RadioButton { Text = LanguageManager.GetString("PlaylistEditor.LogoHideCmd", "Nascondi Logo"), Left = 140, Top = 28, AutoSize = true, ForeColor = Color.White };
-            _cmbRuleLogo = new ComboBox { Left = 260, Top = 25, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
-            foreach (var logo in _additionalLogos) _cmbRuleLogo.Items.Add(logo);
-            if (_cmbRuleLogo.Items.Count > 0) _cmbRuleLogo.SelectedIndex = 0;
-            _btnInsertLogoCmd = CreateButton(LanguageManager.GetString("PlaylistEditor.InsertLogoCmd", "Inserisci Comando Logo"), Color.FromArgb(33, 150, 83));
-            _btnInsertLogoCmd.Left = 490; _btnInsertLogoCmd.Top = 22; _btnInsertLogoCmd.Width = 120; _btnInsertLogoCmd.Height = 30;
-            _btnInsertLogoCmd.Click += BtnInsertLogoCmd_Click;
-            grpLogoCmd.Controls.AddRange(new Control[] { _radLogoCmdShow, _radLogoCmdHide, _cmbRuleLogo, _btnInsertLogoCmd });
-            page.Controls.Add(grpLogoCmd);
-            y += grpLogoCmd.Visible ? 100 : 0;
+            grpCommands.Controls.Add(new Label
+            {
+                Text = LanguageManager.GetString("PlaylistEditor.SelectCommand", "Comando:"),
+                Left = 12,
+                Top = 28,
+                Width = 80,
+                ForeColor = Color.White
+            });
+            _cmbRuleCommand = new ComboBox { Left = 100, Top = 24, Width = 380, DropDownStyle = ComboBoxStyle.DropDownList };
+            foreach (var command in _commandEntries.OrderBy(c => c.Name))
+                _cmbRuleCommand.Items.Add(command);
+            if (_cmbRuleCommand.Items.Count > 0) _cmbRuleCommand.SelectedIndex = 0;
+            _btnInsertCommand = CreateButton(LanguageManager.GetString("PlaylistEditor.InsertCommandBtn", "Inserisci Comando"), Color.FromArgb(33, 150, 83));
+            _btnInsertCommand.Left = 490; _btnInsertCommand.Top = 22; _btnInsertCommand.Width = 120; _btnInsertCommand.Height = 30;
+            _btnInsertCommand.Click += BtnInsertCommand_Click;
+            grpCommands.Controls.AddRange(new Control[] { _cmbRuleCommand, _btnInsertCommand });
+            page.Controls.Add(grpCommands);
+            y += grpCommands.Height + 10;
 
             GroupBox grpStreaming = new GroupBox
             {
@@ -835,9 +827,7 @@ namespace AirDirector.Forms
             if (_btnAddClip != null) _btnAddClip.Text = LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "+ Aggiungi");
             if (_btnAddRule != null) _btnAddRule.Text = LanguageManager.GetString("PlaylistEditor.AddRuleToPlaylist", "+ Aggiungi Regola");
             if (_btnDeletePlaylist != null) _btnDeletePlaylist.Text = LanguageManager.GetString("PlaylistEditor.DeletePlaylist", "Elimina");
-            if (_btnInsertLogoCmd != null) _btnInsertLogoCmd.Text = LanguageManager.GetString("PlaylistEditor.InsertLogoCmd", "Inserisci Comando Logo");
-            if (_radLogoCmdShow != null) _radLogoCmdShow.Text = LanguageManager.GetString("PlaylistEditor.LogoShowCmd", "Mostra Logo");
-            if (_radLogoCmdHide != null) _radLogoCmdHide.Text = LanguageManager.GetString("PlaylistEditor.LogoHideCmd", "Nascondi Logo");
+            if (_btnInsertCommand != null) _btnInsertCommand.Text = LanguageManager.GetString("PlaylistEditor.InsertCommandBtn", "Inserisci Comando");
             if (_btnInsertStreaming != null) _btnInsertStreaming.Text = LanguageManager.GetString("PlaylistEditor.InsertStreamingBtn", "Inserisci Streaming in Playlist");
             if (_btnInsertAudio != null) _btnInsertAudio.Text = LanguageManager.GetString("PlaylistEditor.InsertAudioBtn", "Inserisci Audio in Playlist");
             if (_chkRuleBufferVideo != null) _chkRuleBufferVideo.Text = LanguageManager.GetString("PlaylistEditor.AddBufferVideo", "Aggiungi File Buffer Video");
@@ -1589,17 +1579,27 @@ namespace AirDirector.Forms
             if (_btnBrowseRuleVideoMp4 != null) _btnBrowseRuleVideoMp4.Visible = showVideo;
         }
 
-        private void BtnInsertLogoCmd_Click(object sender, EventArgs e)
+        private void BtnInsertCommand_Click(object sender, EventArgs e)
         {
-            var selectedLogo = _cmbRuleLogo?.SelectedItem as AdditionalLogo;
-            if (selectedLogo == null)
+            var selectedCommand = _cmbRuleCommand?.SelectedItem as CommandEntry;
+            if (selectedCommand == null)
                 return;
+
+            AirPlaylistItemType type;
+            if (string.Equals(selectedCommand.Type, "LogoShow", StringComparison.OrdinalIgnoreCase))
+                type = AirPlaylistItemType.LogoShow;
+            else if (string.Equals(selectedCommand.Type, "LogoHide", StringComparison.OrdinalIgnoreCase))
+                type = AirPlaylistItemType.LogoHide;
+            else if (string.Equals(selectedCommand.Type, "UDP", StringComparison.OrdinalIgnoreCase))
+                type = AirPlaylistItemType.CommandUdp;
+            else
+                type = AirPlaylistItemType.CommandHttp;
 
             var item = new AirPlaylistItem
             {
-                Type = _radLogoCmdShow?.Checked == true ? AirPlaylistItemType.LogoShow : AirPlaylistItemType.LogoHide,
-                CommandValue = selectedLogo.ImagePath,
-                Title = Path.GetFileName(selectedLogo.ImagePath),
+                Type = type,
+                CommandValue = selectedCommand.CommandString ?? "",
+                Title = selectedCommand.Name ?? "",
                 DurationSeconds = 0
             };
 

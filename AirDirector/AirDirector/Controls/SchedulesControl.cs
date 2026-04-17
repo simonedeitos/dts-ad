@@ -242,6 +242,8 @@ namespace AirDirector.Controls
                          (schedule.Type == "PlayMiniPLS" || schedule.Type == "PlayPlaylist") ? "📋" :
                          schedule.Type == "TimeSignal" ? "⏰" :
                          schedule.Type == "URLStreaming" ? "🌐" :
+                         schedule.Type == "HTTP" ? "🌐" :
+                         schedule.Type == "UDP" ? "📶" :
                          schedule.Type == "LogoShow" ? "🟢" :
                          schedule.Type == "LogoHide" ? "🔴" : "📄";
 
@@ -260,6 +262,10 @@ namespace AirDirector.Controls
             {
                 var urlParts = schedule.ClockName?.Split('|');
                 target = urlParts?.Length > 0 ? urlParts[0] : "";
+            }
+            else if (schedule.Type == "HTTP" || schedule.Type == "UDP")
+            {
+                target = schedule.ClockName ?? "";
             }
             else if (schedule.Type == "LogoShow" || schedule.Type == "LogoHide")
             {

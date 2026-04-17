@@ -14,7 +14,9 @@ namespace AirDirector.Models
         URLStreaming,
         ExternalAudio,
         LogoShow,
-        LogoHide
+        LogoHide,
+        CommandHttp,
+        CommandUdp
     }
 
     /// <summary>
@@ -123,6 +125,10 @@ namespace AirDirector.Models
                     return $"Logo Show: {CommandValue}";
                 case AirPlaylistItemType.LogoHide:
                     return $"Logo Hide: {CommandValue}";
+                case AirPlaylistItemType.CommandHttp:
+                    return $"HTTP: {CommandValue}";
+                case AirPlaylistItemType.CommandUdp:
+                    return $"UDP: {CommandValue}";
                 default:
                     return string.Empty;
             }
@@ -143,6 +149,8 @@ namespace AirDirector.Models
                 case AirPlaylistItemType.ExternalAudio: return "🎵";
                 case AirPlaylistItemType.LogoShow: return "🟢";
                 case AirPlaylistItemType.LogoHide: return "🔴";
+                case AirPlaylistItemType.CommandHttp: return "🌐";
+                case AirPlaylistItemType.CommandUdp: return "📶";
                 default:                           return "❓";
             }
         }
