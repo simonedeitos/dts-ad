@@ -94,10 +94,12 @@ namespace AirDirector.Forms
         private TabControl _tabControl;
         private System.Windows.Forms.Timer _previewTimer;
         private ListView _lvAdditionalLogos;
+        private const int LabelToControlGap = 20;
+        private const int MaxDynamicLabelExtra = 140;
 
         // Preview state
-        private string _previewArtist = "Artist Name";
-        private string _previewTitle = "Track Title";
+        private string _previewArtist = LanguageManager.GetString("CGEditor.PreviewArtist", "Artist Name");
+        private string _previewTitle = LanguageManager.GetString("CGEditor.PreviewTitle", "Track Title");
         private float _previewAnimProgress = 1f;
         private float _previewProgressBar = 0.65f;
         private bool _previewShowPersistentInfo = true;
@@ -335,9 +337,10 @@ namespace AirDirector.Forms
             Label lblFont = new Label { Text = LanguageManager.GetString("CGEditor.Font", "Font") + ":", Location = new Point(290, y), AutoSize = true, ForeColor = Color.LightGray };
             tab.Controls.Add(lblFont);
 
+            int fontComboLeft = GetControlLeft(tab, lblFont.Text, 290, 35);
             ComboBox cmbFont = new ComboBox
             {
-                Location = new Point(330, y - 3),
+                Location = new Point(fontComboLeft, y - 3),
                 Size = new Size(150, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
@@ -512,9 +515,10 @@ namespace AirDirector.Forms
             Label lblOpacity = new Label { Text = LanguageManager.GetString("CGEditor.Opacity", "Opacità") + ":", Location = new Point(10, y + 5), AutoSize = true, ForeColor = Color.LightGray };
             tab.Controls.Add(lblOpacity);
 
+            int opacityTrackLeft = GetControlLeft(tab, lblOpacity.Text, 10, 55);
             TrackBar trkOpacity = new TrackBar
             {
-                Location = new Point(70, y),
+                Location = new Point(opacityTrackLeft, y),
                 Size = new Size(200, 30),
                 Minimum = 0,
                 Maximum = 100,
@@ -527,7 +531,7 @@ namespace AirDirector.Forms
             Label lblOpacityValue = new Label
             {
                 Text = $"{_logoOpacity}%",
-                Location = new Point(280, y + 5),
+                Location = new Point(opacityTrackLeft + 210, y + 5),
                 AutoSize = true,
                 ForeColor = Color.White
             };
@@ -678,10 +682,11 @@ namespace AirDirector.Forms
             Label lblText = new Label { Text = LanguageManager.GetString("CGEditor.LabelText", "Testo Etichetta") + ":", Location = new Point(10, y), AutoSize = true, ForeColor = Color.LightGray };
             tab.Controls.Add(lblText);
 
+            int labelTextLeft = GetControlLeft(tab, lblText.Text, 10, 85);
             TextBox txtLabel = new TextBox
             {
                 Text = _spotLabelText,
-                Location = new Point(80, y - 3),
+                Location = new Point(labelTextLeft, y - 3),
                 Size = new Size(150, 25)
             };
             txtLabel.TextChanged += (s, e) => { _spotLabelText = txtLabel.Text; _previewPanel.Invalidate(); };
@@ -773,9 +778,20 @@ namespace AirDirector.Forms
             };
             tab.Controls.Add(chkAdvTextDelayEnabled);
 
+            y += 30;
+
+            Label lblAdvTextDelay = new Label
+            {
+                Text = LanguageManager.GetString("CGEditor.AdvTextDelayMs", "Delay (ms):"),
+                Location = new Point(30, y),
+                AutoSize = true,
+                ForeColor = Color.LightGray
+            };
+            tab.Controls.Add(lblAdvTextDelay);
+
             NumericUpDown numAdvTextDelay = new NumericUpDown
             {
-                Location = new Point(410, y - 3),
+                Location = new Point(GetControlLeft(tab, lblAdvTextDelay.Text, 30, 70), y - 3),
                 Size = new Size(80, 25),
                 Minimum = 0,
                 Maximum = 60000,
@@ -784,15 +800,6 @@ namespace AirDirector.Forms
             };
             numAdvTextDelay.ValueChanged += (s, e) => _advTextDelay = (int)numAdvTextDelay.Value;
             tab.Controls.Add(numAdvTextDelay);
-
-            Label lblAdvTextDelay = new Label
-            {
-                Text = LanguageManager.GetString("CGEditor.AdvTextDelayMs", "Delay (ms):"),
-                Location = new Point(330, y),
-                AutoSize = true,
-                ForeColor = Color.LightGray
-            };
-            tab.Controls.Add(lblAdvTextDelay);
 
             chkAdvTextDelayEnabled.CheckedChanged += (s, e) =>
             {
@@ -883,7 +890,7 @@ namespace AirDirector.Forms
             {
                 var item = new ListViewItem(logo.Name ?? "");
                 item.SubItems.Add(logo.ImagePath ?? "");
-                item.SubItems.Add(logo.Position ?? "BottomLeft");
+                item.SubItems.Add(LocalizePositionName(logo.Position ?? "BottomLeft"));
                 item.SubItems.Add(logo.MarginX.ToString());
                 item.SubItems.Add(logo.MarginY.ToString());
                 item.SubItems.Add((logo.Scale > 0f ? logo.Scale : 1.0f).ToString("0.0#"));
@@ -958,7 +965,7 @@ namespace AirDirector.Forms
             {
                 using (System.Windows.Forms.OpenFileDialog ofd = new System.Windows.Forms.OpenFileDialog())
                 {
-                    ofd.Filter = "Images|*.png;*.jpg;*.jpeg";
+                    ofd.Filter = LanguageManager.GetString("CGEditor.ImagesFilter", "Images|*.png;*.jpg;*.jpeg");
                     ofd.Title = LanguageManager.GetString("CGEditor.AdditionalLogosSelectImage", "Select logo image");
                     if (ofd.ShowDialog() != DialogResult.OK)
                         return false;
@@ -986,9 +993,6 @@ namespace AirDirector.Forms
         // ═══════════════════════════════════════════════════════════
         private int GetControlLeft(TabPage tab, string labelText, int x, int baseLabelWidth)
         {
-            const int labelToControlGap = 12;
-            const int maxDynamicExtra = 80;
-
             int measuredLabelWidth = 0;
             if (!string.IsNullOrEmpty(labelText))
             {
@@ -996,8 +1000,8 @@ namespace AirDirector.Forms
             }
 
             int dynamicExtra = Math.Max(0, measuredLabelWidth - baseLabelWidth);
-            dynamicExtra = Math.Min(maxDynamicExtra, dynamicExtra);
-            return x + baseLabelWidth + dynamicExtra + labelToControlGap;
+            dynamicExtra = Math.Min(MaxDynamicLabelExtra, dynamicExtra);
+            return x + baseLabelWidth + dynamicExtra + LabelToControlGap;
         }
 
         private void AddLabelAndCombo(TabPage tab, string labelText, int x, int y, int labelWidth, int comboWidth, string[] items, int selectedIndex, Action<int> onChange)
@@ -1168,7 +1172,7 @@ namespace AirDirector.Forms
             using (SolidBrush tb = new SolidBrush(Color.FromArgb((int)(_logoOpacity * 2.55f), 50, 50, 50)))
             {
                 StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                g.DrawString("LOGO", f, tb, new RectangleF(x, y, logoW, logoH), sf);
+                g.DrawString(LanguageManager.GetString("CGEditor.LogoPlaceholder", "LOGO"), f, tb, new RectangleF(x, y, logoW, logoH), sf);
             }
         }
 
@@ -1695,12 +1699,29 @@ namespace AirDirector.Forms
             }
         }
 
+        private string LocalizePositionName(string pos)
+        {
+            return pos switch
+            {
+                "TopLeft" => LanguageManager.GetString("CGEditor.TopLeft", "Top Left"),
+                "TopCenter" => LanguageManager.GetString("CGEditor.TopCenter", "Top Center"),
+                "TopRight" => LanguageManager.GetString("CGEditor.TopRight", "Top Right"),
+                "MiddleLeft" => LanguageManager.GetString("CGEditor.MiddleLeft", "Middle Left"),
+                "MiddleCenter" => LanguageManager.GetString("CGEditor.MiddleCenter", "Middle Center"),
+                "MiddleRight" => LanguageManager.GetString("CGEditor.MiddleRight", "Middle Right"),
+                "BottomLeft" => LanguageManager.GetString("CGEditor.BottomLeft", "Bottom Left"),
+                "BottomCenter" => LanguageManager.GetString("CGEditor.BottomCenter", "Bottom Center"),
+                "BottomRight" => LanguageManager.GetString("CGEditor.BottomRight", "Bottom Right"),
+                _ => pos
+            };
+        }
+
         private void BtnBrowseLogo_Click(object sender, EventArgs e)
         {
             using (System.Windows.Forms.OpenFileDialog ofd = new System.Windows.Forms.OpenFileDialog())
             {
-                ofd.Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif";
-                ofd.Title = "Select Logo";
+                ofd.Filter = LanguageManager.GetString("CGEditor.ImagesFilterAll", "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif");
+                ofd.Title = LanguageManager.GetString("CGEditor.SelectLogoTitle", "Select Logo");
 
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
@@ -1905,12 +1926,27 @@ namespace AirDirector.Forms
 
     internal class AdditionalLogoEditForm : Form
     {
+        private struct PositionOption
+        {
+            public string Key { get; }
+            public string Label { get; }
+
+            public PositionOption(string key, string label)
+            {
+                Key = key;
+                Label = label;
+            }
+
+            public override string ToString() => Label;
+        }
+
         private readonly TextBox _txtName;
         private readonly TextBox _txtPath;
         private readonly ComboBox _cmbPosition;
         private readonly NumericUpDown _numMarginX;
         private readonly NumericUpDown _numMarginY;
         private readonly NumericUpDown _numScale;
+        private readonly List<PositionOption> _positionOptions;
         public AdditionalLogo Logo { get; }
 
         public AdditionalLogoEditForm(AdditionalLogo logo)
@@ -1934,7 +1970,7 @@ namespace AirDirector.Forms
             {
                 using (System.Windows.Forms.OpenFileDialog ofd = new System.Windows.Forms.OpenFileDialog())
                 {
-                    ofd.Filter = LanguageManager.GetString("CGEditor.ImagesFilter", "Immagini|*.png;*.jpg;*.jpeg");
+                    ofd.Filter = LanguageManager.GetString("CGEditor.ImagesFilter", "Images|*.png;*.jpg;*.jpeg");
                     if (ofd.ShowDialog(this) == DialogResult.OK)
                         _txtPath.Text = ofd.FileName;
                 }
@@ -1950,13 +1986,22 @@ namespace AirDirector.Forms
                 Width = 170,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            _cmbPosition.Items.AddRange(new object[]
+            _positionOptions = new List<PositionOption>
             {
-                "TopLeft","TopCenter","TopRight",
-                "MiddleLeft","MiddleCenter","MiddleRight",
-                "BottomLeft","BottomCenter","BottomRight"
-            });
-            _cmbPosition.SelectedItem = _cmbPosition.Items.Contains(Logo.Position) ? Logo.Position : "BottomLeft";
+                new PositionOption("TopLeft", LanguageManager.GetString("CGEditor.TopLeft", "Top Left")),
+                new PositionOption("TopCenter", LanguageManager.GetString("CGEditor.TopCenter", "Top Center")),
+                new PositionOption("TopRight", LanguageManager.GetString("CGEditor.TopRight", "Top Right")),
+                new PositionOption("MiddleLeft", LanguageManager.GetString("CGEditor.MiddleLeft", "Middle Left")),
+                new PositionOption("MiddleCenter", LanguageManager.GetString("CGEditor.MiddleCenter", "Middle Center")),
+                new PositionOption("MiddleRight", LanguageManager.GetString("CGEditor.MiddleRight", "Middle Right")),
+                new PositionOption("BottomLeft", LanguageManager.GetString("CGEditor.BottomLeft", "Bottom Left")),
+                new PositionOption("BottomCenter", LanguageManager.GetString("CGEditor.BottomCenter", "Bottom Center")),
+                new PositionOption("BottomRight", LanguageManager.GetString("CGEditor.BottomRight", "Bottom Right"))
+            };
+            foreach (var option in _positionOptions)
+                _cmbPosition.Items.Add(option);
+            int selectedPosition = _positionOptions.FindIndex(p => p.Key == (Logo.Position ?? "BottomLeft"));
+            _cmbPosition.SelectedIndex = selectedPosition >= 0 ? selectedPosition : _positionOptions.FindIndex(p => p.Key == "BottomLeft");
             Controls.Add(_cmbPosition);
 
             Controls.Add(new Label { Text = LanguageManager.GetString("CGEditor.AdditionalLogosMarginX", "Margin X") + ":", Left = 12, Top = 153, Width = 70 });
@@ -1992,7 +2037,7 @@ namespace AirDirector.Forms
 
                 Logo.Name = _txtName.Text.Trim();
                 Logo.ImagePath = _txtPath.Text.Trim();
-                Logo.Position = _cmbPosition.SelectedItem?.ToString() ?? "BottomLeft";
+                Logo.Position = _cmbPosition.SelectedItem is PositionOption selectedPositionOption ? selectedPositionOption.Key : "BottomLeft";
                 Logo.MarginX = (int)_numMarginX.Value;
                 Logo.MarginY = (int)_numMarginY.Value;
                 Logo.Scale = (float)_numScale.Value / 100f;
