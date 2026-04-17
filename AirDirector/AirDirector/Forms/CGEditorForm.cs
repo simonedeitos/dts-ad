@@ -589,7 +589,7 @@ namespace AirDirector.Forms
                 Size = new Size(80, 25),
                 Minimum = 0,
                 Maximum = Math.Max(0, _videoWidth),
-                Value = Math.Max(0, Math.Min(Math.Max(0, _videoWidth), _clockPosX))
+                Value = Math.Clamp(_clockPosX, 0, Math.Max(0, _videoWidth))
             };
             numClockX.ValueChanged += (s, e) => { _clockPosX = (int)numClockX.Value; _previewPanel.Invalidate(); };
             tab.Controls.Add(numClockX);
@@ -609,7 +609,7 @@ namespace AirDirector.Forms
                 Size = new Size(80, 25),
                 Minimum = 0,
                 Maximum = Math.Max(0, _videoHeight),
-                Value = Math.Max(0, Math.Min(Math.Max(0, _videoHeight), _clockPosY))
+                Value = Math.Clamp(_clockPosY, 0, Math.Max(0, _videoHeight))
             };
             numClockY.ValueChanged += (s, e) => { _clockPosY = (int)numClockY.Value; _previewPanel.Invalidate(); };
             tab.Controls.Add(numClockY);
