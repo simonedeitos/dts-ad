@@ -13,6 +13,8 @@ namespace AirDirector.Forms
 {
     public class CommandManagerForm : Form
     {
+        private const string LogoShowType = "LogoShow";
+        private const string LogoHideType = "LogoHide";
         private readonly TabControl _tabs;
         private readonly DataGridView _gridHttp;
         private readonly DataGridView _gridUdp;
@@ -112,7 +114,7 @@ namespace AirDirector.Forms
             return "Logo";
         }
 
-        private static bool IsLogoType(string type) => string.Equals(type, "LogoShow", StringComparison.OrdinalIgnoreCase) || string.Equals(type, "LogoHide", StringComparison.OrdinalIgnoreCase);
+        private static bool IsLogoType(string type) => string.Equals(type, LogoShowType, StringComparison.OrdinalIgnoreCase) || string.Equals(type, LogoHideType, StringComparison.OrdinalIgnoreCase);
 
         private void ReloadGrids()
         {
@@ -154,7 +156,7 @@ namespace AirDirector.Forms
             if (type == "Logo" && !_isRadioTVMode)
                 return;
 
-            var entry = new CommandEntry { Type = type == "Logo" ? "LogoShow" : type };
+            var entry = new CommandEntry { Type = type == "Logo" ? LogoShowType : type };
             if (!EditEntry(entry, type))
                 return;
 
@@ -230,6 +232,8 @@ namespace AirDirector.Forms
 
     internal class CommandEntryEditForm : Form
     {
+        private const string LogoShowType = "LogoShow";
+        private const string LogoHideType = "LogoHide";
         private readonly CommandEntry _entry;
         private readonly string _type;
         private readonly TextBox _txtName;
@@ -257,8 +261,8 @@ namespace AirDirector.Forms
 
             if (_type == "Logo" && isRadioTVMode)
             {
-                _radLogoShow = new RadioButton { Left = 150, Top = 56, Width = 120, Text = LanguageManager.GetString("CommandManager.LogoShow", "Mostra Logo"), Checked = !string.Equals(_entry.Type, "LogoHide", StringComparison.OrdinalIgnoreCase) };
-                _radLogoHide = new RadioButton { Left = 280, Top = 56, Width = 140, Text = LanguageManager.GetString("CommandManager.LogoHide", "Nascondi Logo"), Checked = string.Equals(_entry.Type, "LogoHide", StringComparison.OrdinalIgnoreCase) };
+                _radLogoShow = new RadioButton { Left = 150, Top = 56, Width = 120, Text = LanguageManager.GetString("CommandManager.LogoShow", "Mostra Logo"), Checked = !string.Equals(_entry.Type, LogoHideType, StringComparison.OrdinalIgnoreCase) };
+                _radLogoHide = new RadioButton { Left = 280, Top = 56, Width = 140, Text = LanguageManager.GetString("CommandManager.LogoHide", "Nascondi Logo"), Checked = string.Equals(_entry.Type, LogoHideType, StringComparison.OrdinalIgnoreCase) };
                 Controls.Add(_radLogoShow);
                 Controls.Add(_radLogoHide);
 
@@ -330,7 +334,7 @@ namespace AirDirector.Forms
                     return;
                 }
 
-                _entry.Type = _radLogoHide?.Checked == true ? "LogoHide" : "LogoShow";
+                _entry.Type = _radLogoHide?.Checked == true ? LogoHideType : LogoShowType;
                 _entry.CommandString = selectedLogo.ImagePath ?? "";
             }
             else

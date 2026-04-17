@@ -23,6 +23,7 @@ namespace AirDirector.Forms
 {
     public partial class MainForm : Form
     {
+        private static readonly HttpClient _commandHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         private MenuStrip menuStrip;
         private StatusStrip statusStrip;
         private ToolStripStatusLabel lblStatus;
@@ -986,10 +987,7 @@ namespace AirDirector.Forms
                     url = "http://" + url;
                 }
 
-                using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) })
-                {
-                    await client.GetAsync(url).ConfigureAwait(false);
-                }
+                await _commandHttpClient.GetAsync(url).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
