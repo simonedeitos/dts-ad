@@ -1017,7 +1017,7 @@ namespace AirDirector.Forms
                 if (!int.TryParse(endpointParts[1].Trim(), out int port))
                     return;
 
-                byte[] data = Encoding.UTF8.GetBytes(payload ?? "");
+                byte[] data = Encoding.UTF8.GetBytes(payload);
                 using (var udp = new UdpClient())
                 {
                     udp.Send(data, data.Length, host, port);

@@ -73,6 +73,8 @@ namespace AirDirector.Controls
 
 		// ✅ Tracking clip recenti per rotazione
 		private readonly HashSet<int> _recentClipIds = new HashSet<int>();
+        private int _currentArtistSeparationHours = 2;
+        private int _currentTrackSeparationHours = 3;
 
 		public event EventHandler<int> QueueReady;
 		public event EventHandler<int> QueueCountChanged;
@@ -1746,8 +1748,10 @@ namespace AirDirector.Controls
                 Log($"╔════════════════════════════════════════════════════════════╗");
                 Log($"║  🎼 GENERAZIONE PLAYLIST DA CLOCK: {clockName,-30} ║");
                 Log($"╚════════════════════════════════════════════════════════════╝");
-                int artistSeparationHours = ConfigurationControl.GetArtistSeparation();
-                int hourlySeparationHours = ConfigurationControl.GetHourlySeparation();
+                _currentArtistSeparationHours = ConfigurationControl.GetArtistSeparation();
+                _currentTrackSeparationHours = ConfigurationControl.GetHourlySeparation();
+                int artistSeparationHours = _currentArtistSeparationHours;
+                int hourlySeparationHours = _currentTrackSeparationHours;
                 Log($"[GenerateClock] 🔄 Regole separazione correnti: artista={artistSeparationHours}h, brano={hourlySeparationHours}h");
 
                 _queueSnapshotAtCreation.Clear();
@@ -2274,8 +2278,8 @@ namespace AirDirector.Controls
 
             try
             {
-                int artistSeparationHours = ConfigurationControl.GetArtistSeparation();
-                int hourlySeparationHours = ConfigurationControl.GetHourlySeparation();
+                int artistSeparationHours = _currentArtistSeparationHours > 0 ? _currentArtistSeparationHours : ConfigurationControl.GetArtistSeparation();
+                int hourlySeparationHours = _currentTrackSeparationHours > 0 ? _currentTrackSeparationHours : ConfigurationControl.GetHourlySeparation();
 
                 DateTime now = DateTime.Now;
                 DateTime limitArtist = now.AddHours(-artistSeparationHours);
@@ -2371,8 +2375,8 @@ namespace AirDirector.Controls
 		{
 			try
 			{
-				int artistSeparationHours = ConfigurationControl.GetArtistSeparation();
-				int hourlySeparationHours = ConfigurationControl.GetHourlySeparation();
+				int artistSeparationHours = _currentArtistSeparationHours > 0 ? _currentArtistSeparationHours : ConfigurationControl.GetArtistSeparation();
+				int hourlySeparationHours = _currentTrackSeparationHours > 0 ? _currentTrackSeparationHours : ConfigurationControl.GetHourlySeparation();
 
 				DateTime now = DateTime.Now;
 				DateTime limitArtist = now.AddHours(-artistSeparationHours);
@@ -2593,8 +2597,8 @@ namespace AirDirector.Controls
 					return null;
 
 				DateTime now = DateTime.Now;
-				int artistSeparationHours = ConfigurationControl.GetArtistSeparation();
-				int hourlySeparationHours = ConfigurationControl.GetHourlySeparation();
+				int artistSeparationHours = _currentArtistSeparationHours > 0 ? _currentArtistSeparationHours : ConfigurationControl.GetArtistSeparation();
+				int hourlySeparationHours = _currentTrackSeparationHours > 0 ? _currentTrackSeparationHours : ConfigurationControl.GetHourlySeparation();
 				DateTime limitArtist = now.AddHours(-artistSeparationHours);
 				DateTime limitTrack = now.AddHours(-hourlySeparationHours);
 
