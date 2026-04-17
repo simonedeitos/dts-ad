@@ -501,10 +501,12 @@ namespace AirDirector.Forms
             try
             {
                 Image? previousImage = logoPictureBox.Image;
-                using var ms = new MemoryStream(File.ReadAllBytes(logoPath));
-                using var loaded = Image.FromStream(ms);
-                logoPictureBox.Image = new Bitmap(loaded);
+                logoPictureBox.Image = null;
                 previousImage?.Dispose();
+
+                using var fileStream = File.OpenRead(logoPath);
+                using var loaded = Image.FromStream(fileStream);
+                logoPictureBox.Image = new Bitmap(loaded);
 
                 logoPanel.Visible = true;
                 UpdateLogoPanelWidth();
