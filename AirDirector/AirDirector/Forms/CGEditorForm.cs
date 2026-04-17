@@ -98,8 +98,8 @@ namespace AirDirector.Forms
         private const int MaxDynamicLabelExtra = 140;
 
         // Preview state
-        private string _previewArtist = LanguageManager.GetString("CGEditor.PreviewArtist", "Artist Name");
-        private string _previewTitle = LanguageManager.GetString("CGEditor.PreviewTitle", "Track Title");
+        private string _previewArtist = string.Empty;
+        private string _previewTitle = string.Empty;
         private float _previewAnimProgress = 1f;
         private float _previewProgressBar = 0.65f;
         private bool _previewShowPersistentInfo = true;
@@ -114,6 +114,8 @@ namespace AirDirector.Forms
         {
             LoadVideoResolution();
             LoadSettings();
+            _previewArtist = LanguageManager.GetString("CGEditor.PreviewArtist", "Artist Name");
+            _previewTitle = LanguageManager.GetString("CGEditor.PreviewTitle", "Track Title");
             InitializeComponent();
             StartPreviewTimer();
         }
