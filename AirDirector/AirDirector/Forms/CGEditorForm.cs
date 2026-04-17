@@ -68,6 +68,8 @@ namespace AirDirector.Forms
         private string _clockFontFamily = "Segoe UI";
         private int _clockFontSize = 18;
         private bool _clockBgEnabled = true;
+        private int _clockPosX = 1700;
+        private int _clockPosY = 20;
 
         // ═══════════════════════════════════════════════════════════
         // SPOT/ADV LABEL SETTINGS
@@ -569,6 +571,59 @@ namespace AirDirector.Forms
             };
             chkUnderLogo.CheckedChanged += (s, e) => { _clockUnderLogo = chkUnderLogo.Checked; _previewPanel.Invalidate(); };
             tab.Controls.Add(chkUnderLogo);
+
+            y += 35;
+
+            Label lblClockX = new Label
+            {
+                Text = LanguageManager.GetString("CGEditor.ClockPositionX", "X") + ":",
+                Location = new Point(10, y),
+                AutoSize = true,
+                ForeColor = Color.LightGray
+            };
+            tab.Controls.Add(lblClockX);
+
+            NumericUpDown numClockX = new NumericUpDown
+            {
+                Location = new Point(GetControlLeft(tab, lblClockX.Text, 10, 15), y - 3),
+                Size = new Size(80, 25),
+                Minimum = 0,
+                Maximum = Math.Max(0, _videoWidth),
+                Value = Math.Clamp(_clockPosX, 0, Math.Max(0, _videoWidth))
+            };
+            numClockX.ValueChanged += (s, e) => { _clockPosX = (int)numClockX.Value; _previewPanel.Invalidate(); };
+            tab.Controls.Add(numClockX);
+
+            Label lblClockY = new Label
+            {
+                Text = LanguageManager.GetString("CGEditor.ClockPositionY", "Y") + ":",
+                Location = new Point(160, y),
+                AutoSize = true,
+                ForeColor = Color.LightGray
+            };
+            tab.Controls.Add(lblClockY);
+
+            NumericUpDown numClockY = new NumericUpDown
+            {
+                Location = new Point(GetControlLeft(tab, lblClockY.Text, 160, 15), y - 3),
+                Size = new Size(80, 25),
+                Minimum = 0,
+                Maximum = Math.Max(0, _videoHeight),
+                Value = Math.Clamp(_clockPosY, 0, Math.Max(0, _videoHeight))
+            };
+            numClockY.ValueChanged += (s, e) => { _clockPosY = (int)numClockY.Value; _previewPanel.Invalidate(); };
+            tab.Controls.Add(numClockY);
+
+            Action updateClockManualPositionVisibility = () =>
+            {
+                bool showManualPosition = !chkUnderLogo.Checked;
+                lblClockX.Visible = showManualPosition;
+                numClockX.Visible = showManualPosition;
+                lblClockY.Visible = showManualPosition;
+                numClockY.Visible = showManualPosition;
+            };
+            chkUnderLogo.CheckedChanged += (s, e) => updateClockManualPositionVisibility();
+            updateClockManualPositionVisibility();
 
             y += 35;
 
@@ -1198,8 +1253,10 @@ namespace AirDirector.Forms
                 }
                 else
                 {
-                    x = w - (int)size.Width - 20;
-                    y = 20;
+                    x = (int)(_clockPosX * scale);
+                    y = (int)(_clockPosY * scale);
+                    x = Math.Max(0, Math.Min(w - (int)size.Width, x));
+                    y = Math.Max(0, Math.Min(h - (int)size.Height, y));
                 }
 
                 if (_clockBgEnabled)
@@ -1713,6 +1770,8 @@ namespace AirDirector.Forms
                     _clockBgColor = Color.FromArgb(GetRegInt(key, "ClockBgColor", Color.FromArgb(150, 0, 0, 0).ToArgb()));
                     _clockFontSize = GetRegInt(key, "ClockFontSize", 18);
                     _clockBgEnabled = GetRegBool(key, "ClockBgEnabled", true);
+                    _clockPosX = GetRegInt(key, "ClockPosX", Math.Max(0, _videoWidth - 200));
+                    _clockPosY = GetRegInt(key, "ClockPosY", 20);
 
                     _spotLabelEnabled = GetRegBool(key, "SpotLabelEnabled", true);
                     _spotLabelText = GetRegString(key, "SpotLabelText", LanguageManager.GetString("CGEditor.DefaultAdvText", "PUBBLICITÀ"));
@@ -1782,6 +1841,8 @@ namespace AirDirector.Forms
                     key.SetValue("ClockBgColor", _clockBgColor.ToArgb());
                     key.SetValue("ClockFontSize", _clockFontSize);
                     key.SetValue("ClockBgEnabled", _clockBgEnabled ? 1 : 0);
+                    key.SetValue("ClockPosX", _clockPosX);
+                    key.SetValue("ClockPosY", _clockPosY);
 
                     key.SetValue("SpotLabelEnabled", _spotLabelEnabled ? 1 : 0);
                     key.SetValue("SpotLabelText", _spotLabelText ?? LanguageManager.GetString("CGEditor.DefaultAdvText", "PUBBLICITÀ"));

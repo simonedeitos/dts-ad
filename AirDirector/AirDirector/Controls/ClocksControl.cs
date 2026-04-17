@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using System.Collections.Generic;
 using System.Linq;
 using AirDirector.Services.Database;
+using AirDirector.Services.Licensing;
 using AirDirector.Services.Localization;
 using AirDirector.Forms;
 using AirDirector.Themes;
@@ -147,6 +148,17 @@ namespace AirDirector.Controls
         private void BtnNew_Click(object sender, EventArgs e)
         {
             Console.WriteLine("[ClocksControl] 🆕 Nuovo Clock cliccato");
+            var clocks = DbcManager.LoadFromCsv<ClockEntry>("Clocks.dbc");
+            if (LicenseManager.IsDemoMode() && !DemoLimits.CanAddClock(clocks.Count, false))
+            {
+                MessageBox.Show(
+                    LanguageManager.GetString("Demo.ClockLimitMessage", "Hai raggiunto il limite demo di 2 clock.\n\nAttiva la licenza completa per crearne altri."),
+                    LanguageManager.GetString("Archive.DemoLimitTitle", "Limite Demo Raggiunto"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
             ClockEditorForm editorForm = new ClockEditorForm(null);
             if (editorForm.ShowDialog() == DialogResult.OK)
             {
