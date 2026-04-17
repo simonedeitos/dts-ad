@@ -76,6 +76,8 @@ namespace AirDirector.Forms
         private NumericUpDown _numRuleYearTo;
         private Label _lblRuleFoundTracks;
         private Button _btnAddRule;
+        private GroupBox _grpRuleCommands;
+        private Label _lblRuleCommandSelect;
         private ComboBox _cmbRuleCommand;
         private Button _btnInsertCommand;
         private ComboBox _cmbPlaylistStreaming;
@@ -648,7 +650,7 @@ namespace AirDirector.Forms
             page.Controls.Add(_btnAddRule);
             y += 48;
 
-            GroupBox grpCommands = new GroupBox
+            _grpRuleCommands = new GroupBox
             {
                 Text = LanguageManager.GetString("PlaylistEditor.InsertCommand", "Inserisci Comando"),
                 ForeColor = Color.White,
@@ -657,24 +659,28 @@ namespace AirDirector.Forms
                 Width = 620,
                 Height = 90
             };
-            grpCommands.Controls.Add(new Label
+            _lblRuleCommandSelect = new Label
             {
                 Text = LanguageManager.GetString("PlaylistEditor.SelectCommand", "Comando:"),
                 Left = 12,
                 Top = 28,
-                Width = 80,
+                AutoSize = true,
                 ForeColor = Color.White
-            });
-            _cmbRuleCommand = new ComboBox { Left = 100, Top = 24, Width = 380, DropDownStyle = ComboBoxStyle.DropDownList };
+            };
+            _grpRuleCommands.Controls.Add(_lblRuleCommandSelect);
+
+            int commandComboLeft = Math.Max(120, _lblRuleCommandSelect.Right + 12);
+            int commandComboWidth = Math.Max(260, _grpRuleCommands.Width - commandComboLeft - 140);
+            _cmbRuleCommand = new ComboBox { Left = commandComboLeft, Top = 24, Width = commandComboWidth, DropDownStyle = ComboBoxStyle.DropDownList };
             foreach (var command in _commandEntries.OrderBy(c => c.Name))
                 _cmbRuleCommand.Items.Add(command);
             if (_cmbRuleCommand.Items.Count > 0) _cmbRuleCommand.SelectedIndex = 0;
             _btnInsertCommand = CreateButton(LanguageManager.GetString("PlaylistEditor.InsertCommandBtn", "Inserisci Comando"), Color.FromArgb(33, 150, 83));
-            _btnInsertCommand.Left = 490; _btnInsertCommand.Top = 22; _btnInsertCommand.Width = 120; _btnInsertCommand.Height = 30;
+            _btnInsertCommand.Left = _grpRuleCommands.Width - 130; _btnInsertCommand.Top = 22; _btnInsertCommand.Width = 120; _btnInsertCommand.Height = 30;
             _btnInsertCommand.Click += BtnInsertCommand_Click;
-            grpCommands.Controls.AddRange(new Control[] { _cmbRuleCommand, _btnInsertCommand });
-            page.Controls.Add(grpCommands);
-            y += grpCommands.Height + 10;
+            _grpRuleCommands.Controls.AddRange(new Control[] { _cmbRuleCommand, _btnInsertCommand });
+            page.Controls.Add(_grpRuleCommands);
+            y += _grpRuleCommands.Height + 10;
 
             GroupBox grpStreaming = new GroupBox
             {
@@ -827,6 +833,16 @@ namespace AirDirector.Forms
             if (_btnAddClip != null) _btnAddClip.Text = LanguageManager.GetString("PlaylistEditor.AddToPlaylist", "+ Aggiungi");
             if (_btnAddRule != null) _btnAddRule.Text = LanguageManager.GetString("PlaylistEditor.AddRuleToPlaylist", "+ Aggiungi Regola");
             if (_btnDeletePlaylist != null) _btnDeletePlaylist.Text = LanguageManager.GetString("PlaylistEditor.DeletePlaylist", "Elimina");
+            if (_grpRuleCommands != null) _grpRuleCommands.Text = LanguageManager.GetString("PlaylistEditor.InsertCommand", "Inserisci Comando");
+            if (_lblRuleCommandSelect != null) _lblRuleCommandSelect.Text = LanguageManager.GetString("PlaylistEditor.SelectCommand", "Comando:");
+            if (_cmbRuleCommand != null && _btnInsertCommand != null && _grpRuleCommands != null && _lblRuleCommandSelect != null)
+            {
+                int commandComboLeft = Math.Max(120, _lblRuleCommandSelect.Right + 12);
+                int commandComboWidth = Math.Max(260, _grpRuleCommands.Width - commandComboLeft - 140);
+                _cmbRuleCommand.Left = commandComboLeft;
+                _cmbRuleCommand.Width = commandComboWidth;
+                _btnInsertCommand.Left = _grpRuleCommands.Width - 130;
+            }
             if (_btnInsertCommand != null) _btnInsertCommand.Text = LanguageManager.GetString("PlaylistEditor.InsertCommandBtn", "Inserisci Comando");
             if (_btnInsertStreaming != null) _btnInsertStreaming.Text = LanguageManager.GetString("PlaylistEditor.InsertStreamingBtn", "Inserisci Streaming in Playlist");
             if (_btnInsertAudio != null) _btnInsertAudio.Text = LanguageManager.GetString("PlaylistEditor.InsertAudioBtn", "Inserisci Audio in Playlist");

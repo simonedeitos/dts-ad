@@ -106,6 +106,13 @@ namespace AirDirector.Forms
 
             if (_lblCommandSelect != null)
                 _lblCommandSelect.Text = LanguageManager.GetString("ScheduleEditor.SelectCommand", "Comando:");
+            if (_lblCommandSelect != null && _cmbCommandSelect != null)
+            {
+                _lblCommandSelect.AutoSize = true;
+                int commandComboLeft = Math.Max(445, _lblCommandSelect.Right + 12);
+                _cmbCommandSelect.Left = commandComboLeft;
+                _cmbCommandSelect.Width = Math.Max(120, grpAction.ClientSize.Width - commandComboLeft - 20);
+            }
 
             if (lblStreamDuration != null)
                 lblStreamDuration.Text = LanguageManager.GetString("ScheduleEditor.StreamDuration", "Durata:");
@@ -492,7 +499,7 @@ namespace AirDirector.Forms
             if ((_radCommand?.Checked == true) && (_cmbCommandSelect?.SelectedItem == null))
             {
                 MessageBox.Show(
-                    LanguageManager.GetString("ScheduleEditor.SelectCommand", "Comando:"),
+                    LanguageManager.GetString("ScheduleEditor.ErrorNoCommand", "❌ Devi selezionare un comando"),
                     LanguageManager.GetString("Common.Error", "Errore"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -630,7 +637,7 @@ namespace AirDirector.Forms
             {
                 Name = "lblCommandSelect",
                 Location = new Point(360, 117),
-                Size = new Size(80, 20),
+                AutoSize = true,
                 ForeColor = Color.Black
             };
             grpAction.Controls.Add(_lblCommandSelect);
