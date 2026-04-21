@@ -45,7 +45,7 @@ namespace AirDirector.Controls
         private const int AUDIO_DELAY_MS = 40;
         private const int AUDIO_DELAY_SAMPLES = AUDIO_DELAY_MS * AUDIO_SAMPLE_RATE / 1000 * AUDIO_CHANNELS;
         private const float PROGRAM_PIP_SCALE = 0.75f;
-        private const int STREAM_ACTIVATE_TIMEOUT_MS = 10000;
+        private const int STREAM_ACTIVATE_TIMEOUT_MS = 15000;
         private const int MIN_VALID_STREAM_DURATION_MS = 100;
 
         private sealed class AudioDelayLine
@@ -119,10 +119,11 @@ namespace AirDirector.Controls
             public volatile int SessionId, StartPointMs;
             public readonly System.Diagnostics.Stopwatch StreamClock = new System.Diagnostics.Stopwatch();
             public readonly System.Diagnostics.Stopwatch PendingActivationClock = new System.Diagnostics.Stopwatch();
-            public volatile bool StreamPlayingSeen;
-            public volatile bool StreamTimeAdvanced;
-            public volatile bool StreamVoutSeen;
-            public volatile bool StreamError;
+            public EventHandler<MediaPlayerBufferingEventArgs> BufferingLogHandler;
+            public EventHandler<EventArgs> EncounteredErrorLogHandler;
+            public EventHandler<EventArgs> PlayingLogHandler;
+            public int LastBufferLogBucket = -1;
+            public string StreamLogUrl = "";
         }
         private Deck _deckA, _deckB, _bufferDeck, _activeDeck, _pendingDeck;
         private bool _nextIsA = true; private volatile int _globalSessionId;
@@ -223,6 +224,60 @@ namespace AirDirector.Controls
         private Services.Core.DailyLogger _dailyLogger;
         private static Font SafeFont(string f, float s, FontStyle st) { try { return new Font(new FontFamily(f), s, st); } catch { return new Font(SystemFonts.DefaultFont.FontFamily, s, st); } }
         private static bool IsWebStream(string path) { if (string.IsNullOrEmpty(path)) return false; return path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("mms://", StringComparison.OrdinalIgnoreCase); }
+        private static void ApplyStreamOptions(Media media, string url, bool audioOnly)
+        {
+            bool isRtsp = url.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase);
+
+            media.AddOption(":network-caching=5000");
+            media.AddOption(":live-caching=5000");
+            media.AddOption(":file-caching=1500");
+
+            media.AddOption(":adaptive-logic=highest");
+            media.AddOption(":adaptive-use-access");
+
+            media.AddOption(":http-reconnect");
+            media.AddOption(":http-continuous");
+            media.AddOption(":http-user-agent=VLC/3.0.20 LibVLC/3.0.20");
+
+            if (isRtsp)
+            {
+                media.AddOption(":rtsp-tcp");
+                media.AddOption(":rtsp-frame-buffer-size=500000");
+            }
+
+            if (audioOnly)
+            {
+                media.AddOption(":no-video");
+            }
+
+            media.AddOption(":clock-jitter=0");
+            media.AddOption(":clock-synchro=0");
+        }
+
+        private void AttachStreamDiagnostics(Deck target, string url)
+        {
+            if (target.BufferingLogHandler != null) target.VlcPlayer.Buffering -= target.BufferingLogHandler;
+            if (target.EncounteredErrorLogHandler != null) target.VlcPlayer.EncounteredError -= target.EncounteredErrorLogHandler;
+            if (target.PlayingLogHandler != null) target.VlcPlayer.Playing -= target.PlayingLogHandler;
+
+            target.StreamLogUrl = url;
+            target.LastBufferLogBucket = -1;
+
+            target.BufferingLogHandler = (s, e) =>
+            {
+                if (e.Cache >= 100f) return;
+                int bucket = Math.Max(0, ((int)e.Cache / 25) * 25);
+                if (bucket == target.LastBufferLogBucket) return;
+                target.LastBufferLogBucket = bucket;
+                Log("[VLC-BUFFER] " + bucket + "%");
+            };
+            target.EncounteredErrorLogHandler = (s, e) => Log("[VLC-ERROR] stream " + target.StreamLogUrl + " encountered error");
+            target.PlayingLogHandler = (s, e) => Log("[VLC] Playing started: " + target.StreamLogUrl);
+
+            target.VlcPlayer.Buffering += target.BufferingLogHandler;
+            target.VlcPlayer.EncounteredError += target.EncounteredErrorLogHandler;
+            target.VlcPlayer.Playing += target.PlayingLogHandler;
+        }
 
         public PlayerControlVideo()
         {
@@ -240,7 +295,7 @@ namespace AirDirector.Controls
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 Log("[INIT] Starting engine...");
                 LibVLCSharp.Shared.Core.Initialize();
-                _libVLC = new LibVLC("--no-osd", "--no-stats", "--quiet", "--avcodec-fast", "--avcodec-threads=4", "--avcodec-skiploopfilter=4", "--clock-jitter=0", "--clock-synchro=0", "--file-caching=3000", "--network-caching=3000", "--live-caching=3000", "--http-reconnect", "--no-video-title-show", "--avcodec-hw=none");
+                _libVLC = new LibVLC("--no-osd", "--no-stats", "--quiet", "--avcodec-fast", "--avcodec-threads=4", "--avcodec-skiploopfilter=4", "--clock-jitter=0", "--clock-synchro=0", "--file-caching=500", "--network-caching=1000", "--avcodec-hw=any");
                 if (!NDIlib.initialize()) throw new Exception("NDI init failed");
                 _ndiSender = new Sender(_ndiSourceName, true, false);
                 int fs = _ndiWidth * _ndiHeight * 4;
@@ -401,8 +456,6 @@ namespace AirDirector.Controls
                 }, null);
             deck.VlcPlayer.EndReached += (s, e) =>
             {
-                if (deck.Type == DeckType.WebStream)
-                    Log("[STREAM] " + deck.Name + " EndReached sid=" + deck.SessionId);
                 int sid = deck.SessionId; deck.IsReadyForVideo = false;
                 ThreadPool.QueueUserWorkItem(_ =>
                 {
@@ -410,57 +463,6 @@ namespace AirDirector.Controls
                     else _commandQueue.Enqueue(() => HandleDeckEnded(deck, sid));
                 });
             };
-            if (!isBuffer)
-            {
-                deck.VlcPlayer.Opening += (s, e) =>
-                {
-                    if (deck.Type == DeckType.WebStream)
-                        Log("[STREAM] " + deck.Name + " Opening sid=" + deck.SessionId);
-                };
-                deck.VlcPlayer.Buffering += (s, e) =>
-                {
-                    if (deck.Type == DeckType.WebStream)
-                        Log("[STREAM] " + deck.Name + " Buffering " + e.Cache + "% sid=" + deck.SessionId);
-                };
-                deck.VlcPlayer.Playing += (s, e) =>
-                {
-                    if (deck.Type == DeckType.WebStream)
-                    {
-                        deck.StreamPlayingSeen = true;
-                        Log("[STREAM] " + deck.Name + " Playing sid=" + deck.SessionId);
-                    }
-                };
-                deck.VlcPlayer.Stopped += (s, e) =>
-                {
-                    if (deck.Type == DeckType.WebStream)
-                        Log("[STREAM] " + deck.Name + " Stopped sid=" + deck.SessionId);
-                };
-                deck.VlcPlayer.TimeChanged += (s, e) =>
-                {
-                    if (e.Time > 0) deck.VlcTimeMs = e.Time;
-                    if (deck.Type == DeckType.WebStream && e.Time > 0)
-                    {
-                        deck.StreamTimeAdvanced = true;
-                    }
-                };
-                deck.VlcPlayer.Vout += (s, e) =>
-                {
-                    if (deck.Type != DeckType.WebStream) return;
-                    if (e.Count > 0)
-                    {
-                        deck.StreamVoutSeen = true;
-                        Log("[STREAM] " + deck.Name + " Vout=" + e.Count + " sid=" + deck.SessionId);
-                    }
-                };
-                deck.VlcPlayer.EncounteredError += (s, e) =>
-                {
-                    if (deck.Type != DeckType.WebStream) return;
-                    int sid = deck.SessionId;
-                    deck.StreamError = true;
-                    Log("[STREAM] ❌ " + deck.Name + " EncounteredError sid=" + sid);
-                    ThreadPool.QueueUserWorkItem(_ => _commandQueue.Enqueue(() => HandleStreamDeckError(deck, sid)));
-                };
-            }
             if (!isBuffer)
             {
                 deck.VlcPlayer.SetAudioFormat("S16N", AUDIO_SAMPLE_RATE, AUDIO_CHANNELS);
@@ -506,10 +508,6 @@ namespace AirDirector.Controls
             d.FrameCount = 0; d.AudioStarted = false; d.WarmupDone = false;
             d.VlcTimeMs = 0; d.Ring.Reset(); d.CurrentItem = null; d.StartPointMs = 0;
             d.StreamClock.Reset();
-            d.StreamPlayingSeen = false;
-            d.StreamTimeAdvanced = false;
-            d.StreamVoutSeen = false;
-            d.StreamError = false;
         }
 
         private void StopDeckInternal(Deck d, bool clearVid)
@@ -788,15 +786,9 @@ namespace AirDirector.Controls
             {
                 bool isVS = p.CurrentItem?.IsVideoStream ?? false;
                 long waitedMs = p.PendingActivationClock.ElapsedMilliseconds;
-                if (p.StreamError)
-                {
-                    Log("[TRANS] ❌ WebStream pending error on " + p.Name + " after " + waitedMs + "ms");
-                    HandleStreamDeckError(p, p.SessionId);
-                    return;
-                }
                 ready = isVS
-                    ? p.StreamVoutSeen || p.StreamTimeAdvanced || (p.WarmupDone && p.FrameCount >= MIN_READY_FRAMES) || waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS
-                    : p.StreamPlayingSeen || p.StreamTimeAdvanced || p.WarmupDone || waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS;
+                    ? (p.WarmupDone && p.FrameCount >= MIN_READY_FRAMES) || waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS
+                    : p.WarmupDone || waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS;
                 if (waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS)
                     Log("[TRANS] ⚠️ WebStream pending timeout, force-activating after " + waitedMs + "ms");
             }
@@ -813,18 +805,6 @@ namespace AirDirector.Controls
         }
 
         private void HandleDeckEnded(Deck deck, int sessionId) { if (deck.SessionId != sessionId || deck != _activeDeck) return; if (!TryTriggerMix()) return; Log("[END] " + deck.Name + " ended"); SafeInvoke(() => OnTrackEnded()); }
-
-        private void HandleStreamDeckError(Deck deck, int sessionId)
-        {
-            if (deck.SessionId != sessionId) return;
-            bool isRelevant = deck == _activeDeck || deck == _pendingDeck;
-            if (!isRelevant) return;
-            Log("[STREAM] Releasing errored deck " + deck.Name + " sid=" + sessionId);
-            StopDeckInternal(deck, true);
-            if (_pendingDeck == deck) _pendingDeck = null;
-            if (_activeDeck == deck) _activeDeck = null;
-            SafeInvoke(() => AutoSkipToNext());
-        }
 
         // ═══════════════════════════════════════════════════════════
         // POSITION
@@ -997,16 +977,6 @@ namespace AirDirector.Controls
         public void LoadAndPlay(PlaylistQueueItem qi) { if (qi == null || _isDisposed) return; _commandQueue.Enqueue(() => PlayInternal(PlayItem.FromQueueItem(qi))); }
         public void LoadTrack(string fp, string artist, string title, TimeSpan intro, int mIN, int mINTRO, int mMIX, int mOUT, string type) { _commandQueue.Enqueue(() => PlayInternal(new PlayItem { FilePath = fp ?? "", Artist = artist ?? "", Title = title ?? "", Intro = intro, MarkerIN = mIN, MarkerINTRO = mINTRO, MarkerMIX = mMIX, MarkerOUT = mOUT, ItemType = type ?? "Clip" })); }
 
-        private void ApplyStreamMediaOptions(Media media, bool isAudioOnlyStream)
-        {
-            media.AddOption(":network-caching=3000");
-            media.AddOption(":live-caching=3000");
-            media.AddOption(":http-reconnect");
-            media.AddOption(":http-user-agent=VLC/3.0.20 LibVLC/3.0.20");
-            if (isAudioOnlyStream) media.AddOption(":no-video");
-            Log("[STREAM] options: :network-caching=3000 :live-caching=3000 :http-reconnect :http-user-agent=VLC/3.0.20 LibVLC/3.0.20" + (isAudioOnlyStream ? " :no-video" : ""));
-        }
-
         private void PlayInternal(PlayItem item)
         {
             string fp = item.FilePath, fn = Path.GetFileName(fp);
@@ -1060,14 +1030,14 @@ namespace AirDirector.Controls
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
                 var media = new Media(_libVLC, fp, FromType.FromLocation);
-                ApplyStreamMediaOptions(media, !item.IsVideoStream);
-                Log("[STREAM] Create media " + fp + " isVideoStream=" + item.IsVideoStream);
+                ApplyStreamOptions(media, fp, audioOnly: !item.IsVideoStream);
 
                 if (!item.IsVideoStream)
                 {
-                    target.VlcPlayer.Play(media);
+                    target.VlcPlayer.Media = media;
+                    AttachStreamDiagnostics(target, fp);
                     media.Dispose();
-                    try { target.VlcPlayer.Mute = false; target.VlcPlayer.Volume = 100; } catch { }
+                    target.VlcPlayer.Play();
                     _bufferShouldShow = true; _currentFileIsVideo = false;
                     if (string.IsNullOrEmpty(_bufferVideoPath))
                         Log("[PLAY] WebStream (audio-only): nessun buffer video configurato");
@@ -1076,9 +1046,10 @@ namespace AirDirector.Controls
                 }
                 else
                 {
-                    target.VlcPlayer.Play(media);
+                    target.VlcPlayer.Media = media;
+                    AttachStreamDiagnostics(target, fp);
                     media.Dispose();
-                    try { target.VlcPlayer.Mute = false; target.VlcPlayer.Volume = 100; } catch { }
+                    target.VlcPlayer.Play();
                     _bufferShouldShow = false;
                     _currentFileIsVideo = true;
                     StopBufferDeck();

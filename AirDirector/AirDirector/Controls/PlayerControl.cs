@@ -81,7 +81,11 @@ namespace AirDirector.Controls
         private bool _isStreamingURL = false;
         private TimeSpan _streamScheduledDuration = TimeSpan.Zero;
         private DateTime _streamStartTime = DateTime.MinValue;
-        private bool _streamPlaybackStarted = false;
+        private EventHandler<MediaPlayerBufferingEventArgs> _streamBufferingLogHandler;
+        private EventHandler<EventArgs> _streamEncounteredErrorLogHandler;
+        private EventHandler<EventArgs> _streamPlayingLogHandler;
+        private int _lastStreamBufferLogBucket = -1;
+        private string _currentStreamLogUrl = "";
 
         private Panel waveformPanel;
         private Label lblIntro;
@@ -168,43 +172,21 @@ namespace AirDirector.Controls
 
                 _libVLC = new LibVLC(
                     "--no-video",
-                    "--network-caching=3000",
-                    "--live-caching=3000",
-                    "--file-caching=3000",
-                    "--http-reconnect",
-                    "--no-video-title-show",
+                    "--network-caching=10000",
+                    "--live-caching=10000",
                     "--clock-jitter=0",
                     "--clock-synchro=0",
                     "--no-audio-time-stretch",
-                    "--quiet"
+                    "--verbose=2"
                 );
 
                 _vlcPlayer = new MediaPlayer(_libVLC);
 
-                _vlcPlayer.Opening += (s, e) => Log("[STREAM] Opening");
-                _vlcPlayer.Buffering += (s, e) => Log($"[STREAM] Buffering {e.Cache}%");
-                _vlcPlayer.Playing += (s, e) =>
-                {
-                    Log("[STREAM] ▶️ Playing");
-                    StartStreamPlaybackClock("Playing");
-                    try { _vlcPlayer.Mute = false; _vlcPlayer.Volume = 100; } catch { }
-                };
+                _vlcPlayer.Playing += (s, e) => Log("[VLC] ▶️ Playing");
                 _vlcPlayer.Paused += (s, e) => Log("[VLC] ⏸️ Paused");
-                _vlcPlayer.Stopped += (s, e) => Log("[STREAM] ⏹️ Stopped");
-                _vlcPlayer.EndReached += (s, e) => Log("[STREAM] 🏁 EndReached");
-                _vlcPlayer.TimeChanged += (s, e) =>
-                {
-                    if (e.Time > 0) StartStreamPlaybackClock("TimeChanged");
-                };
-                _vlcPlayer.EncounteredError += (s, e) =>
-                {
-                    Log("[STREAM] ❌ EncounteredError");
-                    if (_isStreamingURL)
-                    {
-                        if (InvokeRequired) BeginInvoke(new Action(() => { _streamDurationTimer.Stop(); Stop(); }));
-                        else { _streamDurationTimer.Stop(); Stop(); }
-                    }
-                };
+                _vlcPlayer.Stopped += (s, e) => Log("[VLC] ⏹️ Stopped");
+                _vlcPlayer.EndReached += (s, e) => Log("[VLC] 🏁 EndReached");
+                _vlcPlayer.EncounteredError += (s, e) => Log("[VLC] ❌ Error");
 
                 Log("[VLC] ✅ Inizializzato con successo");
             }
@@ -710,13 +692,18 @@ namespace AirDirector.Controls
 
         private void StreamDurationTimer_Tick(object sender, EventArgs e)
         {
-            if (!_isStreamingURL || !_isPlaying || _isPaused || !_streamPlaybackStarted)
+            if (!_isStreamingURL || !_isPlaying || _isPaused)
             {
                 return;
             }
 
             TimeSpan elapsed = DateTime.Now - _streamStartTime;
             _currentPosition = elapsed;
+
+            if (_vlcPlayer != null && !_vlcPlayer.IsPlaying)
+            {
+                _vlcPlayer.Play();
+            }
 
             UpdateCounters();
             waveformPanel.Invalidate();
@@ -727,7 +714,6 @@ namespace AirDirector.Controls
             {
                 _streamDurationTimer.Stop();
                 _isStreamingURL = false;
-                _streamPlaybackStarted = false;
 
                 if (_vlcPlayer != null && _vlcPlayer.IsPlaying)
                 {
@@ -906,8 +892,7 @@ namespace AirDirector.Controls
 
                         _isStreamingURL = true;
                         _streamScheduledDuration = nextItem.Duration;
-                        _streamStartTime = DateTime.MinValue;
-                        _streamPlaybackStarted = false;
+                        _streamStartTime = DateTime.Now;
                         _currentPosition = TimeSpan.Zero;
                         _totalDuration = nextItem.Duration;
 
@@ -915,10 +900,12 @@ namespace AirDirector.Controls
 
                         if (_vlcPlayer != null)
                         {
-                            using (var media = BuildStreamMedia(nextItem.FilePath, true))
-                            {
-                                _vlcPlayer.Play(media);
-                            }
+                            var media = new Media(_libVLC, new Uri(nextItem.FilePath));
+                            ApplyStreamOptions(media, nextItem.FilePath, audioOnly: true);
+
+                            _vlcPlayer.Media = media;
+                            AttachStreamDiagnostics(nextItem.FilePath);
+                            _vlcPlayer.Play();
                         }
 
                         if (_isPlayerAActive)
@@ -940,6 +927,8 @@ namespace AirDirector.Controls
 
                         _mixCheckTimer.Stop();
                         _updateTimer.Stop();
+                        _streamDurationTimer.Start();
+
                         UpdateCounters();
 
                         Log($"[OnMixPointReached] Player attivo DOPO il mix:  {(_isPlayerAActive ? "A" : "B")}");
@@ -1035,45 +1024,65 @@ namespace AirDirector.Controls
 
         private bool IsStreamUrl(string filePath)
         {
-            if (string.IsNullOrWhiteSpace(filePath)) return false;
             return filePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                    filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.StartsWith("icy://", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.StartsWith("icyx://", StringComparison.OrdinalIgnoreCase) ||
                    filePath.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.StartsWith("mms://", StringComparison.OrdinalIgnoreCase);
+                   filePath.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase);
         }
 
-        private Media BuildStreamMedia(string streamUrl, bool audioOnly)
+        private static void ApplyStreamOptions(Media media, string url, bool audioOnly)
         {
-            var media = new Media(_libVLC, streamUrl, FromType.FromLocation);
-            media.AddOption(":network-caching=3000");
-            media.AddOption(":live-caching=3000");
+            bool isRtsp = url.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase);
+
+            media.AddOption(":network-caching=5000");
+            media.AddOption(":live-caching=5000");
+            media.AddOption(":file-caching=1500");
+
+            media.AddOption(":adaptive-logic=highest");
+            media.AddOption(":adaptive-use-access");
+
             media.AddOption(":http-reconnect");
+            media.AddOption(":http-continuous");
             media.AddOption(":http-user-agent=VLC/3.0.20 LibVLC/3.0.20");
-            if (audioOnly) media.AddOption(":no-video");
-            Log("[STREAM] Media created " + streamUrl + " opts=:network-caching=3000,:live-caching=3000,:http-reconnect,:http-user-agent=VLC/3.0.20 LibVLC/3.0.20" + (audioOnly ? ",:no-video" : ""));
-            return media;
+
+            if (isRtsp)
+            {
+                media.AddOption(":rtsp-tcp");
+                media.AddOption(":rtsp-frame-buffer-size=500000");
+            }
+
+            if (audioOnly)
+            {
+                media.AddOption(":no-video");
+            }
+
+            media.AddOption(":clock-jitter=0");
+            media.AddOption(":clock-synchro=0");
         }
 
-        private void StartStreamPlaybackClock(string trigger)
+        private void AttachStreamDiagnostics(string url)
         {
-            if (InvokeRequired)
+            if (_streamBufferingLogHandler != null) _vlcPlayer.Buffering -= _streamBufferingLogHandler;
+            if (_streamEncounteredErrorLogHandler != null) _vlcPlayer.EncounteredError -= _streamEncounteredErrorLogHandler;
+            if (_streamPlayingLogHandler != null) _vlcPlayer.Playing -= _streamPlayingLogHandler;
+
+            _currentStreamLogUrl = url;
+            _lastStreamBufferLogBucket = -1;
+
+            _streamBufferingLogHandler = (s, e) =>
             {
-                BeginInvoke(new Action(() => StartStreamPlaybackClock(trigger)));
-                return;
-            }
-            if (!_isStreamingURL || _streamPlaybackStarted) return;
-            _streamPlaybackStarted = true;
-            _streamStartTime = DateTime.Now;
-            _currentPosition = TimeSpan.Zero;
-            _isPlaying = true;
-            _isPaused = false;
-            try { _vlcPlayer.Mute = false; _vlcPlayer.Volume = 100; } catch { }
-            _streamDurationTimer.Start();
-            UpdateCounters();
-            Log("[STREAM] Activated via " + trigger);
+                if (e.Cache >= 100f) return;
+                int bucket = Math.Max(0, ((int)e.Cache / 25) * 25);
+                if (bucket == _lastStreamBufferLogBucket) return;
+                _lastStreamBufferLogBucket = bucket;
+                Log("[VLC-BUFFER] " + bucket + "%");
+            };
+            _streamEncounteredErrorLogHandler = (s, e) => Log("[VLC-ERROR] stream " + _currentStreamLogUrl + " encountered error");
+            _streamPlayingLogHandler = (s, e) => Log("[VLC] Playing started: " + _currentStreamLogUrl);
+
+            _vlcPlayer.Buffering += _streamBufferingLogHandler;
+            _vlcPlayer.EncounteredError += _streamEncounteredErrorLogHandler;
+            _vlcPlayer.Playing += _streamPlayingLogHandler;
         }
 
         private void LoadTrackInfo(PlaylistQueueItem item)
@@ -1091,8 +1100,7 @@ namespace AirDirector.Controls
                 _introTime = TimeSpan.Zero;
                 _currentPosition = TimeSpan.Zero;
                 _streamScheduledDuration = item.Duration;
-                _streamStartTime = DateTime.MinValue;
-                _streamPlaybackStarted = false;
+                _streamStartTime = DateTime.Now;
 
                 _markerIN = 0;
                 _markerINTRO = 0;
@@ -2716,8 +2724,7 @@ namespace AirDirector.Controls
                     var streamItem = items[0];
 
                     _streamScheduledDuration = streamItem.Duration;
-                    _streamStartTime = DateTime.MinValue;
-                    _streamPlaybackStarted = false;
+                    _streamStartTime = DateTime.Now;
                     _currentPosition = TimeSpan.Zero;
                     _totalDuration = streamItem.Duration;
                     _isPlaying = true;
@@ -2727,14 +2734,18 @@ namespace AirDirector.Controls
 
                     if (_vlcPlayer != null)
                     {
-                        using (var media = BuildStreamMedia(streamItem.FilePath, true))
-                        {
-                            _vlcPlayer.Play(media);
-                        }
+                        var media = new Media(_libVLC, new Uri(streamItem.FilePath));
+                        ApplyStreamOptions(media, streamItem.FilePath, audioOnly: true);
+
+                        _vlcPlayer.Media = media;
+                        AttachStreamDiagnostics(streamItem.FilePath);
+                        _vlcPlayer.Play();
                     }
 
                     _updateTimer.Stop();
                     _mixCheckTimer.Stop();
+                    _streamDurationTimer.Start();
+
                     UpdateButtonStates();
 
                     // NOTIFICA RADIOTV BRIDGE
@@ -2931,7 +2942,6 @@ namespace AirDirector.Controls
             _isPlaying = false;
             _isPaused = false;
             _isStreamingURL = false;
-            _streamPlaybackStarted = false;
 
             AudioFileReader activeAudio = _isPlayerAActive ? _audioFileA : _audioFileB;
             if (activeAudio != null)
@@ -2995,7 +3005,6 @@ namespace AirDirector.Controls
             _markerOUT = 0;
             _mixRequested = false;
             _isStreamingURL = false;
-            _streamPlaybackStarted = false;
 
             CurrentFilePath = "";
             CurrentArtist = "";
