@@ -1325,7 +1325,10 @@ namespace AirDirector.Controls
             if (_activeDeck == null || !_activeDeck.IsPlaying) return;
             if (_activeDeck.Type == DeckType.WebStream)
             {
-                long triggerMs = _markerMIX > 0 ? _markerMIX : (long)_totalDuration.TotalMilliseconds;
+                long totalMs = (long)_totalDuration.TotalMilliseconds;
+                long triggerMs = _markerMIX > 0
+                    ? _markerMIX
+                    : (_markerOUT == 0 && totalMs > MIN_VALID_STREAM_DURATION_MS ? totalMs : 0);
                 if (_autoMode && triggerMs > 0 && _positionMs >= triggerMs)
                 {
                     if (TryTriggerMix()) { _mixCheckTimer.Stop(); OnMixReached(); }
