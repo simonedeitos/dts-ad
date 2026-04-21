@@ -230,13 +230,18 @@ namespace AirDirector.Controls
                         (dialog, title, text, defaultUserName, askStore, token) =>
                         {
                             Log($"[libvlc:Dialog/Login] {title} (auto-cancel)");
-                            try { dialog.Dismiss(); } catch { }
+                            try { dialog.Dismiss(); } catch (Exception ex) { Log($"[libvlc:Dialog/Login] dismiss failed: {ex.Message}"); }
                             return Task.CompletedTask;
                         },
                         (dialog, title, text, qType, cancel, action1, action2, token) =>
                         {
                             Log($"[libvlc:Dialog/Question] {title}: {text} → auto-accept (action1='{action1}')");
-                            try { dialog.PostAction(1); } catch { try { dialog.Dismiss(); } catch { } }
+                            try { dialog.PostAction(1); }
+                            catch (Exception ex)
+                            {
+                                Log($"[libvlc:Dialog/Question] post-action failed: {ex.Message}");
+                                try { dialog.Dismiss(); } catch (Exception dismissEx) { Log($"[libvlc:Dialog/Question] dismiss failed: {dismissEx.Message}"); }
+                            }
                             return Task.CompletedTask;
                         },
                         (dialog, title, text, indeterminate, position, cancel, token) => Task.CompletedTask,
