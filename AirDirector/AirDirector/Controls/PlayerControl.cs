@@ -180,8 +180,40 @@ namespace AirDirector.Controls
                 _vlcPlayer.Playing += (s, e) => Log("[VLC] ▶️ Playing");
                 _vlcPlayer.Paused += (s, e) => Log("[VLC] ⏸️ Paused");
                 _vlcPlayer.Stopped += (s, e) => Log("[VLC] ⏹️ Stopped");
-                _vlcPlayer.EndReached += (s, e) => Log("[VLC] 🏁 EndReached");
-                _vlcPlayer.EncounteredError += (s, e) => Log("[VLC] ❌ Error");
+                _vlcPlayer.EndReached += (s, e) =>
+                {
+                    Log("[VLC] 🏁 EndReached");
+                    if (_isStreamingURL)
+                    {
+                        try
+                        {
+                            this.BeginInvoke((Action)(() =>
+                            {
+                                try { _streamDurationTimer.Stop(); } catch { }
+                                _isStreamingURL = false;
+                                OnTrackEnded();
+                            }));
+                        }
+                        catch { }
+                    }
+                };
+                _vlcPlayer.EncounteredError += (s, e) =>
+                {
+                    Log("[VLC] ❌ Error");
+                    if (_isStreamingURL)
+                    {
+                        try
+                        {
+                            this.BeginInvoke((Action)(() =>
+                            {
+                                try { _streamDurationTimer.Stop(); } catch { }
+                                _isStreamingURL = false;
+                                OnTrackEnded();
+                            }));
+                        }
+                        catch { }
+                    }
+                };
 
                 Log("[VLC] ✅ Inizializzato con successo");
             }
@@ -695,10 +727,10 @@ namespace AirDirector.Controls
             TimeSpan elapsed = DateTime.Now - _streamStartTime;
             _currentPosition = elapsed;
 
-            if (_vlcPlayer != null && !_vlcPlayer.IsPlaying)
-            {
-                _vlcPlayer.Play();
-            }
+            // NOTA: non richiamiamo più _vlcPlayer.Play() se non è in play:
+            // gli errori di apertura vengono gestiti dall'handler EncounteredError,
+            // che fa avanzare alla traccia successiva. Rianimare Play() ogni secondo
+            // lasciava VLC bloccato in "opening" su certi Icecast.
 
             UpdateCounters();
             waveformPanel.Invalidate();
@@ -710,9 +742,14 @@ namespace AirDirector.Controls
                 _streamDurationTimer.Stop();
                 _isStreamingURL = false;
 
-                if (_vlcPlayer != null && _vlcPlayer.IsPlaying)
+                // Stop VLC fuori dall'UI thread per evitare deadlock con i callback audio/video.
+                var player = _vlcPlayer;
+                if (player != null)
                 {
-                    _vlcPlayer.Stop();
+                    System.Threading.Tasks.Task.Run(() =>
+                    {
+                        try { if (player.IsPlaying) player.Stop(); } catch { }
+                    });
                 }
 
                 OnTrackEnded();
@@ -896,9 +933,12 @@ namespace AirDirector.Controls
                         if (_vlcPlayer != null)
                         {
                             var media = new Media(_libVLC, new Uri(nextItem.FilePath));
-                            media.AddOption(": no-video");
-                            media.AddOption(": network-caching=10000");
-                            media.AddOption(": live-caching=10000");
+                            media.AddOption(":no-video");
+                            media.AddOption(":network-caching=10000");
+                            media.AddOption(":live-caching=10000");
+                            media.AddOption(":http-reconnect");
+                            media.AddOption(":http-continuous");
+                            media.AddOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
                             _vlcPlayer.Media = media;
                             _vlcPlayer.Play();
@@ -2674,9 +2714,12 @@ namespace AirDirector.Controls
                     if (_vlcPlayer != null)
                     {
                         var media = new Media(_libVLC, new Uri(streamItem.FilePath));
-                        media.AddOption(": no-video");
-                        media.AddOption(": network-caching=10000");
-                        media.AddOption(": live-caching=10000");
+                        media.AddOption(":no-video");
+                        media.AddOption(":network-caching=10000");
+                        media.AddOption(":live-caching=10000");
+                        media.AddOption(":http-reconnect");
+                        media.AddOption(":http-continuous");
+                        media.AddOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
                         _vlcPlayer.Media = media;
                         _vlcPlayer.Play();
