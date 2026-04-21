@@ -458,10 +458,12 @@ namespace AirDirector.Controls
                     {
                         deck.WebStreamRetryCount++;
                         int retryN = deck.WebStreamRetryCount;
-                        string originalUrl = deck.CurrentItem?.FilePath ?? url;
-                        string retryUrl = originalUrl;
-                        if (retryN == 2 && retryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-                            retryUrl = "http://" + retryUrl.Substring("https://".Length);
+                        string baseRetryUrl = deck.CurrentItem?.FilePath ?? url;
+                        string retryUrl = baseRetryUrl;
+                        // retry #1: HTTPS via proxy (if enabled)
+                        // retry #2: legacy HTTPS→HTTP fallback
+                        if (retryN == 2 && baseRetryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                            retryUrl = "http://" + baseRetryUrl.Substring("https://".Length);
                         if (_httpsProxy != null && retryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                         {
                             string rewritten = _httpsProxy.Rewrite(retryUrl);

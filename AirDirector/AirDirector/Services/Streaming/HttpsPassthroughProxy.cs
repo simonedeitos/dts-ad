@@ -181,12 +181,13 @@ namespace AirDirector.Services.Streaming
             int changedCount = 0;
             var sb = new StringBuilder(content.Length + 256);
             var baseUri = new Uri(originalUri, "./");
+            string newline = content.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
             using var reader = new StringReader(content);
             string? line;
             bool first = true;
             while ((line = reader.ReadLine()) != null)
             {
-                if (!first) sb.Append('\n');
+                if (!first) sb.Append(newline);
                 first = false;
 
                 if (line.StartsWith("#EXT-X-KEY:", StringComparison.OrdinalIgnoreCase) ||
