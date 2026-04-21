@@ -97,6 +97,7 @@ namespace AirDirector.Controls
             public volatile bool AudioStarted; public PlayItem CurrentItem;
             public volatile bool IsPreBuffered, IsPendingActivation, PreBufferReady;
             public volatile int SessionId, StartPointMs;
+            public long PendingActivationStartTick;
             public readonly System.Diagnostics.Stopwatch StreamClock = new System.Diagnostics.Stopwatch();
         }
         private Deck _deckA, _deckB, _bufferDeck, _activeDeck, _pendingDeck;
@@ -427,6 +428,7 @@ namespace AirDirector.Controls
             d.PreBufferReady = false; d.Volume = 0f; d.IsReadyForVideo = false;
             d.FrameCount = 0; d.AudioStarted = false; d.WarmupDone = false;
             d.VlcTimeMs = 0; d.Ring.Reset(); d.CurrentItem = null; d.StartPointMs = 0;
+            d.PendingActivationStartTick = 0;
             d.StreamClock.Reset();
         }
 
@@ -702,7 +704,21 @@ namespace AirDirector.Controls
             bool ready;
             if (p.Type == DeckType.VideoClip) ready = p.FrameCount >= MIN_READY_FRAMES && p.WarmupDone;
             else if (p.Type == DeckType.AudioTrack && p.VlcPlayer.IsPlaying) ready = p.FrameCount >= MIN_READY_FRAMES;
-            else if (p.Type == DeckType.WebStream) ready = p.WarmupDone;
+            else if (p.Type == DeckType.WebStream)
+            {
+                ready = p.WarmupDone;
+                if (!ready && p.PendingActivationStartTick > 0 && p.VlcPlayer.IsPlaying)
+                {
+                    double elapsed = (System.Diagnostics.Stopwatch.GetTimestamp() - p.PendingActivationStartTick)
+                                     / (double)System.Diagnostics.Stopwatch.Frequency;
+                    if (elapsed >= 15.0)
+                    {
+                        p.WarmupDone = true;
+                        ready = true;
+                        Log("[TRANS] WebStream WarmupDone forzato dopo " + elapsed.ToString("F1") + "s");
+                    }
+                }
+            }
             else ready = true;
             if (!ready) return;
             Deck old = _activeDeck; _activeDeck = p; _pendingDeck = null; p.IsPendingActivation = false;
@@ -927,11 +943,13 @@ namespace AirDirector.Controls
                 target = _nextIsA ? _deckA : _deckB; if (target == _activeDeck) target = !_nextIsA ? _deckA : _deckB; _nextIsA = !_nextIsA;
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
-                var media = new Media(_libVLC, fp, FromType.FromLocation); media.AddOption(":network-caching=1000"); media.AddOption(":no-video");
+                var media = new Media(_libVLC, fp, FromType.FromLocation); media.AddOption(":network-caching=5000"); media.AddOption(":no-video");
                 target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
                 _bufferShouldShow = true; _currentFileIsVideo = false;
                 EnsureBufferVideoPlaying();
-                target.Volume = 1.0f; target.IsPlaying = true; target.CurrentItem = item; target.IsPendingActivation = true; _pendingDeck = target;
+                target.Volume = 1.0f; target.IsPlaying = true; target.CurrentItem = item;
+                target.IsPendingActivation = true; target.PendingActivationStartTick = System.Diagnostics.Stopwatch.GetTimestamp();
+                _pendingDeck = target;
                 Log("[PLAY] WebStream → " + target.Name);
             }
             else if (_preBufferedDeck != null && _preBufferedFile == fp && _preBufferedDeck.PreBufferReady)
