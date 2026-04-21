@@ -9,6 +9,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -28,6 +29,13 @@ namespace AirDirector.Controls
 
         private AudioFileReader _audioFileB;
         private VolumeSampleProvider _volumeProviderB;
+
+        // Stream VLC → NAudio bridge
+        private VlcBridgeSampleProvider _streamBridge;
+        private VolumeSampleProvider _streamVolumeProvider;
+        private ISampleProvider _streamResampledProvider;
+        private const int VLC_STREAM_SAMPLE_RATE = 48000;
+        private const int VLC_STREAM_CHANNELS = 2;
 
         private LibVLC _libVLC;
         private MediaPlayer _vlcPlayer;
@@ -199,6 +207,28 @@ namespace AirDirector.Controls
                 _vlcPlayer.EndReached += (s, e) => Log("[VLC] 🏁 EndReached");
                 _vlcPlayer.EncounteredError += (s, e) => HandleStreamError();
 
+                // Routing audio VLC → NAudio (per stream web)
+                try
+                {
+                    _vlcPlayer.SetAudioFormat("S16N", VLC_STREAM_SAMPLE_RATE, VLC_STREAM_CHANNELS);
+                    _vlcPlayer.SetAudioCallbacks(
+                        (data, samples, count, pts) =>
+                        {
+                            var bridge = _streamBridge;
+                            if (bridge == null) return;
+                            try { bridge.WriteS16(samples, (int)count); } catch { /* VLC audio callback must never throw. */ }
+                        },
+                        null,
+                        null,
+                        null,
+                        null);
+                    Log("[VLC] ✅ Audio callbacks registrati (" + VLC_STREAM_SAMPLE_RATE + "Hz/" + VLC_STREAM_CHANNELS + "ch S16N → NAudio bridge)");
+                }
+                catch (Exception ex)
+                {
+                    LogErr("[VLC] SetAudioCallbacks failed", ex);
+                }
+
                 Log("[VLC] ✅ Inizializzato con successo");
             }
             catch (Exception ex)
@@ -258,6 +288,7 @@ namespace AirDirector.Controls
                             try { _vlcPlayer.Stop(); } catch { }
                             try
                             {
+                                AttachStreamBridgeToMixer();
                                 var m = new Media(_libVLC, retryUrl, FromType.FromLocation);
                                 AddStreamOptions(m, retryN == 2);
                                 _vlcPlayer.Media = m;
@@ -274,6 +305,7 @@ namespace AirDirector.Controls
 
         private void AddStreamOptions(Media m, bool aggressiveDemux)
         {
+            m.AddOption(":aout=none");
             m.AddOption(":no-video");
             m.AddOption(":network-caching=10000");
             m.AddOption(":live-caching=10000");
@@ -294,6 +326,47 @@ namespace AirDirector.Controls
             {
                 m.AddOption(":demux=any");
             }
+        }
+
+        /// <summary>
+        /// Collega il bridge VLC→NAudio al _mixer. Idempotente: se già collegato, ricrea tutto.
+        /// </summary>
+        private void AttachStreamBridgeToMixer()
+        {
+            DetachStreamBridgeFromMixer();
+
+            _streamBridge = new VlcBridgeSampleProvider(VLC_STREAM_SAMPLE_RATE, VLC_STREAM_CHANNELS);
+
+            ISampleProvider chain = _streamBridge;
+            if (_mixer != null && chain.WaveFormat.SampleRate != _mixer.WaveFormat.SampleRate)
+            {
+                Log("[Stream] 🔄 Resampling da " + chain.WaveFormat.SampleRate + "Hz a " + _mixer.WaveFormat.SampleRate + "Hz");
+                chain = new WdlResamplingSampleProvider(chain, _mixer.WaveFormat.SampleRate);
+            }
+            _streamResampledProvider = chain;
+
+            _streamVolumeProvider = new VolumeSampleProvider(chain);
+            _streamVolumeProvider.Volume = 1f;
+            try { _mixer?.AddMixerInput(_streamVolumeProvider); } catch (Exception ex) { LogErr("[Stream] AddMixerInput", ex); }
+        }
+
+        /// <summary>
+        /// Rimuove il bridge dal mixer e resetta i buffer.
+        /// </summary>
+        private void DetachStreamBridgeFromMixer()
+        {
+            try
+            {
+                if (_streamVolumeProvider != null && _mixer != null)
+                {
+                    _mixer.RemoveMixerInput(_streamVolumeProvider);
+                }
+            }
+            catch { }
+            _streamVolumeProvider = null;
+            _streamResampledProvider = null;
+            try { _streamBridge?.Reset(); } catch { }
+            _streamBridge = null;
         }
 
         private void SafeInvoke(Action a)
@@ -961,6 +1034,7 @@ namespace AirDirector.Controls
                 try
                 {
                     bool nextIsStream = IsStreamUrl(nextItem.FilePath);
+                    bool wasStream = _isStreamingURL;
 
                     Log($"");
                     Log($"╔════════════════════════════════════════════════════════════╗");
@@ -1010,6 +1084,7 @@ namespace AirDirector.Controls
 
                         if (_vlcPlayer != null)
                         {
+                            AttachStreamBridgeToMixer();
                             _streamOriginalUrl = nextItem.FilePath;
                             _streamRetryCount = 0;
                             var media = new Media(_libVLC, nextItem.FilePath, FromType.FromLocation);
@@ -1048,6 +1123,8 @@ namespace AirDirector.Controls
                     else
                     {
                         Log($"[OnMixPointReached] 🎵 Caricamento file audio normale...");
+                        _isStreamingURL = false;
+                        if (wasStream) DetachStreamBridgeFromMixer();
 
                         if (_isPlayerAActive)
                         {
@@ -2431,6 +2508,7 @@ namespace AirDirector.Controls
             if (_isStreamingURL)
             {
                 Stop();
+                DetachStreamBridgeFromMixer();
                 _playlistQueue.RemoveItem(0);
                 DrainAndExecuteCommands();
 
@@ -2788,6 +2866,7 @@ namespace AirDirector.Controls
 
                     if (_vlcPlayer != null)
                     {
+                        AttachStreamBridgeToMixer();
                         _streamOriginalUrl = streamItem.FilePath;
                         _streamRetryCount = 0;
                         var media = new Media(_libVLC, streamItem.FilePath, FromType.FromLocation);
@@ -2974,6 +3053,7 @@ namespace AirDirector.Controls
             {
                 _vlcPlayer.Stop();
             }
+            DetachStreamBridgeFromMixer();
 
             if (_volumeProviderA != null)
             {
@@ -3104,6 +3184,7 @@ namespace AirDirector.Controls
                 _streamDurationTimer?.Stop();
                 _streamDurationTimer?.Dispose();
 
+                DetachStreamBridgeFromMixer();
                 _vlcPlayer?.Stop();
                 _vlcPlayer?.Dispose();
                 _libVLC?.Dispose();
@@ -3265,6 +3346,98 @@ namespace AirDirector.Controls
             }
 
             return samplesRead;
+        }
+    }
+
+    /// <summary>
+    /// Thread-safe bridge sample provider between VLC audio callbacks
+    /// (producer, interleaved S16 PCM) and the NAudio chain (consumer, float).
+    /// Used to route web streams through the MixingSampleProvider so the
+    /// configured output device and VU metering are always used.
+    /// </summary>
+    public class VlcBridgeSampleProvider : ISampleProvider
+    {
+        private const float INT16_TO_FLOAT = 1f / 32768f;
+        private readonly WaveFormat _format;
+        private readonly float[] _ring;
+        private readonly int _mask;
+        private long _writePos;
+        private long _readPos;
+        private readonly object _lock = new object();
+
+        public WaveFormat WaveFormat => _format;
+        public int SampleRate => _format.SampleRate;
+        public int Channels => _format.Channels;
+
+        public VlcBridgeSampleProvider(int sampleRate, int channels)
+        {
+            _format = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
+            int size = 1;
+            int target = sampleRate * channels * 2; // ~2 seconds of audio buffer.
+            while (size < target) size <<= 1;
+            _ring = new float[size];
+            _mask = size - 1;
+        }
+
+        /// <summary>
+        /// Writes a block of interleaved S16 samples into the ring.
+        /// Called from the VLC callback thread.
+        /// </summary>
+        public void WriteS16(IntPtr samples, int sampleCountPerChannel)
+        {
+            int totalInt16 = sampleCountPerChannel * Channels;
+            if (totalInt16 <= 0) return;
+            short[] tmp = new short[totalInt16];
+            Marshal.Copy(samples, tmp, 0, totalInt16);
+            lock (_lock)
+            {
+                long wp = _writePos;
+                int ringSize = _ring.Length;
+                int available = (int)(wp - _readPos);
+                int free = ringSize - available;
+                if (totalInt16 > free)
+                {
+                    // Ring full: drop oldest samples by advancing read pointer.
+                    // Intentional to keep "live" audio and avoid blocking VLC producer thread.
+                    long advance = totalInt16 - free;
+                    _readPos += advance;
+                }
+                for (int i = 0; i < totalInt16; i++)
+                {
+                    _ring[(int)((wp + i) & _mask)] = tmp[i] * INT16_TO_FLOAT;
+                }
+                _writePos = wp + totalInt16;
+            }
+        }
+
+        public int Read(float[] buffer, int offset, int count)
+        {
+            lock (_lock)
+            {
+                long rp = _readPos;
+                int avail = (int)(_writePos - rp);
+                int toRead = Math.Min(count, avail);
+                for (int i = 0; i < toRead; i++)
+                {
+                    buffer[offset + i] = _ring[(int)((rp + i) & _mask)];
+                }
+                for (int i = toRead; i < count; i++)
+                {
+                    buffer[offset + i] = 0f;
+                }
+                _readPos = rp + toRead;
+                return count;
+            }
+        }
+
+        public void Reset()
+        {
+            lock (_lock)
+            {
+                _writePos = 0;
+                _readPos = 0;
+                Array.Clear(_ring, 0, _ring.Length);
+            }
         }
     }
 
