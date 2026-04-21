@@ -171,8 +171,7 @@ namespace AirDirector.Controls
                     "--live-caching=10000",
                     "--clock-jitter=0",
                     "--clock-synchro=0",
-                    "--no-audio-time-stretch",
-                    "--verbose=2"
+                    "--no-audio-time-stretch"
                 );
 
                 _vlcPlayer = new MediaPlayer(_libVLC);
@@ -695,8 +694,9 @@ namespace AirDirector.Controls
             TimeSpan elapsed = DateTime.Now - _streamStartTime;
             _currentPosition = elapsed;
 
-            if (_vlcPlayer != null && !_vlcPlayer.IsPlaying)
+            if (_vlcPlayer != null && (_vlcPlayer.State == VLCState.Stopped || _vlcPlayer.State == VLCState.Error))
             {
+                Log("[VLC] ⚠️ Stream restarting (state=" + _vlcPlayer.State + ")");
                 _vlcPlayer.Play();
             }
 
@@ -897,8 +897,10 @@ namespace AirDirector.Controls
                         {
                             var media = new Media(_libVLC, new Uri(nextItem.FilePath));
                             media.AddOption(":no-video");
-                            media.AddOption(":network-caching=3000");
-                            media.AddOption(":live-caching=3000");
+                            media.AddOption(":network-caching=5000");
+                            media.AddOption(":live-caching=5000");
+                            media.AddOption(":http-user-agent=Mozilla/5.0 (compatible; AirDirector)");
+                            media.AddOption(":http-reconnect");
 
                             _vlcPlayer.Media = media;
                             _vlcPlayer.Play();
@@ -2677,8 +2679,10 @@ namespace AirDirector.Controls
                     {
                         var media = new Media(_libVLC, new Uri(streamItem.FilePath));
                         media.AddOption(":no-video");
-                        media.AddOption(":network-caching=3000");
-                        media.AddOption(":live-caching=3000");
+                        media.AddOption(":network-caching=5000");
+                        media.AddOption(":live-caching=5000");
+                        media.AddOption(":http-user-agent=Mozilla/5.0 (compatible; AirDirector)");
+                        media.AddOption(":http-reconnect");
 
                         _vlcPlayer.Media = media;
                         _vlcPlayer.Play();
