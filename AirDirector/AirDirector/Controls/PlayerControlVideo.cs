@@ -730,8 +730,11 @@ namespace AirDirector.Controls
                 if (!d.StreamClock.IsRunning) return;
                 int ms = (int)d.StreamClock.ElapsedMilliseconds;
                 _positionMs = ms;
+                int outMs = _markerOUT > 0
+                    ? _markerOUT
+                    : (int)(d.CurrentItem?.Duration.TotalMilliseconds ?? 0);
                 if (_autoMode && _markerMIX > 0 && ms >= _markerMIX) { if (TryTriggerMix()) { Log("[POS] WebStream MIX at " + ms + "ms"); SafeInvoke(() => { _mixCheckTimer.Stop(); OnMixReached(); }); } return; }
-                if (_markerOUT > 0 && ms >= _markerOUT) { if (TryTriggerMix()) { Log("[POS] WebStream OUT at " + ms + "ms"); SafeInvoke(() => { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); else { _isPlaying = false; OnTrackEnded(); } }); } }
+                if (outMs > 0 && ms >= outMs) { if (TryTriggerMix()) { Log("[POS] WebStream OUT at " + ms + "ms"); SafeInvoke(() => { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); else { _isPlaying = false; OnTrackEnded(); } }); } }
                 return;
             }
 
