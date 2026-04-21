@@ -895,12 +895,15 @@ namespace AirDirector.Controls
 
                         if (_vlcPlayer != null)
                         {
-                            var media = new Media(_libVLC, new Uri(nextItem.FilePath));
-                            media.AddOption(": no-video");
-                            media.AddOption(": network-caching=10000");
-                            media.AddOption(": live-caching=10000");
+                            var media = new Media(_libVLC, nextItem.FilePath, FromType.FromLocation);
+                            media.AddOption(":no-video");
+                            media.AddOption(":network-caching=10000");
+                            media.AddOption(":live-caching=10000");
+                            media.AddOption(":http-reconnect");
+                            media.AddOption(":http-continuous");
 
                             _vlcPlayer.Media = media;
+                            media.Dispose();
                             _vlcPlayer.Play();
                         }
 
@@ -2673,12 +2676,15 @@ namespace AirDirector.Controls
 
                     if (_vlcPlayer != null)
                     {
-                        var media = new Media(_libVLC, new Uri(streamItem.FilePath));
-                        media.AddOption(": no-video");
-                        media.AddOption(": network-caching=10000");
-                        media.AddOption(": live-caching=10000");
+                        var media = new Media(_libVLC, streamItem.FilePath, FromType.FromLocation);
+                        media.AddOption(":no-video");
+                        media.AddOption(":network-caching=10000");
+                        media.AddOption(":live-caching=10000");
+                        media.AddOption(":http-reconnect");
+                        media.AddOption(":http-continuous");
 
                         _vlcPlayer.Media = media;
+                        media.Dispose();
                         _vlcPlayer.Play();
                     }
 

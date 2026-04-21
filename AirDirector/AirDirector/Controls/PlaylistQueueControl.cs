@@ -3959,6 +3959,8 @@ namespace AirDirector.Controls
                             ? ""
                             : (string.IsNullOrWhiteSpace(pItem.AssociatedVideoPath) ? "BufferVideo" : "StaticVideo");
 
+                        int durMs = (int)duration.TotalMilliseconds;
+
                         var streamingItem = new PlaylistQueueItem
                         {
                             Type = PlaylistItemType.Other,
@@ -3970,8 +3972,8 @@ namespace AirDirector.Controls
                             FilePath = pItem.FilePath ?? "",
                             MarkerIN = 0,
                             MarkerINTRO = 0,
-                            MarkerMIX = 0,
-                            MarkerOUT = 0,
+                            MarkerMIX = durMs,
+                            MarkerOUT = durMs,
                             VideoFilePath = associatedVideo,
                             VideoSource = associatedVideoSource
                         };
