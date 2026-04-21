@@ -81,6 +81,8 @@ namespace AirDirector.Controls
         private bool _isStreamingURL = false;
         private TimeSpan _streamScheduledDuration = TimeSpan.Zero;
         private DateTime _streamStartTime = DateTime.MinValue;
+        private int _streamRetryCount = 0;
+        private string _streamOriginalUrl = "";
 
         private Panel waveformPanel;
         private Label lblIntro;
@@ -177,11 +179,25 @@ namespace AirDirector.Controls
 
                 _vlcPlayer = new MediaPlayer(_libVLC);
 
-                _vlcPlayer.Playing += (s, e) => Log("[VLC] ▶️ Playing");
+                // Log libVLC warning/error per diagnostica stream
+                try
+                {
+                    _libVLC.Log += (sender, args) =>
+                    {
+                        if (args.Level == LibVLCSharp.Shared.LogLevel.Warning || args.Level == LibVLCSharp.Shared.LogLevel.Error)
+                        {
+                            try { Log("[libvlc:" + args.Level + "] " + (args.Module ?? "?") + ": " + (args.Message ?? "")); } catch { }
+                        }
+                    };
+                }
+                catch { }
+
+                _vlcPlayer.Opening += (s, e) => Log("[VLC] … Opening");
+                _vlcPlayer.Playing += (s, e) => { Log("[VLC] ▶️ Playing"); _streamRetryCount = 0; };
                 _vlcPlayer.Paused += (s, e) => Log("[VLC] ⏸️ Paused");
                 _vlcPlayer.Stopped += (s, e) => Log("[VLC] ⏹️ Stopped");
                 _vlcPlayer.EndReached += (s, e) => Log("[VLC] 🏁 EndReached");
-                _vlcPlayer.EncounteredError += (s, e) => Log("[VLC] ❌ Error");
+                _vlcPlayer.EncounteredError += (s, e) => HandleStreamError();
 
                 Log("[VLC] ✅ Inizializzato con successo");
             }
@@ -190,6 +206,105 @@ namespace AirDirector.Controls
                 MessageBox.Show(string.Format(LanguageManager.GetString("Player.VLCInitError", "Errore inizializzazione VLC:\n{0}\n\nAssicurati di aver installato libvlc."), ex.Message),
                     LanguageManager.GetString("Player.VLCErrorTitle", "Errore VLC"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void HandleStreamError()
+        {
+            string mrl = "";
+            try { mrl = _vlcPlayer?.Media?.Mrl ?? ""; } catch { }
+            Log("[VLC] ❌ EncounteredError state=" + (_vlcPlayer?.State.ToString() ?? "?") + " mrl=" + mrl);
+
+            if (!_isStreamingURL || string.IsNullOrEmpty(_streamOriginalUrl))
+            {
+                // Non-stream o stream già completamente perso → skip
+                SafeInvoke(() =>
+                {
+                    Log("[VLC] Stream error non recuperabile → skip");
+                    if (_autoMode) PlayNextTrack();
+                    else Stop();
+                });
+                return;
+            }
+
+            if (_streamRetryCount >= 2)
+            {
+                SafeInvoke(() =>
+                {
+                    Log("[VLC] ❌ Retry esauriti per " + _streamOriginalUrl + " → skip");
+                    if (_autoMode) PlayNextTrack();
+                    else Stop();
+                });
+                return;
+            }
+
+            _streamRetryCount++;
+            int retryN = _streamRetryCount;
+            string retryUrl = _streamOriginalUrl;
+            if (retryN == 1 && retryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                retryUrl = "http://" + retryUrl.Substring("https://".Length);
+            }
+
+            Log("[VLC] ↻ Stream retry #" + retryN + " → " + retryUrl);
+
+            SafeInvoke(() =>
+            {
+                try
+                {
+                    System.Threading.Tasks.Task.Delay(500).ContinueWith(_ =>
+                    {
+                        SafeInvoke(() =>
+                        {
+                            try { _vlcPlayer.Stop(); } catch { }
+                            try
+                            {
+                                var m = new Media(_libVLC, retryUrl, FromType.FromLocation);
+                                AddStreamOptions(m, retryN == 2);
+                                _vlcPlayer.Media = m;
+                                m.Dispose();
+                                _vlcPlayer.Play();
+                            }
+                            catch (Exception ex) { LogErr("[VLC retry]", ex); }
+                        });
+                    });
+                }
+                catch (Exception ex) { LogErr("[VLC retry schedule]", ex); }
+            });
+        }
+
+        private void AddStreamOptions(Media m, bool aggressiveDemux)
+        {
+            m.AddOption(":no-video");
+            m.AddOption(":network-caching=10000");
+            m.AddOption(":live-caching=10000");
+            m.AddOption(":http-reconnect");
+            m.AddOption(":http-continuous");
+            m.AddOption(":http-forward-cookies");
+            m.AddOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+            string mrl = "";
+            try { mrl = m.Mrl ?? ""; } catch { }
+            bool looksLikeHls = mrl.IndexOf(".m3u8", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (aggressiveDemux && !looksLikeHls)
+            {
+                m.AddOption(":demux=mpga");
+                m.AddOption(":codec=any");
+            }
+            else if (!looksLikeHls)
+            {
+                m.AddOption(":demux=any");
+            }
+        }
+
+        private void SafeInvoke(Action a)
+        {
+            try
+            {
+                if (IsDisposed) return;
+                if (InvokeRequired) BeginInvoke(a);
+                else a();
+            }
+            catch { }
         }
 
         private void InitializeAudioEngine()
@@ -895,13 +1010,10 @@ namespace AirDirector.Controls
 
                         if (_vlcPlayer != null)
                         {
+                            _streamOriginalUrl = nextItem.FilePath;
+                            _streamRetryCount = 0;
                             var media = new Media(_libVLC, nextItem.FilePath, FromType.FromLocation);
-                            media.AddOption(":no-video");
-                            media.AddOption(":network-caching=10000");
-                            media.AddOption(":live-caching=10000");
-                            media.AddOption(":http-reconnect");
-                            media.AddOption(":http-continuous");
-
+                            AddStreamOptions(media, false);
                             _vlcPlayer.Media = media;
                             media.Dispose();
                             _vlcPlayer.Play();
@@ -2676,13 +2788,10 @@ namespace AirDirector.Controls
 
                     if (_vlcPlayer != null)
                     {
+                        _streamOriginalUrl = streamItem.FilePath;
+                        _streamRetryCount = 0;
                         var media = new Media(_libVLC, streamItem.FilePath, FromType.FromLocation);
-                        media.AddOption(":no-video");
-                        media.AddOption(":network-caching=10000");
-                        media.AddOption(":live-caching=10000");
-                        media.AddOption(":http-reconnect");
-                        media.AddOption(":http-continuous");
-
+                        AddStreamOptions(media, false);
                         _vlcPlayer.Media = media;
                         media.Dispose();
                         _vlcPlayer.Play();
@@ -2888,6 +2997,8 @@ namespace AirDirector.Controls
             _isPlaying = false;
             _isPaused = false;
             _isStreamingURL = false;
+            _streamRetryCount = 0;
+            _streamOriginalUrl = "";
 
             AudioFileReader activeAudio = _isPlayerAActive ? _audioFileA : _audioFileB;
             if (activeAudio != null)
