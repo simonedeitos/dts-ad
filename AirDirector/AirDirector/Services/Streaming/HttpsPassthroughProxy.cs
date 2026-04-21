@@ -20,6 +20,7 @@ namespace AirDirector.Services.Streaming
         private readonly HttpClient _httpClient;
         private readonly Action<string>? _logger;
         private volatile bool _running;
+        private bool _loggedManifestDump;
 
         public int Port { get; }
 
@@ -93,23 +94,30 @@ namespace AirDirector.Services.Streaming
         {
             try
             {
-                string path = ctx.Request.Url?.AbsolutePath ?? "";
-                if (!path.Equals("/p", StringComparison.OrdinalIgnoreCase))
-                {
-                    ctx.Response.StatusCode = 404;
-                    return;
-                }
-
-                string upstreamRaw = GetQueryParam(ctx.Request.Url?.Query, "u");
-                if (string.IsNullOrWhiteSpace(upstreamRaw))
+                if (!TryGetUpstreamUrl(ctx.Request, out string upstreamRaw, out string error))
                 {
                     ctx.Response.StatusCode = 400;
+                    ApplyProxyHeaders(ctx.Response);
+                    await WriteTextResponseAsync(ctx.Response, error).ConfigureAwait(false);
+                    Log($"[PROXY] ERR bad request: {ctx.Request.Url?.AbsolutePath}");
                     return;
                 }
 
                 if (!Uri.TryCreate(upstreamRaw, UriKind.Absolute, out var upstreamUri))
                 {
                     ctx.Response.StatusCode = 400;
+                    ApplyProxyHeaders(ctx.Response);
+                    await WriteTextResponseAsync(ctx.Response, "Invalid upstream URL").ConfigureAwait(false);
+                    Log($"[PROXY] ERR bad request: {ctx.Request.Url?.AbsolutePath}");
+                    return;
+                }
+
+                if (upstreamUri.Scheme != Uri.UriSchemeHttp && upstreamUri.Scheme != Uri.UriSchemeHttps)
+                {
+                    ctx.Response.StatusCode = 400;
+                    ApplyProxyHeaders(ctx.Response);
+                    await WriteTextResponseAsync(ctx.Response, "Only http/https URLs are supported").ConfigureAwait(false);
+                    Log($"[PROXY] ERR bad request: {ctx.Request.Url?.AbsolutePath}");
                     return;
                 }
 
@@ -132,18 +140,22 @@ namespace AirDirector.Services.Streaming
 
                 ctx.Response.StatusCode = (int)upstreamResp.StatusCode;
                 CopyResponseHeaders(upstreamResp, ctx.Response, includeContentLength: true, includeContentType: true);
+                ApplyProxyHeaders(ctx.Response);
                 await using var body = await upstreamResp.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                await body.CopyToAsync(ctx.Response.OutputStream).ConfigureAwait(false);
-                Log($"GET {upstreamUri} → {(int)upstreamResp.StatusCode}");
+                long copiedBytes = await CopyToWithCountAsync(body, ctx.Response.OutputStream).ConfigureAwait(false);
+                string contentType = upstreamResp.Content.Headers.ContentType?.ToString() ?? "(none)";
+                Log($"[PROXY] GET {upstreamUri} → {(int)upstreamResp.StatusCode} ({copiedBytes} bytes, {contentType})");
             }
             catch (Exception ex)
             {
                 try
                 {
                     ctx.Response.StatusCode = 502;
+                    ApplyProxyHeaders(ctx.Response);
+                    await WriteTextResponseAsync(ctx.Response, "Proxy error").ConfigureAwait(false);
                 }
                 catch { }
-                Log("ERR request: " + ex.Message);
+                Log("[PROXY] ERR request: " + TruncateException(ex));
             }
             finally
             {
@@ -161,44 +173,62 @@ namespace AirDirector.Services.Streaming
                 content = await reader.ReadToEndAsync().ConfigureAwait(false);
             }
 
-            var rewritten = RewriteManifest(content, upstreamUri, out int rewrittenItems);
+            var rewritten = RewriteManifest(content, upstreamUri, out int rewrittenItems, out var rewriteSamples);
             var bytes = Encoding.UTF8.GetBytes(rewritten);
 
             ctx.Response.StatusCode = (int)upstreamResp.StatusCode;
             CopyResponseHeaders(upstreamResp, ctx.Response, includeContentLength: false, includeContentType: false);
+            ApplyProxyHeaders(ctx.Response);
             ctx.Response.ContentType = "application/vnd.apple.mpegurl";
             ctx.Response.ContentLength64 = bytes.LongLength;
-            ctx.Response.Headers["Cache-Control"] = "no-cache";
-            ctx.Response.Headers["Pragma"] = "no-cache";
-            ctx.Response.Headers["Expires"] = "0";
             await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
 
-            Log($"GET {upstreamUri} → {(int)upstreamResp.StatusCode} (HLS rewrite, {rewrittenItems} segments)");
+            Log($"[PROXY] GET {upstreamUri} → {(int)upstreamResp.StatusCode} (HLS rewrite, {rewrittenItems} segments)");
+            foreach (var sample in rewriteSamples)
+                Log("[PROXY] HLS rewrite sample: " + sample);
+
+            if (!_loggedManifestDump)
+            {
+                _loggedManifestDump = true;
+                Log("[PROXY] HLS upstream head: " + TruncateSingleLine(content, 500));
+                Log("[PROXY] HLS rewritten head: " + TruncateSingleLine(rewritten, 500));
+            }
         }
 
-        private string RewriteManifest(string content, Uri originalUri, out int rewrittenItems)
+        private string RewriteManifest(string content, Uri originalUri, out int rewrittenItems, out string[] rewriteSamples)
         {
             int changedCount = 0;
+            var samples = new System.Collections.Generic.List<string>(2);
             var sb = new StringBuilder(content.Length + 256);
             var baseUri = new Uri(originalUri, "./");
             string newline = content.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
             using var reader = new StringReader(content);
             string? line;
             bool first = true;
+            bool nextLineIsVariantPlaylist = false;
             while ((line = reader.ReadLine()) != null)
             {
                 if (!first) sb.Append(newline);
                 first = false;
 
-                if (line.StartsWith("#EXT-X-KEY:", StringComparison.OrdinalIgnoreCase) ||
-                    line.StartsWith("#EXT-X-MAP:", StringComparison.OrdinalIgnoreCase))
+                if (line.StartsWith("#EXT-X-STREAM-INF:", StringComparison.OrdinalIgnoreCase))
+                    nextLineIsVariantPlaylist = true;
+
+                if (line.StartsWith("#EXT", StringComparison.OrdinalIgnoreCase) && line.IndexOf("URI=\"", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     string replaced = Regex.Replace(line, "URI=\"([^\"]+)\"", m =>
                     {
                         string uriValue = m.Groups[1].Value;
-                        string rewritten = RewritePlaylistUri(uriValue, baseUri);
+                        bool isPlaylistUriTag =
+                            line.StartsWith("#EXT-X-MEDIA:", StringComparison.OrdinalIgnoreCase) ||
+                            line.StartsWith("#EXT-X-I-FRAME-STREAM-INF:", StringComparison.OrdinalIgnoreCase);
+                        string rewritten = RewritePlaylistUri(uriValue, baseUri, isPlaylistUriTag);
                         if (!string.Equals(uriValue, rewritten, StringComparison.Ordinal))
+                        {
                             changedCount++;
+                            if (samples.Count < 2)
+                                samples.Add($"{uriValue} → {rewritten}");
+                        }
                         return "URI=\"" + rewritten + "\"";
                     });
                     sb.Append(replaced);
@@ -207,20 +237,31 @@ namespace AirDirector.Services.Streaming
 
                 if (line.Length > 0 && !line.StartsWith("#", StringComparison.Ordinal))
                 {
-                    string rewritten = RewritePlaylistUri(line.Trim(), baseUri);
+                    string original = line.Trim();
+                    string rewritten = RewritePlaylistUri(original, baseUri, preferPlaylistDummy: nextLineIsVariantPlaylist);
                     if (!string.Equals(line.Trim(), rewritten, StringComparison.Ordinal))
+                    {
                         changedCount++;
+                        if (samples.Count < 2)
+                            samples.Add($"{original} → {rewritten}");
+                    }
                     sb.Append(rewritten);
+                    nextLineIsVariantPlaylist = false;
                     continue;
                 }
 
                 sb.Append(line);
             }
+
+            if (sb.Length == 0 || sb[sb.Length - 1] != '\n')
+                sb.Append('\n');
+
             rewrittenItems = changedCount;
+            rewriteSamples = samples.ToArray();
             return sb.ToString();
         }
 
-        private string RewritePlaylistUri(string value, Uri baseUri)
+        private string RewritePlaylistUri(string value, Uri baseUri, bool preferPlaylistDummy)
         {
             if (string.IsNullOrWhiteSpace(value))
                 return value;
@@ -234,7 +275,8 @@ namespace AirDirector.Services.Streaming
             if (absolute.Scheme != Uri.UriSchemeHttp && absolute.Scheme != Uri.UriSchemeHttps)
                 return value;
 
-            return BuildProxyUrl(absolute.ToString());
+            string dummyName = GetDummyName(absolute, preferPlaylistDummy);
+            return BuildProxyUrl(absolute.ToString(), dummyName);
         }
 
         private void ForwardRequestHeaders(HttpListenerRequest source, HttpRequestMessage target)
@@ -295,9 +337,13 @@ namespace AirDirector.Services.Streaming
             try { response.Headers[key] = value; } catch { }
         }
 
-        private string BuildProxyUrl(string originalUrl)
+        private string BuildProxyUrl(string originalUrl, string? dummyName = null)
         {
-            return $"http://127.0.0.1:{Port}/p?u={Uri.EscapeDataString(originalUrl)}";
+            string token = EncodeBase64Url(originalUrl);
+            string safeDummy = dummyName ?? "playlist.m3u8";
+            if (string.IsNullOrWhiteSpace(dummyName) && Uri.TryCreate(originalUrl, UriKind.Absolute, out var uri))
+                safeDummy = GetDummyName(uri, preferPlaylistDummy: true);
+            return $"http://127.0.0.1:{Port}/p/{token}/{Uri.EscapeDataString(safeDummy)}";
         }
 
         private static int GetFreeLoopbackPort()
@@ -323,6 +369,128 @@ namespace AirDirector.Services.Streaming
                 return Uri.UnescapeDataString(v);
             }
             return "";
+        }
+
+        private static async Task WriteTextResponseAsync(HttpListenerResponse response, string text)
+        {
+            var bytes = Encoding.UTF8.GetBytes(text ?? "");
+            response.ContentType = "text/plain; charset=utf-8";
+            response.ContentLength64 = bytes.LongLength;
+            await response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+        }
+
+        private static async Task<long> CopyToWithCountAsync(Stream source, Stream destination)
+        {
+            byte[] buffer = new byte[81920];
+            long total = 0;
+            int read;
+            while ((read = await source.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
+            {
+                await destination.WriteAsync(buffer, 0, read).ConfigureAwait(false);
+                total += read;
+            }
+            return total;
+        }
+
+        private static string GetDummyName(Uri uri, bool preferPlaylistDummy)
+        {
+            string last = Uri.UnescapeDataString(Path.GetFileName(uri.AbsolutePath) ?? "");
+            if (!string.IsNullOrWhiteSpace(last) && !string.IsNullOrWhiteSpace(Path.GetExtension(last)))
+                return last;
+
+            return preferPlaylistDummy ? "playlist.m3u8" : "seg.ts";
+        }
+
+        private static string EncodeBase64Url(string text)
+        {
+            var raw = Encoding.UTF8.GetBytes(text);
+            return Convert.ToBase64String(raw).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        }
+
+        private static bool TryDecodeBase64Url(string token, out string value)
+        {
+            value = "";
+            if (string.IsNullOrWhiteSpace(token))
+                return false;
+
+            string base64 = token.Replace('-', '+').Replace('_', '/');
+            int mod = base64.Length % 4;
+            if (mod > 0)
+                base64 = base64.PadRight(base64.Length + (4 - mod), '=');
+
+            try
+            {
+                var bytes = Convert.FromBase64String(base64);
+                value = Encoding.UTF8.GetString(bytes);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string TruncateException(Exception ex)
+        {
+            var full = ex.ToString();
+            const int max = 1200;
+            return full.Length <= max ? full : full.Substring(0, max) + "...";
+        }
+
+        private static string TruncateSingleLine(string text, int max)
+        {
+            if (string.IsNullOrEmpty(text))
+                return "";
+            string oneLine = text.Replace('\r', ' ').Replace('\n', ' ');
+            return oneLine.Length <= max ? oneLine : oneLine.Substring(0, max) + "...";
+        }
+
+        private static void ApplyProxyHeaders(HttpListenerResponse response)
+        {
+            TrySetHeader(response, "Cache-Control", "no-cache, no-store, must-revalidate");
+            TrySetHeader(response, "Pragma", "no-cache");
+            TrySetHeader(response, "Expires", "0");
+            TrySetHeader(response, "Access-Control-Allow-Origin", "*");
+        }
+
+        private static bool TryGetUpstreamUrl(HttpListenerRequest request, out string upstreamRaw, out string error)
+        {
+            upstreamRaw = "";
+            error = "Missing upstream URL";
+
+            string path = request.Url?.AbsolutePath ?? "";
+            if (path.StartsWith("/p/", StringComparison.OrdinalIgnoreCase))
+            {
+                string rest = path.Substring(3);
+                if (string.IsNullOrWhiteSpace(rest))
+                {
+                    error = "Malformed proxy path";
+                    return false;
+                }
+
+                int slash = rest.IndexOf('/');
+                string token = slash >= 0 ? rest.Substring(0, slash) : rest;
+                if (!TryDecodeBase64Url(token, out upstreamRaw))
+                {
+                    error = "Invalid base64url token";
+                    return false;
+                }
+                return true;
+            }
+
+            if (!path.Equals("/p", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "Unsupported proxy path";
+                return false;
+            }
+
+            upstreamRaw = GetQueryParam(request.Url?.Query, "u");
+            if (string.IsNullOrWhiteSpace(upstreamRaw))
+            {
+                error = "Missing query parameter u";
+                return false;
+            }
+            return true;
         }
 
         private void Log(string message)
