@@ -97,7 +97,7 @@ namespace AirDirector.Controls
             public volatile bool AudioStarted; public PlayItem CurrentItem;
             public volatile bool IsPreBuffered, IsPendingActivation, PreBufferReady;
             public volatile int SessionId, StartPointMs;
-            public volatile bool WebStreamRetried;
+            public int WebStreamRetryCount;
             public readonly System.Diagnostics.Stopwatch StreamClock = new System.Diagnostics.Stopwatch();
         }
         private Deck _deckA, _deckB, _bufferDeck, _activeDeck, _pendingDeck;
@@ -407,13 +407,16 @@ namespace AirDirector.Controls
                     int sid = deck.SessionId;
 
                     bool isStreamDeck = deck.Type == DeckType.WebStream;
-                    bool alreadyRetried = deck.WebStreamRetried;
-                    bool looksLikeHls = !string.IsNullOrEmpty(url) && url.IndexOf(".m3u8", StringComparison.OrdinalIgnoreCase) >= 0;
-
-                    if (isStreamDeck && !alreadyRetried && !string.IsNullOrEmpty(url))
+                    if (isStreamDeck && !string.IsNullOrEmpty(url) && deck.WebStreamRetryCount < 2)
                     {
-                        deck.WebStreamRetried = true;
-                        Log("[VLC] ↻ Retry WebStream con demux alternativo: " + url);
+                        deck.WebStreamRetryCount++;
+                        int retryN = deck.WebStreamRetryCount;
+                        string retryUrl = url;
+                        if (retryN == 1 && retryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                        {
+                            retryUrl = "http://" + retryUrl.Substring("https://".Length);
+                        }
+                        Log("[VLC] ↻ WebStream retry #" + retryN + " → " + retryUrl);
                         ThreadPool.QueueUserWorkItem(_ =>
                         {
                             Thread.Sleep(500);
@@ -424,7 +427,7 @@ namespace AirDirector.Controls
                                 {
                                     if (deck.SessionId != sid) return;
                                     try { deck.VlcPlayer.Stop(); } catch { }
-                                    var m = new Media(_libVLC, url, FromType.FromLocation);
+                                    var m = new Media(_libVLC, retryUrl, FromType.FromLocation);
                                     m.AddOption(":no-video");
                                     m.AddOption(":network-caching=10000");
                                     m.AddOption(":live-caching=10000");
@@ -432,11 +435,15 @@ namespace AirDirector.Controls
                                     m.AddOption(":http-continuous");
                                     m.AddOption(":http-forward-cookies");
                                     m.AddOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-                                    if (!looksLikeHls)
+                                    bool retryIsHls = retryUrl.IndexOf(".m3u8", StringComparison.OrdinalIgnoreCase) >= 0;
+                                    if (retryN == 2 && !retryIsHls)
                                     {
-                                        // Primo tentativo usa demux=any; al retry forziamo mpga per stream Icecast/MP3 con URL non standard (.audio).
                                         m.AddOption(":demux=mpga");
                                         m.AddOption(":codec=any");
+                                    }
+                                    else if (!retryIsHls)
+                                    {
+                                        m.AddOption(":demux=any");
                                     }
                                     deck.VlcPlayer.Media = m;
                                     m.Dispose();
@@ -504,7 +511,7 @@ namespace AirDirector.Controls
             d.PreBufferReady = false; d.Volume = 0f; d.IsReadyForVideo = false;
             d.FrameCount = 0; d.AudioStarted = false; d.WarmupDone = false;
             d.VlcTimeMs = 0; d.Ring.Reset(); d.CurrentItem = null; d.StartPointMs = 0;
-            d.WebStreamRetried = false;
+            d.WebStreamRetryCount = 0;
             d.StreamClock.Reset();
         }
 
