@@ -69,8 +69,26 @@ namespace AirDirector.Controls
             public int MarkerIN, MarkerINTRO, MarkerMIX, MarkerOUT;
             public int FileDurationMs;
             public bool IsScheduled = false;
+            public bool IsVideoStream = false;
             public static PlayItem FromQueueItem(PlaylistQueueItem qi) => new PlayItem
-            { FilePath = qi.FilePath ?? "", Artist = qi.Artist ?? "", Title = qi.Title ?? "", Intro = qi.Intro, MarkerIN = qi.MarkerIN, MarkerINTRO = qi.MarkerINTRO, MarkerMIX = qi.MarkerMIX, MarkerOUT = qi.MarkerOUT, ItemType = qi.ItemType ?? "Clip", VideoFilePath = qi.VideoFilePath ?? "", VideoSource = qi.VideoSource ?? "", NDISourceName = qi.NDISourceName ?? "", Duration = qi.Duration, FileDurationMs = qi.FileDurationMs, IsScheduled = qi.IsScheduled };
+            {
+                FilePath = qi.FilePath ?? "",
+                Artist = qi.Artist ?? "",
+                Title = qi.Title ?? "",
+                Intro = qi.Intro,
+                MarkerIN = qi.MarkerIN,
+                MarkerINTRO = qi.MarkerINTRO,
+                MarkerMIX = qi.MarkerMIX,
+                MarkerOUT = qi.MarkerOUT,
+                ItemType = qi.ItemType ?? "Clip",
+                VideoFilePath = qi.VideoFilePath ?? "",
+                VideoSource = qi.VideoSource ?? "",
+                NDISourceName = qi.NDISourceName ?? "",
+                Duration = qi.Duration,
+                FileDurationMs = qi.FileDurationMs,
+                IsScheduled = qi.IsScheduled,
+                IsVideoStream = qi.IsVideoStream
+            };
         }
 
         private enum DeckType { VideoClip, AudioTrack, WebStream, Buffer }
@@ -702,7 +720,11 @@ namespace AirDirector.Controls
             bool ready;
             if (p.Type == DeckType.VideoClip) ready = p.FrameCount >= MIN_READY_FRAMES && p.WarmupDone;
             else if (p.Type == DeckType.AudioTrack && p.VlcPlayer.IsPlaying) ready = p.FrameCount >= MIN_READY_FRAMES;
-            else if (p.Type == DeckType.WebStream) ready = p.WarmupDone;
+            else if (p.Type == DeckType.WebStream)
+            {
+                bool isVS = p.CurrentItem?.IsVideoStream ?? false;
+                ready = isVS ? (p.WarmupDone && p.FrameCount >= MIN_READY_FRAMES) : p.WarmupDone;
+            }
             else ready = true;
             if (!ready) return;
             Deck old = _activeDeck; _activeDeck = p; _pendingDeck = null; p.IsPendingActivation = false;
@@ -927,12 +949,29 @@ namespace AirDirector.Controls
                 target = _nextIsA ? _deckA : _deckB; if (target == _activeDeck) target = !_nextIsA ? _deckA : _deckB; _nextIsA = !_nextIsA;
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
-                var media = new Media(_libVLC, fp, FromType.FromLocation); media.AddOption(":network-caching=1000"); media.AddOption(":no-video");
-                target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
-                _bufferShouldShow = true; _currentFileIsVideo = false;
-                EnsureBufferVideoPlaying();
+                var media = new Media(_libVLC, fp, FromType.FromLocation);
+                // Video web stream (HLS/RTMP) needs a slightly longer startup buffer to stabilize A/V before on-air transition.
+                media.AddOption(":network-caching=2000");
+                media.AddOption(":live-caching=2000");
+
+                if (!item.IsVideoStream)
+                {
+                    media.AddOption(":no-video");
+                    target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
+                    _bufferShouldShow = true; _currentFileIsVideo = false;
+                    EnsureBufferVideoPlaying();
+                    Log("[PLAY] WebStream (audio-only) → " + target.Name);
+                }
+                else
+                {
+                    target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
+                    _bufferShouldShow = false;
+                    _currentFileIsVideo = true;
+                    StopBufferDeck();
+                    Log("[PLAY] WebStream (video) → " + target.Name);
+                }
+
                 target.Volume = 1.0f; target.IsPlaying = true; target.CurrentItem = item; target.IsPendingActivation = true; _pendingDeck = target;
-                Log("[PLAY] WebStream → " + target.Name);
             }
             else if (_preBufferedDeck != null && _preBufferedFile == fp && _preBufferedDeck.PreBufferReady)
             {

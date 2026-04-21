@@ -13,13 +13,15 @@ namespace AirDirector.Forms
     {
         private readonly DataGridView _grid;
         private readonly List<StreamingEntry> _entries;
+        private readonly bool _isRadioTVMode;
         private readonly Button _btnNew;
         private readonly Button _btnEdit;
         private readonly Button _btnDelete;
         private readonly Button _btnClose;
 
-        public StreamingManagerForm()
+        public StreamingManagerForm(bool isRadioTVMode = false)
         {
+            _isRadioTVMode = isRadioTVMode;
             Text = "🌐 " + LanguageManager.GetString("StreamingManager.Title", "Gestione Streaming");
             StartPosition = FormStartPosition.CenterParent;
             Size = new Size(820, 500);
@@ -42,6 +44,14 @@ namespace AirDirector.Forms
             };
             _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("StreamingManager.Name", "Nome"), Width = 220 });
             _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("StreamingManager.URL", "URL"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+            if (_isRadioTVMode)
+            {
+                _grid.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    HeaderText = LanguageManager.GetString("StreamingManager.StreamType", "Tipo"),
+                    Width = 120
+                });
+            }
 
             var panelButtons = new FlowLayoutPanel
             {
@@ -78,7 +88,9 @@ namespace AirDirector.Forms
             _grid.Rows.Clear();
             foreach (var e in _entries.OrderBy(x => x.Name))
             {
-                int row = _grid.Rows.Add(e.Name, e.URL);
+                int row = _isRadioTVMode
+                    ? _grid.Rows.Add(e.Name, e.URL, e.IsVideoStream ? "🎬 Video" : "🔊 Audio")
+                    : _grid.Rows.Add(e.Name, e.URL);
                 _grid.Rows[row].Tag = e;
             }
         }
@@ -105,7 +117,13 @@ namespace AirDirector.Forms
             if (selected == null)
                 return;
 
-            var edit = new StreamingEntry { ID = selected.ID, Name = selected.Name, URL = selected.URL };
+            var edit = new StreamingEntry
+            {
+                ID = selected.ID,
+                Name = selected.Name,
+                URL = selected.URL,
+                IsVideoStream = selected.IsVideoStream
+            };
             if (!EditEntry(edit))
                 return;
 
@@ -113,6 +131,7 @@ namespace AirDirector.Forms
             {
                 selected.Name = edit.Name;
                 selected.URL = edit.URL;
+                selected.IsVideoStream = edit.IsVideoStream;
                 ReloadGrid();
             }
         }
@@ -143,7 +162,7 @@ namespace AirDirector.Forms
 
         private bool EditEntry(StreamingEntry entry)
         {
-            using (var form = new StreamingEntryEditForm(entry))
+            using (var form = new StreamingEntryEditForm(entry, _isRadioTVMode))
             {
                 return form.ShowDialog(this) == DialogResult.OK;
             }
@@ -154,14 +173,15 @@ namespace AirDirector.Forms
     {
         private readonly TextBox _txtName;
         private readonly TextBox _txtUrl;
+        private readonly CheckBox _chkIsVideo;
         private readonly StreamingEntry _entry;
 
-        public StreamingEntryEditForm(StreamingEntry entry)
+        public StreamingEntryEditForm(StreamingEntry entry, bool isRadioTVMode = false)
         {
             _entry = entry;
             Text = LanguageManager.GetString("StreamingManager.Title", "Gestione Streaming");
             StartPosition = FormStartPosition.CenterParent;
-            Size = new Size(520, 200);
+            Size = new Size(520, isRadioTVMode ? 240 : 200);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -174,11 +194,26 @@ namespace AirDirector.Forms
             _txtUrl = new TextBox { Left = 140, Top = 54, Width = 350, Text = _entry.URL ?? "" };
             Controls.Add(_txtUrl);
 
-            var btnSave = new Button { Left = 330, Top = 96, Width = 75, Text = LanguageManager.GetString("Common.Save", "Salva"), DialogResult = DialogResult.OK };
+            if (isRadioTVMode)
+            {
+                Controls.Add(new Label { Left = 12, Top = 92, Width = 120, Text = LanguageManager.GetString("StreamingManager.StreamType", "Tipo Stream:") });
+                _chkIsVideo = new CheckBox
+                {
+                    Left = 140,
+                    Top = 90,
+                    Width = 280,
+                    Text = LanguageManager.GetString("StreamingManager.IsVideoStream", "Stream Video (HLS/RTMP)"),
+                    Checked = _entry.IsVideoStream
+                };
+                Controls.Add(_chkIsVideo);
+            }
+
+            int buttonsTop = isRadioTVMode ? 130 : 96;
+            var btnSave = new Button { Left = 330, Top = buttonsTop, Width = 75, Text = LanguageManager.GetString("Common.Save", "Salva"), DialogResult = DialogResult.OK };
             btnSave.Click += BtnSave_Click;
             Controls.Add(btnSave);
 
-            var btnCancel = new Button { Left = 415, Top = 96, Width = 75, Text = LanguageManager.GetString("Common.Cancel", "Annulla"), DialogResult = DialogResult.Cancel };
+            var btnCancel = new Button { Left = 415, Top = buttonsTop, Width = 75, Text = LanguageManager.GetString("Common.Cancel", "Annulla"), DialogResult = DialogResult.Cancel };
             Controls.Add(btnCancel);
 
             AcceptButton = btnSave;
@@ -202,6 +237,7 @@ namespace AirDirector.Forms
 
             _entry.Name = _txtName.Text.Trim();
             _entry.URL = _txtUrl.Text.Trim();
+            _entry.IsVideoStream = _chkIsVideo?.Checked ?? false;
         }
     }
 }
