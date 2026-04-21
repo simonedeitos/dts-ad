@@ -182,8 +182,44 @@ namespace AirDirector.Controls
                     "--clock-jitter=0",
                     "--clock-synchro=0",
                     "--no-audio-time-stretch",
-                    "--verbose=2"
+                    "--verbose=2",
+                    "--gnutls-priorities=NORMAL:%COMPAT",
+                    "--no-video-title-show"
                 );
+                try
+                {
+                    _libVLC.SetDialogHandlers(
+                        (title, text) =>
+                        {
+                            Log($"[libvlc:Dialog/Error] {title}: {text}");
+                            return Task.CompletedTask;
+                        },
+                        (dialog, title, text, defaultUserName, askStore, token) =>
+                        {
+                            Log($"[libvlc:Dialog/Login] {title} (auto-cancel)");
+                            try { dialog.Dismiss(); } catch (Exception ex) { Log($"[libvlc:Dialog/Login] dismiss failed: {ex.Message}"); }
+                            return Task.CompletedTask;
+                        },
+                        (dialog, title, text, qType, cancel, action1, action2, token) =>
+                        {
+                            Log($"[libvlc:Dialog/Question] {title}: {text} → auto-accept (action1='{action1}')");
+                            try { dialog.PostAction(1); }
+                            catch (Exception ex)
+                            {
+                                Log($"[libvlc:Dialog/Question] post-action failed: {ex.Message}");
+                                try { dialog.Dismiss(); } catch (Exception dismissEx) { Log($"[libvlc:Dialog/Question] dismiss failed: {dismissEx.Message}"); }
+                            }
+                            return Task.CompletedTask;
+                        },
+                        (dialog, title, text, indeterminate, position, cancel, token) => Task.CompletedTask,
+                        (dialog, position, text) => Task.CompletedTask
+                    );
+                    Log("[INIT] LibVLC dialog handlers registered (TLS auto-accept)");
+                }
+                catch (Exception ex)
+                {
+                    Log($"[INIT] ⚠️ SetDialogHandlers failed: {ex.Message}");
+                }
 
                 _vlcPlayer = new MediaPlayer(_libVLC);
 
