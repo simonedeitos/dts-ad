@@ -404,6 +404,8 @@ namespace AirDirector.Controls
                     else _commandQueue.Enqueue(() => HandleDeckEnded(deck, sid));
                 });
             };
+            deck.VlcPlayer.EncounteredError += (s, e) =>
+                Log("[VLC] ❌ Error on " + deck.Name + " (type=" + deck.Type + ")");
             if (!isBuffer)
             {
                 deck.VlcPlayer.SetAudioFormat("S16N", AUDIO_SAMPLE_RATE, AUDIO_CHANNELS);
@@ -731,7 +733,12 @@ namespace AirDirector.Controls
                     ? (p.WarmupDone && p.FrameCount >= MIN_READY_FRAMES) || waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS
                     : p.WarmupDone || waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS;
                 if (waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS)
+                {
                     Log("[TRANS] ⚠️ WebStream pending timeout, force-activating after " + waitedMs + "ms");
+                    // Open the audio gate so the ring is read as soon as VLC delivers samples.
+                    // Ring.Read returns 0 when empty, so forcing WarmupDone=true is safe.
+                    p.WarmupDone = true;
+                }
             }
             else ready = true;
             if (!ready) return;
@@ -971,9 +978,17 @@ namespace AirDirector.Controls
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
                 var media = new Media(_libVLC, fp, FromType.FromLocation);
-                // Video web stream (HLS/RTMP) needs a slightly longer startup buffer to stabilize A/V before on-air transition.
-                media.AddOption(":network-caching=2000");
-                media.AddOption(":live-caching=2000");
+                // HLS/RTMP stream options: generous caching for slow CDN segments, software decoding
+                // required for SMEM video callbacks (avcodec-hw=any bypasses memory-mapped frames),
+                // custom user-agent so CDNs that block the default VLC agent still respond,
+                // and http-reconnect to recover from transient network interruptions.
+                media.AddOption(":network-caching=5000");
+                media.AddOption(":live-caching=5000");
+                media.AddOption(":avcodec-hw=none");
+                media.AddOption(":http-user-agent=Mozilla/5.0 (compatible; AirDirector)");
+                media.AddOption(":http-reconnect");
+                media.AddOption(":no-drop-late-frames");
+                media.AddOption(":no-skip-frames");
 
                 if (!item.IsVideoStream)
                 {
