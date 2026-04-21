@@ -434,6 +434,7 @@ namespace AirDirector.Controls
                                     m.AddOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
                                     if (!looksLikeHls)
                                     {
+                                        // Primo tentativo usa demux=any; al retry forziamo mpga per stream Icecast/MP3 con URL non standard (.audio).
                                         m.AddOption(":demux=mpga");
                                         m.AddOption(":codec=any");
                                     }
@@ -1015,6 +1016,8 @@ namespace AirDirector.Controls
                 media.AddOption(":http-continuous");
                 media.AddOption(":http-forward-cookies");
                 media.AddOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                // Evita autodetect problematico su estensioni non standard (.audio, ecc.)
+                // Non forzare il demux per gli HLS (.m3u8): VLC li gestisce bene da solo.
                 bool looksLikeHls = fp.IndexOf(".m3u8", StringComparison.OrdinalIgnoreCase) >= 0;
                 if (!looksLikeHls) media.AddOption(":demux=any");
                 target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
