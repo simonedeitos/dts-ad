@@ -85,7 +85,7 @@ namespace AirDirector.Forms
             _btnOnAirImmediate = new Button
             {
                 Width = 160,
-                Text = "▶ " + LanguageManager.GetString("LoadPlaylistOnAir.BtnImmediate", "Subito in Onda"),
+                Text = "In onda > " + LanguageManager.GetString("LoadPlaylistOnAir.BtnImmediate", "Subito in Onda"),
                 BackColor = Color.FromArgb(33, 150, 83),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat
@@ -95,8 +95,8 @@ namespace AirDirector.Forms
 
             _btnOnAirEnqueue = new Button
             {
-                Width = 120,
-                Text = "➕ " + LanguageManager.GetString("LoadPlaylistOnAir.BtnEnqueue", "Accoda"),
+                Width = 150,
+                Text = "In onda > " + LanguageManager.GetString("LoadPlaylistOnAir.BtnEnqueue", "Accoda"),
                 BackColor = Color.FromArgb(33, 100, 183),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat
