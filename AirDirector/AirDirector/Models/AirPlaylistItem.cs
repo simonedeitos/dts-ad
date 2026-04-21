@@ -43,6 +43,7 @@ namespace AirDirector.Models
         public string CommandValue { get; set; }
         public string AssociatedBufferPath { get; set; }
         public string AssociatedVideoPath { get; set; }
+        public bool IsVideoStream { get; set; }
 
         public AirPlaylistItem()
         {
@@ -62,6 +63,7 @@ namespace AirDirector.Models
             CommandValue = string.Empty;
             AssociatedBufferPath = string.Empty;
             AssociatedVideoPath = string.Empty;
+            IsVideoStream = false;
         }
 
         /// <summary>

@@ -1359,9 +1359,32 @@ namespace AirDirector.Controls
 
 				string url = parts[0].Trim();
 				TimeSpan duration = TimeSpan.FromMinutes(60);
+                bool isVideoStream = false;
+                bool? isVideoStreamToken = null;
 
 				if (parts.Length >= 2 && TimeSpan.TryParse(parts[1].Trim(), out TimeSpan parsedDuration))
 					duration = parsedDuration;
+                if (parts.Length >= 3)
+                {
+                    string token = parts[2].Trim();
+                    if (string.Equals(token, "video", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(token, "true", StringComparison.OrdinalIgnoreCase))
+                    {
+                        isVideoStreamToken = true;
+                    }
+                    else if (string.Equals(token, "audio", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(token, "false", StringComparison.OrdinalIgnoreCase))
+                    {
+                        isVideoStreamToken = false;
+                    }
+                }
+
+                var matchedEntry = DbcManager.LoadFromCsv<StreamingEntry>("Streaming.dbc")
+                    .FirstOrDefault(s => string.Equals(s.URL, url, StringComparison.OrdinalIgnoreCase));
+                if (isVideoStreamToken.HasValue)
+                    isVideoStream = isVideoStreamToken.Value;
+                else if (matchedEntry != null)
+                    isVideoStream = matchedEntry.IsVideoStream;
 
 				DateTime scheduledPlayTime = CalculateScheduledPlayTime();
 
@@ -1379,7 +1402,8 @@ namespace AirDirector.Controls
 					MarkerINTRO = 0,
 					MarkerMIX = 0,
 					MarkerOUT = 0,
-					IsScheduled = true
+					IsScheduled = true,
+                    IsVideoStream = isVideoStream
 				};
 
 				int insertPosition = GetCorrectScheduleInsertPosition();
@@ -3973,7 +3997,8 @@ namespace AirDirector.Controls
                             MarkerMIX = 0,
                             MarkerOUT = 0,
                             VideoFilePath = associatedVideo,
-                            VideoSource = associatedVideoSource
+                            VideoSource = associatedVideoSource,
+                            IsVideoStream = pItem.IsVideoStream
                         };
                         return streamingItem;
                     }
@@ -4317,6 +4342,7 @@ namespace AirDirector.Controls
         public string VideoFilePath { get; set; }
         public string VideoSource { get; set; }      // "StaticVideo", "BufferVideo", "NDISource"
         public string NDISourceName { get; set; }
+		public bool IsVideoStream { get; set; }
 		public bool IsCommand { get; set; }
 		public string CommandType { get; set; }
 		public string CommandValue { get; set; }
@@ -4330,9 +4356,11 @@ namespace AirDirector.Controls
 
 				if (!string.IsNullOrEmpty(FilePath) &&
 					(FilePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-					 FilePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+					 FilePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+                     FilePath.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase) ||
+                     FilePath.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase)))
 				{
-					return "Stream";
+					return IsVideoStream ? "VideoStream" : "Stream";
 				}
 
 				return Type == PlaylistItemType.Music ? "Music" : "Clip";
@@ -4367,6 +4395,7 @@ namespace AirDirector.Controls
             VideoFilePath = string.Empty;
             VideoSource = string.Empty;
             NDISourceName = string.Empty;
+            IsVideoStream = false;
 			IsCommand = false;
 			CommandType = string.Empty;
 			CommandValue = string.Empty;
