@@ -950,6 +950,7 @@ namespace AirDirector.Controls
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
                 var media = new Media(_libVLC, fp, FromType.FromLocation);
+                // Video web stream (HLS/RTMP) needs a slightly longer startup buffer to stabilize A/V before on-air transition.
                 media.AddOption(":network-caching=2000");
                 media.AddOption(":live-caching=2000");
 
