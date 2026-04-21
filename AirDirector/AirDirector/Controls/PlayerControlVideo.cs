@@ -385,6 +385,26 @@ namespace AirDirector.Controls
             };
             if (!isBuffer)
             {
+                deck.VlcPlayer.Opening += (s, e) => Log("[VLC] … " + deck.Name + " Opening (type=" + deck.Type + ")");
+                deck.VlcPlayer.Playing += (s, e) => Log("[VLC] ▶ " + deck.Name + " Playing (type=" + deck.Type + ")");
+                deck.VlcPlayer.EncounteredError += (s, e) =>
+                {
+                    Log("[VLC] ❌ EncounteredError on " + deck.Name + " (type=" + deck.Type + ")");
+                    int sid = deck.SessionId;
+                    _commandQueue.Enqueue(() =>
+                    {
+                        try
+                        {
+                            if (deck == _pendingDeck) { StopDeckInternal(deck, true); _pendingDeck = null; }
+                            if (deck == _activeDeck) { HandleDeckEnded(deck, sid); }
+                            else { SafeInvoke(() => { if (_autoMode) OnMixReached(); else AutoSkipToNext(); }); }
+                        }
+                        catch (Exception ex) { LogErr("[VLC EncounteredError]", ex); }
+                    });
+                };
+            }
+            if (!isBuffer)
+            {
                 deck.VlcPlayer.SetAudioFormat("S16N", AUDIO_SAMPLE_RATE, AUDIO_CHANNELS);
                 deck.VlcPlayer.SetAudioCallbacks(
                     (data, samples, count, pts) =>
@@ -930,12 +950,32 @@ namespace AirDirector.Controls
                 target = _nextIsA ? _deckA : _deckB; if (target == _activeDeck) target = !_nextIsA ? _deckA : _deckB; _nextIsA = !_nextIsA;
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
-                var media = new Media(_libVLC, fp, FromType.FromLocation); media.AddOption(":network-caching=1000"); media.AddOption(":no-video");
+                var media = new Media(_libVLC, fp, FromType.FromLocation); media.AddOption(":no-video"); media.AddOption(":network-caching=10000"); media.AddOption(":live-caching=10000"); media.AddOption(":http-reconnect"); media.AddOption(":http-continuous");
                 target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
                 _bufferShouldShow = true; _currentFileIsVideo = false;
                 EnsureBufferVideoPlaying();
                 target.Volume = 1.0f; target.IsPlaying = true; target.CurrentItem = item; target.IsPendingActivation = true; _pendingDeck = target;
                 Log("[PLAY] WebStream → " + target.Name);
+                int streamSid = sid;
+                var streamTarget = target;
+                ThreadPool.QueueUserWorkItem(_ =>
+                {
+                    Thread.Sleep(15000);
+                    if (_isDisposed) return;
+                    if (streamTarget.SessionId == streamSid && !streamTarget.WarmupDone && _pendingDeck == streamTarget)
+                    {
+                        Log("[STREAM] ❌ Timeout 15s senza audio, skip: " + fp);
+                        _commandQueue.Enqueue(() =>
+                        {
+                            try
+                            {
+                                if (_pendingDeck == streamTarget) { StopDeckInternal(streamTarget, true); _pendingDeck = null; }
+                                SafeInvoke(() => { if (_autoMode) OnMixReached(); else AutoSkipToNext(); });
+                            }
+                            catch (Exception ex) { LogErr("[STREAM Timeout]", ex); }
+                        });
+                    }
+                });
             }
             else if (_preBufferedDeck != null && _preBufferedFile == fp && _preBufferedDeck.PreBufferReady)
             {
