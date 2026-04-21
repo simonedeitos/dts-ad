@@ -398,26 +398,6 @@ namespace AirDirector.Controls
                         deck.Ring.Write(deck.PcmFloat, 0, sc);
                         if (!deck.WarmupDone && deck.Ring.Available >= AUDIO_WARMUP_SAMPLES) deck.WarmupDone = true;
                     }, null, null, null, null);
-                deck.VlcPlayer.EncounteredError += (s, e) =>
-                {
-                    int sid = deck.SessionId;
-                    Log("[VLC] ❌ Error on " + deck.Name + " (type=" + deck.Type + ")");
-                    ThreadPool.QueueUserWorkItem(_ =>
-                    {
-                        _commandQueue.Enqueue(() =>
-                        {
-                            if (deck.SessionId != sid) return;
-                            if (deck.Type == DeckType.WebStream && deck == _pendingDeck)
-                            {
-                                StopDeckInternal(deck, true);
-                                _pendingDeck = null;
-                                SafeInvoke(() => AutoSkipToNext());
-                                return;
-                            }
-                            HandleDeckEnded(deck, sid);
-                        });
-                    });
-                };
             }
             return deck;
         }
@@ -722,7 +702,7 @@ namespace AirDirector.Controls
             bool ready;
             if (p.Type == DeckType.VideoClip) ready = p.FrameCount >= MIN_READY_FRAMES && p.WarmupDone;
             else if (p.Type == DeckType.AudioTrack && p.VlcPlayer.IsPlaying) ready = p.FrameCount >= MIN_READY_FRAMES;
-            else if (p.Type == DeckType.WebStream) ready = p.WarmupDone || p.AudioStarted;
+            else if (p.Type == DeckType.WebStream) ready = p.WarmupDone;
             else ready = true;
             if (!ready) return;
             Deck old = _activeDeck; _activeDeck = p; _pendingDeck = null; p.IsPendingActivation = false;
@@ -947,34 +927,12 @@ namespace AirDirector.Controls
                 target = _nextIsA ? _deckA : _deckB; if (target == _activeDeck) target = !_nextIsA ? _deckA : _deckB; _nextIsA = !_nextIsA;
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
-                var media = new Media(_libVLC, fp, FromType.FromLocation);
-                media.AddOption(":network-caching=5000");
-                media.AddOption(":live-caching=5000");
-                media.AddOption(":no-video");
-                media.AddOption(":http-reconnect");
-                media.AddOption(":http-continuous");
-                media.AddOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                var media = new Media(_libVLC, fp, FromType.FromLocation); media.AddOption(":network-caching=1000"); media.AddOption(":no-video");
                 target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
                 _bufferShouldShow = true; _currentFileIsVideo = false;
                 EnsureBufferVideoPlaying();
                 target.Volume = 1.0f; target.IsPlaying = true; target.CurrentItem = item; target.IsPendingActivation = true; _pendingDeck = target;
                 Log("[PLAY] WebStream → " + target.Name);
-                int guardSid = sid;
-                ThreadPool.QueueUserWorkItem(_ =>
-                {
-                    Thread.Sleep(15000);
-                    if (_isDisposed) return;
-                    if (target.SessionId == guardSid && target.IsPendingActivation && !target.AudioStarted)
-                    {
-                        Log("[PLAY] ⚠️ WebStream non partito dopo 15s, skip");
-                        _commandQueue.Enqueue(() =>
-                        {
-                            StopDeckInternal(target, true);
-                            if (_pendingDeck == target) _pendingDeck = null;
-                            SafeInvoke(() => AutoSkipToNext());
-                        });
-                    }
-                });
             }
             else if (_preBufferedDeck != null && _preBufferedFile == fp && _preBufferedDeck.PreBufferReady)
             {
