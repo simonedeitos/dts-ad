@@ -81,6 +81,11 @@ namespace AirDirector.Controls
         private bool _isStreamingURL = false;
         private TimeSpan _streamScheduledDuration = TimeSpan.Zero;
         private DateTime _streamStartTime = DateTime.MinValue;
+        private EventHandler<MediaPlayerBufferingEventArgs> _streamBufferingLogHandler;
+        private EventHandler<EventArgs> _streamEncounteredErrorLogHandler;
+        private EventHandler<EventArgs> _streamPlayingLogHandler;
+        private int _lastStreamBufferLogBucket = -1;
+        private string _currentStreamLogUrl = "";
 
         private Panel waveformPanel;
         private Label lblIntro;
@@ -896,11 +901,10 @@ namespace AirDirector.Controls
                         if (_vlcPlayer != null)
                         {
                             var media = new Media(_libVLC, new Uri(nextItem.FilePath));
-                            media.AddOption(":no-video");
-                            media.AddOption(":network-caching=3000");
-                            media.AddOption(":live-caching=3000");
+                            ApplyStreamOptions(media, nextItem.FilePath, audioOnly: true);
 
                             _vlcPlayer.Media = media;
+                            AttachStreamDiagnostics(nextItem.FilePath);
                             _vlcPlayer.Play();
                         }
 
@@ -1024,6 +1028,61 @@ namespace AirDirector.Controls
                    filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
                    filePath.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase) ||
                    filePath.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void ApplyStreamOptions(Media media, string url, bool audioOnly)
+        {
+            bool isRtsp = url.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase);
+
+            media.AddOption(":network-caching=5000");
+            media.AddOption(":live-caching=5000");
+            media.AddOption(":file-caching=1500");
+
+            media.AddOption(":adaptive-logic=highest");
+            media.AddOption(":adaptive-use-access");
+
+            media.AddOption(":http-reconnect");
+            media.AddOption(":http-continuous");
+            media.AddOption(":http-user-agent=VLC/3.0.20 LibVLC/3.0.20");
+
+            if (isRtsp)
+            {
+                media.AddOption(":rtsp-tcp");
+                media.AddOption(":rtsp-frame-buffer-size=500000");
+            }
+
+            if (audioOnly)
+            {
+                media.AddOption(":no-video");
+            }
+
+            media.AddOption(":clock-jitter=0");
+            media.AddOption(":clock-synchro=0");
+        }
+
+        private void AttachStreamDiagnostics(string url)
+        {
+            if (_streamBufferingLogHandler != null) _vlcPlayer.Buffering -= _streamBufferingLogHandler;
+            if (_streamEncounteredErrorLogHandler != null) _vlcPlayer.EncounteredError -= _streamEncounteredErrorLogHandler;
+            if (_streamPlayingLogHandler != null) _vlcPlayer.Playing -= _streamPlayingLogHandler;
+
+            _currentStreamLogUrl = url;
+            _lastStreamBufferLogBucket = -1;
+
+            _streamBufferingLogHandler = (s, e) =>
+            {
+                if (e.Cache >= 100f) return;
+                int bucket = Math.Max(0, ((int)e.Cache / 25) * 25);
+                if (bucket == _lastStreamBufferLogBucket) return;
+                _lastStreamBufferLogBucket = bucket;
+                Log("[VLC-BUFFER] " + bucket + "%");
+            };
+            _streamEncounteredErrorLogHandler = (s, e) => Log("[VLC-ERROR] stream " + _currentStreamLogUrl + " encountered error");
+            _streamPlayingLogHandler = (s, e) => Log("[VLC] Playing started: " + _currentStreamLogUrl);
+
+            _vlcPlayer.Buffering += _streamBufferingLogHandler;
+            _vlcPlayer.EncounteredError += _streamEncounteredErrorLogHandler;
+            _vlcPlayer.Playing += _streamPlayingLogHandler;
         }
 
         private void LoadTrackInfo(PlaylistQueueItem item)
@@ -2676,11 +2735,10 @@ namespace AirDirector.Controls
                     if (_vlcPlayer != null)
                     {
                         var media = new Media(_libVLC, new Uri(streamItem.FilePath));
-                        media.AddOption(":no-video");
-                        media.AddOption(":network-caching=3000");
-                        media.AddOption(":live-caching=3000");
+                        ApplyStreamOptions(media, streamItem.FilePath, audioOnly: true);
 
                         _vlcPlayer.Media = media;
+                        AttachStreamDiagnostics(streamItem.FilePath);
                         _vlcPlayer.Play();
                     }
 
