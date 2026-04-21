@@ -9,7 +9,6 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -82,12 +81,6 @@ namespace AirDirector.Controls
         private bool _isStreamingURL = false;
         private TimeSpan _streamScheduledDuration = TimeSpan.Zero;
         private DateTime _streamStartTime = DateTime.MinValue;
-
-        // VLC stream audio → NAudio mixer
-        private BufferedWaveProvider _vlcStreamBuffer;
-        private VolumeSampleProvider _vlcStreamVolumeProvider;
-        private short[] _vlcPcmBuf;
-        private byte[] _vlcByteBuf;
 
         private Panel waveformPanel;
         private Label lblIntro;
@@ -183,24 +176,6 @@ namespace AirDirector.Controls
                 );
 
                 _vlcPlayer = new MediaPlayer(_libVLC);
-
-                // Instrada l'audio VLC nel mixer NAudio: VLC scrive samples PCM 16-bit
-                // nel BufferedWaveProvider che viene creato ad ogni apertura di stream.
-                _vlcPlayer.SetAudioFormat("S16N", 44100, 2);
-                _vlcPlayer.SetAudioCallbacks(
-                    (data, samples, count, pts) =>
-                    {
-                        int numShorts = (int)count * 2; // 2 canali
-                        if (numShorts <= 0) return;
-                        var buf = _vlcStreamBuffer; // cattura reference: evita NullRef se Stop() azzera il campo
-                        if (buf == null) return;
-                        int byteCount = numShorts * 2;
-                        if (_vlcPcmBuf == null || _vlcPcmBuf.Length < numShorts) _vlcPcmBuf = new short[numShorts];
-                        if (_vlcByteBuf == null || _vlcByteBuf.Length < byteCount) _vlcByteBuf = new byte[byteCount];
-                        Marshal.Copy(samples, _vlcPcmBuf, 0, numShorts);
-                        Buffer.BlockCopy(_vlcPcmBuf, 0, _vlcByteBuf, 0, byteCount);
-                        buf.AddSamples(_vlcByteBuf, 0, byteCount);
-                    }, null, null, null, null);
 
                 _vlcPlayer.Playing += (s, e) => Log("[VLC] ▶️ Playing");
                 _vlcPlayer.Paused += (s, e) => Log("[VLC] ⏸️ Paused");
@@ -920,18 +895,10 @@ namespace AirDirector.Controls
 
                         if (_vlcPlayer != null)
                         {
-                            // Prepara il buffer PCM→mixer prima di avviare VLC
-                            if (_vlcStreamVolumeProvider != null)
-                                _mixer.RemoveMixerInput(_vlcStreamVolumeProvider);
-                            _vlcStreamBuffer = new BufferedWaveProvider(new WaveFormat(44100, 16, 2))
-                                { BufferDuration = TimeSpan.FromSeconds(10), DiscardOnBufferOverflow = true };
-                            _vlcStreamVolumeProvider = new VolumeSampleProvider(new WaveToSampleProvider(_vlcStreamBuffer)) { Volume = 1f };
-                            _mixer.AddMixerInput(_vlcStreamVolumeProvider);
-
                             var media = new Media(_libVLC, new Uri(nextItem.FilePath));
-                            media.AddOption(":no-video");
-                            media.AddOption(":network-caching=10000");
-                            media.AddOption(":live-caching=10000");
+                            media.AddOption(": no-video");
+                            media.AddOption(": network-caching=10000");
+                            media.AddOption(": live-caching=10000");
 
                             _vlcPlayer.Media = media;
                             _vlcPlayer.Play();
@@ -2706,18 +2673,10 @@ namespace AirDirector.Controls
 
                     if (_vlcPlayer != null)
                     {
-                        // Prepara il buffer PCM→mixer prima di avviare VLC
-                        if (_vlcStreamVolumeProvider != null)
-                            _mixer.RemoveMixerInput(_vlcStreamVolumeProvider);
-                        _vlcStreamBuffer = new BufferedWaveProvider(new WaveFormat(44100, 16, 2))
-                            { BufferDuration = TimeSpan.FromSeconds(10), DiscardOnBufferOverflow = true };
-                        _vlcStreamVolumeProvider = new VolumeSampleProvider(new WaveToSampleProvider(_vlcStreamBuffer)) { Volume = 1f };
-                        _mixer.AddMixerInput(_vlcStreamVolumeProvider);
-
                         var media = new Media(_libVLC, new Uri(streamItem.FilePath));
-                        media.AddOption(":no-video");
-                        media.AddOption(":network-caching=10000");
-                        media.AddOption(":live-caching=10000");
+                        media.AddOption(": no-video");
+                        media.AddOption(": network-caching=10000");
+                        media.AddOption(": live-caching=10000");
 
                         _vlcPlayer.Media = media;
                         _vlcPlayer.Play();
@@ -2900,15 +2859,6 @@ namespace AirDirector.Controls
             {
                 _vlcPlayer.Stop();
             }
-
-            // Rimuovi lo stream buffer dal mixer e resetta il riferimento
-            // (il callback VLC cattura il ref localmente, quindi non c'è race condition)
-            if (_vlcStreamVolumeProvider != null)
-            {
-                _mixer.RemoveMixerInput(_vlcStreamVolumeProvider);
-                _vlcStreamVolumeProvider = null;
-            }
-            _vlcStreamBuffer = null;
 
             if (_volumeProviderA != null)
             {
