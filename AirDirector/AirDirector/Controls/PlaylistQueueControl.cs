@@ -1367,24 +1367,27 @@ namespace AirDirector.Controls
                 if (parts.Length >= 3)
                 {
                     string token = parts[2].Trim();
-                    if (string.Equals(token, "video", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(token, "true", StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(token, "video", StringComparison.OrdinalIgnoreCase))
                     {
                         isVideoStreamToken = true;
                     }
-                    else if (string.Equals(token, "audio", StringComparison.OrdinalIgnoreCase) ||
-                             string.Equals(token, "false", StringComparison.OrdinalIgnoreCase))
+                    else if (string.Equals(token, "audio", StringComparison.OrdinalIgnoreCase))
                     {
                         isVideoStreamToken = false;
                     }
                 }
 
-                var matchedEntry = DbcManager.LoadFromCsv<StreamingEntry>("Streaming.dbc")
-                    .FirstOrDefault(s => string.Equals(s.URL, url, StringComparison.OrdinalIgnoreCase));
                 if (isVideoStreamToken.HasValue)
+                {
                     isVideoStream = isVideoStreamToken.Value;
-                else if (matchedEntry != null)
-                    isVideoStream = matchedEntry.IsVideoStream;
+                }
+                else
+                {
+                    var matchedEntry = DbcManager.LoadFromCsv<StreamingEntry>("Streaming.dbc")
+                        .FirstOrDefault(s => string.Equals(s.URL, url, StringComparison.OrdinalIgnoreCase));
+                    if (matchedEntry != null)
+                        isVideoStream = matchedEntry.IsVideoStream;
+                }
 
 				DateTime scheduledPlayTime = CalculateScheduledPlayTime();
 

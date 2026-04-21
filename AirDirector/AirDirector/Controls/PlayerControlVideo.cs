@@ -71,7 +71,24 @@ namespace AirDirector.Controls
             public bool IsScheduled = false;
             public bool IsVideoStream = false;
             public static PlayItem FromQueueItem(PlaylistQueueItem qi) => new PlayItem
-            { FilePath = qi.FilePath ?? "", Artist = qi.Artist ?? "", Title = qi.Title ?? "", Intro = qi.Intro, MarkerIN = qi.MarkerIN, MarkerINTRO = qi.MarkerINTRO, MarkerMIX = qi.MarkerMIX, MarkerOUT = qi.MarkerOUT, ItemType = qi.ItemType ?? "Clip", VideoFilePath = qi.VideoFilePath ?? "", VideoSource = qi.VideoSource ?? "", NDISourceName = qi.NDISourceName ?? "", Duration = qi.Duration, FileDurationMs = qi.FileDurationMs, IsScheduled = qi.IsScheduled, IsVideoStream = qi.IsVideoStream };
+            {
+                FilePath = qi.FilePath ?? "",
+                Artist = qi.Artist ?? "",
+                Title = qi.Title ?? "",
+                Intro = qi.Intro,
+                MarkerIN = qi.MarkerIN,
+                MarkerINTRO = qi.MarkerINTRO,
+                MarkerMIX = qi.MarkerMIX,
+                MarkerOUT = qi.MarkerOUT,
+                ItemType = qi.ItemType ?? "Clip",
+                VideoFilePath = qi.VideoFilePath ?? "",
+                VideoSource = qi.VideoSource ?? "",
+                NDISourceName = qi.NDISourceName ?? "",
+                Duration = qi.Duration,
+                FileDurationMs = qi.FileDurationMs,
+                IsScheduled = qi.IsScheduled,
+                IsVideoStream = qi.IsVideoStream
+            };
         }
 
         private enum DeckType { VideoClip, AudioTrack, WebStream, Buffer }
