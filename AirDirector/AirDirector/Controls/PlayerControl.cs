@@ -896,9 +896,9 @@ namespace AirDirector.Controls
                         if (_vlcPlayer != null)
                         {
                             var media = new Media(_libVLC, new Uri(nextItem.FilePath));
-                            media.AddOption(":no-video");
-                            media.AddOption(":network-caching=10000");
-                            media.AddOption(":live-caching=10000");
+                            media.AddOption(": no-video");
+                            media.AddOption(": network-caching=10000");
+                            media.AddOption(": live-caching=10000");
 
                             _vlcPlayer.Media = media;
                             _vlcPlayer.Play();
@@ -1020,12 +1020,8 @@ namespace AirDirector.Controls
 
         private bool IsStreamUrl(string filePath)
         {
-            if (string.IsNullOrEmpty(filePath)) return false;
             return filePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.StartsWith("mms://", StringComparison.OrdinalIgnoreCase);
+                   filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
         }
 
         private void LoadTrackInfo(PlaylistQueueItem item)
@@ -2368,18 +2364,6 @@ namespace AirDirector.Controls
             {
                 var nextItem = queueItems[0];
 
-                // Se il prossimo elemento è uno stream, gestiscilo senza AudioFileReader
-                if (IsStreamUrl(nextItem.FilePath))
-                {
-                    _isPlayerAActive = !_isPlayerAActive;
-                    _playlistQueue.SetCurrentPlaying(0);
-                    LoadTrack(nextItem.FilePath, nextItem.Artist, nextItem.Title, nextItem.Intro,
-                        nextItem.MarkerIN, nextItem.MarkerINTRO, nextItem.MarkerMIX, nextItem.MarkerOUT, nextItem.ItemType);
-                    Play();
-                    NotifyTrackChanged(nextItem);
-                    return;
-                }
-
                 if (_isPlayerAActive)
                 {
                     if (_volumeProviderB != null)
@@ -2559,24 +2543,10 @@ namespace AirDirector.Controls
 
                 if (_isStreamingURL)
                 {
-                    // Per gli stream, recupera la durata dalla coda se intro non è specificato
-                    TimeSpan streamDuration = intro;
-                    if (streamDuration.TotalMilliseconds <= 0 && _playlistQueue != null)
-                    {
-                        try
-                        {
-                            var queueItems = _playlistQueue.GetAllItems();
-                            var match = queueItems.FirstOrDefault(i => string.Equals(i.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
-                            if (match != null && match.Duration.TotalMilliseconds > 0)
-                                streamDuration = match.Duration;
-                        }
-                        catch { }
-                    }
-
-                    _totalDuration = streamDuration;
+                    _totalDuration = intro;
                     _introTime = TimeSpan.Zero;
                     _currentPosition = TimeSpan.Zero;
-                    _streamScheduledDuration = streamDuration;
+                    _streamScheduledDuration = intro;
 
                     _markerIN = 0;
                     _markerINTRO = 0;
@@ -2704,9 +2674,9 @@ namespace AirDirector.Controls
                     if (_vlcPlayer != null)
                     {
                         var media = new Media(_libVLC, new Uri(streamItem.FilePath));
-                        media.AddOption(":no-video");
-                        media.AddOption(":network-caching=10000");
-                        media.AddOption(":live-caching=10000");
+                        media.AddOption(": no-video");
+                        media.AddOption(": network-caching=10000");
+                        media.AddOption(": live-caching=10000");
 
                         _vlcPlayer.Media = media;
                         _vlcPlayer.Play();

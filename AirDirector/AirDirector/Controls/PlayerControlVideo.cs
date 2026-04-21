@@ -731,9 +731,7 @@ namespace AirDirector.Controls
                 int ms = (int)d.StreamClock.ElapsedMilliseconds;
                 _positionMs = ms;
                 if (_autoMode && _markerMIX > 0 && ms >= _markerMIX) { if (TryTriggerMix()) { Log("[POS] WebStream MIX at " + ms + "ms"); SafeInvoke(() => { _mixCheckTimer.Stop(); OnMixReached(); }); } return; }
-                if (_markerOUT > 0 && ms >= _markerOUT) { if (TryTriggerMix()) { Log("[POS] WebStream OUT at " + ms + "ms"); SafeInvoke(() => { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); else { _isPlaying = false; OnTrackEnded(); } }); } return; }
-                // Se non sono definiti marker MIX/OUT, usa la durata totale pianificata
-                if (_totalDuration.TotalMilliseconds > 100 && ms >= (int)_totalDuration.TotalMilliseconds) { if (TryTriggerMix()) { Log("[POS] WebStream duration elapsed at " + ms + "ms (dur=" + (int)_totalDuration.TotalMilliseconds + "ms)"); SafeInvoke(() => { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); else { _isPlaying = false; OnTrackEnded(); } }); } }
+                if (_markerOUT > 0 && ms >= _markerOUT) { if (TryTriggerMix()) { Log("[POS] WebStream OUT at " + ms + "ms"); SafeInvoke(() => { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); else { _isPlaying = false; OnTrackEnded(); } }); } }
                 return;
             }
 
@@ -875,23 +873,7 @@ namespace AirDirector.Controls
         // PLAY
         // ═══════════════════════════════════════════════════════════
         public void LoadAndPlay(PlaylistQueueItem qi) { if (qi == null || _isDisposed) return; _commandQueue.Enqueue(() => PlayInternal(PlayItem.FromQueueItem(qi))); }
-        public void LoadTrack(string fp, string artist, string title, TimeSpan intro, int mIN, int mINTRO, int mMIX, int mOUT, string type)
-        {
-            // Per gli stream, recupera la Duration dalla coda così che UpdatePosition possa terminarlo correttamente
-            TimeSpan streamDuration = TimeSpan.Zero;
-            if (IsWebStream(fp) && _playlistQueue != null)
-            {
-                try
-                {
-                    var queueItems = _playlistQueue.GetAllItems();
-                    var match = queueItems.FirstOrDefault(i => string.Equals(i.FilePath, fp, StringComparison.OrdinalIgnoreCase));
-                    if (match != null) streamDuration = match.Duration;
-                }
-                catch { }
-            }
-            TimeSpan capturedDuration = streamDuration;
-            _commandQueue.Enqueue(() => PlayInternal(new PlayItem { FilePath = fp ?? "", Artist = artist ?? "", Title = title ?? "", Intro = intro, MarkerIN = mIN, MarkerINTRO = mINTRO, MarkerMIX = mMIX, MarkerOUT = mOUT, ItemType = type ?? "Clip", Duration = capturedDuration }));
-        }
+        public void LoadTrack(string fp, string artist, string title, TimeSpan intro, int mIN, int mINTRO, int mMIX, int mOUT, string type) { _commandQueue.Enqueue(() => PlayInternal(new PlayItem { FilePath = fp ?? "", Artist = artist ?? "", Title = title ?? "", Intro = intro, MarkerIN = mIN, MarkerINTRO = mINTRO, MarkerMIX = mMIX, MarkerOUT = mOUT, ItemType = type ?? "Clip" })); }
 
         private void PlayInternal(PlayItem item)
         {
