@@ -961,6 +961,40 @@ namespace AirDirector.Forms
         {
             using (var form = new StreamingManagerForm())
             {
+                form.OnAirRequested += (s, args) =>
+                {
+                    try
+                    {
+                        if (args?.Entry == null || playlistQueue == null) return;
+                        var qi = new PlaylistQueueItem
+                        {
+                            Type = PlaylistItemType.Other,
+                            Artist = "",
+                            Title = $"WebStreaming - {args.Entry.Name}",
+                            FilePath = args.Entry.URL ?? "",
+                            Duration = args.Duration,
+                            Intro = TimeSpan.Zero,
+                            MarkerIN = 0,
+                            MarkerINTRO = 0,
+                            MarkerMIX = 0,
+                            MarkerOUT = 0,
+                            IsVideoStream = args.Entry.IsVideo,
+                            ScheduledTime = DateTime.Now
+                        };
+
+                        if (args.IsImmediate)
+                        {
+                            int insertIndex = playlistQueue.GetCurrentPlayingItem() != null ? 1 : 0;
+                            playlistQueue.InsertItem(insertIndex, qi);
+                            PlayerNotifyQueueItemsAvailable();
+                        }
+                        else
+                        {
+                            playlistQueue.AddItem(qi);
+                        }
+                    }
+                    catch { }
+                };
                 form.ShowDialog(this);
             }
         }
