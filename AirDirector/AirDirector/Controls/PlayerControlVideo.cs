@@ -218,7 +218,36 @@ namespace AirDirector.Controls
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 Log("[INIT] Starting engine...");
                 LibVLCSharp.Shared.Core.Initialize();
-                _libVLC = new LibVLC("--no-osd", "--no-stats", "--quiet", "--avcodec-fast", "--avcodec-threads=4", "--avcodec-skiploopfilter=4", "--clock-jitter=0", "--clock-synchro=0", "--file-caching=500", "--network-caching=1000", "--avcodec-hw=any");
+                _libVLC = new LibVLC("--no-osd", "--no-stats", "--quiet", "--avcodec-fast", "--avcodec-threads=4", "--avcodec-skiploopfilter=4", "--clock-jitter=0", "--clock-synchro=0", "--file-caching=500", "--network-caching=1000", "--avcodec-hw=any", "--gnutls-priorities=NORMAL:%COMPAT", "--no-video-title-show");
+                try
+                {
+                    _libVLC.SetDialogHandlers(
+                        (title, text) =>
+                        {
+                            Log($"[libvlc:Dialog/Error] {title}: {text}");
+                            return Task.CompletedTask;
+                        },
+                        (dialog, title, text, defaultUserName, askStore, token) =>
+                        {
+                            Log($"[libvlc:Dialog/Login] {title} (auto-cancel)");
+                            try { dialog.Dismiss(); } catch { }
+                            return Task.CompletedTask;
+                        },
+                        (dialog, title, text, qType, cancel, action1, action2, token) =>
+                        {
+                            Log($"[libvlc:Dialog/Question] {title}: {text} → auto-accept (action1='{action1}')");
+                            try { dialog.PostAction(1); } catch { try { dialog.Dismiss(); } catch { } }
+                            return Task.CompletedTask;
+                        },
+                        (dialog, title, text, indeterminate, position, cancel, token) => Task.CompletedTask,
+                        (dialog, position, text) => Task.CompletedTask
+                    );
+                    Log("[INIT] LibVLC dialog handlers registered (TLS auto-accept)");
+                }
+                catch (Exception ex)
+                {
+                    Log($"[INIT] ⚠️ SetDialogHandlers failed: {ex.Message}");
+                }
                 try
                 {
                     _libVLC.Log += (sender, args) =>
@@ -1028,6 +1057,8 @@ namespace AirDirector.Controls
                 media.AddOption(":http-continuous");
                 media.AddOption(":http-forward-cookies");
                 media.AddOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                media.AddOption(":adaptive-maxwidth=1920");
+                media.AddOption(":adaptive-maxheight=1080");
                 // Evita autodetect problematico su estensioni non standard (.audio, ecc.)
                 // Non forzare il demux per gli HLS (.m3u8): VLC li gestisce bene da solo.
                 bool looksLikeHls = fp.IndexOf(".m3u8", StringComparison.OrdinalIgnoreCase) >= 0;
