@@ -45,6 +45,8 @@ namespace AirDirector.Controls
         private const int AUDIO_DELAY_MS = 40;
         private const int AUDIO_DELAY_SAMPLES = AUDIO_DELAY_MS * AUDIO_SAMPLE_RATE / 1000 * AUDIO_CHANNELS;
         private const float PROGRAM_PIP_SCALE = 0.75f;
+        private const int STREAM_ACTIVATE_TIMEOUT_MS = 10000;
+        private const int MIN_VALID_STREAM_DURATION_MS = 100;
 
         private sealed class AudioDelayLine
         {
@@ -116,6 +118,7 @@ namespace AirDirector.Controls
             public volatile bool IsPreBuffered, IsPendingActivation, PreBufferReady;
             public volatile int SessionId, StartPointMs;
             public readonly System.Diagnostics.Stopwatch StreamClock = new System.Diagnostics.Stopwatch();
+            public readonly System.Diagnostics.Stopwatch PendingActivationClock = new System.Diagnostics.Stopwatch();
         }
         private Deck _deckA, _deckB, _bufferDeck, _activeDeck, _pendingDeck;
         private bool _nextIsA = true; private volatile int _globalSessionId;
@@ -723,11 +726,16 @@ namespace AirDirector.Controls
             else if (p.Type == DeckType.WebStream)
             {
                 bool isVS = p.CurrentItem?.IsVideoStream ?? false;
-                ready = isVS ? (p.WarmupDone && p.FrameCount >= MIN_READY_FRAMES) : p.WarmupDone;
+                long waitedMs = p.PendingActivationClock.ElapsedMilliseconds;
+                ready = isVS
+                    ? (p.WarmupDone && p.FrameCount >= MIN_READY_FRAMES) || waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS
+                    : p.WarmupDone || waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS;
+                if (waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS)
+                    Log("[TRANS] ⚠️ WebStream pending timeout, force-activating after " + waitedMs + "ms");
             }
             else ready = true;
             if (!ready) return;
-            Deck old = _activeDeck; _activeDeck = p; _pendingDeck = null; p.IsPendingActivation = false;
+            Deck old = _activeDeck; _activeDeck = p; _pendingDeck = null; p.IsPendingActivation = false; p.PendingActivationClock.Reset();
             if (p.IsPreBuffered) { p.IsPreBuffered = false; p.PreBufferReady = false; ThreadPool.QueueUserWorkItem(_ => { try { p.VlcPlayer.SetPause(false); } catch { } }); }
             Log("[TRANS] " + p.Name + " → ACTIVE (type=" + p.Type + ")");
             ResetMixTrigger();
@@ -752,6 +760,19 @@ namespace AirDirector.Controls
                 if (!d.StreamClock.IsRunning) return;
                 int ms = (int)d.StreamClock.ElapsedMilliseconds;
                 _positionMs = ms;
+                long totalMs = (long)_totalDuration.TotalMilliseconds;
+                if (_markerMIX == 0 && _markerOUT == 0 && totalMs > MIN_VALID_STREAM_DURATION_MS)
+                {
+                    if (ms >= totalMs)
+                    {
+                        if (TryTriggerMix())
+                        {
+                            Log("[POS] WebStream duration OUT at " + ms + "ms (totalDuration=" + totalMs + "ms)");
+                            SafeInvoke(() => { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); else { _isPlaying = false; OnTrackEnded(); } });
+                        }
+                    }
+                    return;
+                }
                 if (_autoMode && _markerMIX > 0 && ms >= _markerMIX) { if (TryTriggerMix()) { Log("[POS] WebStream MIX at " + ms + "ms"); SafeInvoke(() => { _mixCheckTimer.Stop(); OnMixReached(); }); } return; }
                 if (_markerOUT > 0 && ms >= _markerOUT) { if (TryTriggerMix()) { Log("[POS] WebStream OUT at " + ms + "ms"); SafeInvoke(() => { _mixCheckTimer.Stop(); if (_autoMode) OnMixReached(); else { _isPlaying = false; OnTrackEnded(); } }); } }
                 return;
@@ -959,6 +980,8 @@ namespace AirDirector.Controls
                     media.AddOption(":no-video");
                     target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
                     _bufferShouldShow = true; _currentFileIsVideo = false;
+                    if (string.IsNullOrEmpty(_bufferVideoPath))
+                        Log("[PLAY] WebStream (audio-only): nessun buffer video configurato");
                     EnsureBufferVideoPlaying();
                     Log("[PLAY] WebStream (audio-only) → " + target.Name);
                 }
@@ -971,7 +994,7 @@ namespace AirDirector.Controls
                     Log("[PLAY] WebStream (video) → " + target.Name);
                 }
 
-                target.Volume = 1.0f; target.IsPlaying = true; target.CurrentItem = item; target.IsPendingActivation = true; _pendingDeck = target;
+                target.Volume = 1.0f; target.IsPlaying = true; target.CurrentItem = item; target.IsPendingActivation = true; target.PendingActivationClock.Restart(); _pendingDeck = target;
             }
             else if (_preBufferedDeck != null && _preBufferedFile == fp && _preBufferedDeck.PreBufferReady)
             {
@@ -1296,7 +1319,24 @@ namespace AirDirector.Controls
         // ═══════════════════════════════════════════════════════════
         // MIX
         // ═══════════════════════════════════════════════════════════
-        private void MixCheckTimer_Tick(object s, EventArgs e) { if (!_isPlaying || _isPaused) return; if (_activeDeck == null || !_activeDeck.IsPlaying) return; if (_autoMode && _markerMIX > 0 && _positionMs >= _markerMIX) { if (TryTriggerMix()) { _mixCheckTimer.Stop(); OnMixReached(); } } }
+        private void MixCheckTimer_Tick(object s, EventArgs e)
+        {
+            if (!_isPlaying || _isPaused) return;
+            if (_activeDeck == null || !_activeDeck.IsPlaying) return;
+            if (_activeDeck.Type == DeckType.WebStream)
+            {
+                long totalMs = (long)_totalDuration.TotalMilliseconds;
+                long triggerMs = _markerMIX > 0
+                    ? _markerMIX
+                    : (_markerOUT == 0 && totalMs > MIN_VALID_STREAM_DURATION_MS ? totalMs : 0);
+                if (_autoMode && triggerMs > 0 && _positionMs >= triggerMs)
+                {
+                    if (TryTriggerMix()) { _mixCheckTimer.Stop(); OnMixReached(); }
+                }
+                return;
+            }
+            if (_autoMode && _markerMIX > 0 && _positionMs >= _markerMIX) { if (TryTriggerMix()) { _mixCheckTimer.Stop(); OnMixReached(); } }
+        }
         private void OnMixReached()
         {
             if (_playlistQueue == null) return;
