@@ -216,7 +216,7 @@ namespace AirDirector.Controls
                         {
                             var bridge = _streamBridge;
                             if (bridge == null) return;
-                            try { bridge.WriteS16(samples, (int)count); } catch { }
+                            try { bridge.WriteS16(samples, (int)count); } catch { /* VLC audio callback must never throw. */ }
                         },
                         null,
                         null,
@@ -3350,13 +3350,14 @@ namespace AirDirector.Controls
     }
 
     /// <summary>
-    /// Sample provider che funge da ponte thread-safe tra i callback audio VLC
-    /// (producer, formato S16 interleaved) e la catena NAudio (consumer, float).
-    /// Usato per instradare gli stream web attraverso il MixingSampleProvider
-    /// così da rispettare il device audio configurato e alimentare i VU meter.
+    /// Thread-safe bridge sample provider between VLC audio callbacks
+    /// (producer, interleaved S16 PCM) and the NAudio chain (consumer, float).
+    /// Used to route web streams through the MixingSampleProvider so the
+    /// configured output device and VU metering are always used.
     /// </summary>
     public class VlcBridgeSampleProvider : ISampleProvider
     {
+        private const float INT16_TO_FLOAT = 1f / 32768f;
         private readonly WaveFormat _format;
         private readonly float[] _ring;
         private readonly int _mask;
@@ -3372,15 +3373,15 @@ namespace AirDirector.Controls
         {
             _format = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
             int size = 1;
-            int target = sampleRate * channels * 2;
+            int target = sampleRate * channels * 2; // ~2 seconds of audio buffer.
             while (size < target) size <<= 1;
             _ring = new float[size];
             _mask = size - 1;
         }
 
         /// <summary>
-        /// Scrive un blocco di campioni S16 interleaved nel ring.
-        /// Chiamata dal thread VLC.
+        /// Writes a block of interleaved S16 samples into the ring.
+        /// Called from the VLC callback thread.
         /// </summary>
         public void WriteS16(IntPtr samples, int sampleCountPerChannel)
         {
@@ -3396,12 +3397,14 @@ namespace AirDirector.Controls
                 int free = ringSize - available;
                 if (totalInt16 > free)
                 {
+                    // Ring full: drop oldest samples by advancing read pointer.
+                    // Intentional to keep "live" audio and avoid blocking VLC producer thread.
                     long advance = totalInt16 - free;
                     _readPos += advance;
                 }
                 for (int i = 0; i < totalInt16; i++)
                 {
-                    _ring[(int)((wp + i) & _mask)] = tmp[i] / 32768f;
+                    _ring[(int)((wp + i) & _mask)] = tmp[i] * INT16_TO_FLOAT;
                 }
                 _writePos = wp + totalInt16;
             }
