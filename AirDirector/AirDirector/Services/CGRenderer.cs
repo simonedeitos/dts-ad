@@ -192,23 +192,6 @@ namespace AirDirector.Services
                     _additionalLogos = ParseAdditionalLogos(GetRegString(key, "AdditionalLogosJson", "[]"));
                     _visibleAdditionalLogos = ParseAdditionalLogoPathSet(GetRegString(key, "AdditionalLogosVisible", ""));
 
-                    if (_visibleAdditionalLogos.Count == 0)
-                    {
-                        var legacyHiddenAdditionalLogos = ParseAdditionalLogoPathSet(GetRegString(key, "AdditionalLogosHidden", ""));
-                        if (legacyHiddenAdditionalLogos.Count > 0)
-                        {
-                            foreach (var logo in _additionalLogos)
-                            {
-                                if (logo == null || string.IsNullOrWhiteSpace(logo.ImagePath))
-                                    continue;
-
-                                var path = logo.ImagePath.Trim();
-                                if (!legacyHiddenAdditionalLogos.Contains(path))
-                                    _visibleAdditionalLogos.Add(path);
-                            }
-                        }
-                    }
-
                     NormalizeVisibleAdditionalLogos();
 
                     // Clock
