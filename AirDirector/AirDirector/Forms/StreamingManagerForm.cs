@@ -33,7 +33,7 @@ namespace AirDirector.Forms
         {
             Text = "🌐 " + LanguageManager.GetString("StreamingManager.Title", "Gestione Streaming");
             StartPosition = FormStartPosition.CenterParent;
-            Size = new Size(820, 500);
+            Size = new Size(920, 500);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
