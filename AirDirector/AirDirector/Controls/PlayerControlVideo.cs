@@ -45,6 +45,8 @@ namespace AirDirector.Controls
         private const int AUDIO_DELAY_MS = 40;
         private const int AUDIO_DELAY_SAMPLES = AUDIO_DELAY_MS * AUDIO_SAMPLE_RATE / 1000 * AUDIO_CHANNELS;
         private const float PROGRAM_PIP_SCALE = 0.75f;
+        private const int STREAM_ACTIVATE_TIMEOUT_MS = 10000;
+        private const int MIN_VALID_STREAM_DURATION_MS = 100;
 
         private sealed class AudioDelayLine
         {
@@ -725,7 +727,6 @@ namespace AirDirector.Controls
             {
                 bool isVS = p.CurrentItem?.IsVideoStream ?? false;
                 long waitedMs = p.PendingActivationClock.ElapsedMilliseconds;
-                const int STREAM_ACTIVATE_TIMEOUT_MS = 10000;
                 ready = isVS
                     ? (p.WarmupDone && p.FrameCount >= MIN_READY_FRAMES) || waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS
                     : p.WarmupDone || waitedMs >= STREAM_ACTIVATE_TIMEOUT_MS;
@@ -760,7 +761,7 @@ namespace AirDirector.Controls
                 int ms = (int)d.StreamClock.ElapsedMilliseconds;
                 _positionMs = ms;
                 long totalMs = (long)_totalDuration.TotalMilliseconds;
-                if (_markerMIX == 0 && _markerOUT == 0 && totalMs > 100)
+                if (_markerMIX == 0 && _markerOUT == 0 && totalMs > MIN_VALID_STREAM_DURATION_MS)
                 {
                     if (ms >= totalMs)
                     {
