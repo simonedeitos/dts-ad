@@ -405,7 +405,7 @@ namespace AirDirector.Controls
                 });
             };
             deck.VlcPlayer.EncounteredError += (s, e) =>
-                Log("[VLC] ❌ Error on " + deck.Name + " (type=" + deck.Type + ")");
+                Log("[VLC] ❌ Error on " + deck.Name + " (type=" + deck.Type + ", media=" + (deck.VlcPlayer.Media?.Mrl ?? "none") + ")");
             if (!isBuffer)
             {
                 deck.VlcPlayer.SetAudioFormat("S16N", AUDIO_SAMPLE_RATE, AUDIO_CHANNELS);
@@ -979,7 +979,8 @@ namespace AirDirector.Controls
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
                 var media = new Media(_libVLC, fp, FromType.FromLocation);
                 // HLS/RTMP stream options: generous caching for slow CDN segments, software decoding
-                // required for SMEM video callbacks (avcodec-hw=any bypasses memory-mapped frames),
+                // (:avcodec-hw=none) to ensure frames are in CPU-accessible memory for SMEM callbacks
+                // (hardware-decoded frames live in GPU memory and cannot be read by the frame callback),
                 // custom user-agent so CDNs that block the default VLC agent still respond,
                 // and http-reconnect to recover from transient network interruptions.
                 media.AddOption(":network-caching=5000");

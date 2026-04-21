@@ -696,7 +696,7 @@ namespace AirDirector.Controls
 
             if (_vlcPlayer != null && (_vlcPlayer.State == VLCState.Stopped || _vlcPlayer.State == VLCState.Error))
             {
-                Log("[VLC] ⚠️ Stream stopped/errored, restarting");
+                Log("[VLC] ⚠️ Stream restarting (state=" + _vlcPlayer.State + ")");
                 _vlcPlayer.Play();
             }
 
