@@ -45,7 +45,7 @@ namespace AirDirector.Controls
         private const int AUDIO_DELAY_MS = 40;
         private const int AUDIO_DELAY_SAMPLES = AUDIO_DELAY_MS * AUDIO_SAMPLE_RATE / 1000 * AUDIO_CHANNELS;
         private const float PROGRAM_PIP_SCALE = 0.75f;
-        private const int STREAM_ACTIVATE_TIMEOUT_MS = 10000;
+        private const int STREAM_ACTIVATE_TIMEOUT_MS = 15000;
         private const int MIN_VALID_STREAM_DURATION_MS = 100;
 
         private sealed class AudioDelayLine
@@ -119,6 +119,11 @@ namespace AirDirector.Controls
             public volatile int SessionId, StartPointMs;
             public readonly System.Diagnostics.Stopwatch StreamClock = new System.Diagnostics.Stopwatch();
             public readonly System.Diagnostics.Stopwatch PendingActivationClock = new System.Diagnostics.Stopwatch();
+            public EventHandler<MediaPlayerBufferingEventArgs> BufferingLogHandler;
+            public EventHandler<EventArgs> EncounteredErrorLogHandler;
+            public EventHandler<EventArgs> PlayingLogHandler;
+            public int LastBufferLogBucket = -1;
+            public string StreamLogUrl = "";
         }
         private Deck _deckA, _deckB, _bufferDeck, _activeDeck, _pendingDeck;
         private bool _nextIsA = true; private volatile int _globalSessionId;
@@ -219,6 +224,60 @@ namespace AirDirector.Controls
         private Services.Core.DailyLogger _dailyLogger;
         private static Font SafeFont(string f, float s, FontStyle st) { try { return new Font(new FontFamily(f), s, st); } catch { return new Font(SystemFonts.DefaultFont.FontFamily, s, st); } }
         private static bool IsWebStream(string path) { if (string.IsNullOrEmpty(path)) return false; return path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("mms://", StringComparison.OrdinalIgnoreCase); }
+        private static void ApplyStreamOptions(Media media, string url, bool audioOnly)
+        {
+            bool isRtsp = url.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase);
+
+            media.AddOption(":network-caching=5000");
+            media.AddOption(":live-caching=5000");
+            media.AddOption(":file-caching=1500");
+
+            media.AddOption(":adaptive-logic=highest");
+            media.AddOption(":adaptive-use-access");
+
+            media.AddOption(":http-reconnect");
+            media.AddOption(":http-continuous");
+            media.AddOption(":http-user-agent=VLC/3.0.20 LibVLC/3.0.20");
+
+            if (isRtsp)
+            {
+                media.AddOption(":rtsp-tcp");
+                media.AddOption(":rtsp-frame-buffer-size=500000");
+            }
+
+            if (audioOnly)
+            {
+                media.AddOption(":no-video");
+            }
+
+            media.AddOption(":clock-jitter=0");
+            media.AddOption(":clock-synchro=0");
+        }
+
+        private void AttachStreamDiagnostics(Deck target, string url)
+        {
+            if (target.BufferingLogHandler != null) target.VlcPlayer.Buffering -= target.BufferingLogHandler;
+            if (target.EncounteredErrorLogHandler != null) target.VlcPlayer.EncounteredError -= target.EncounteredErrorLogHandler;
+            if (target.PlayingLogHandler != null) target.VlcPlayer.Playing -= target.PlayingLogHandler;
+
+            target.StreamLogUrl = url;
+            target.LastBufferLogBucket = -1;
+
+            target.BufferingLogHandler = (s, e) =>
+            {
+                if (e.Cache >= 100f) return;
+                int bucket = Math.Max(0, ((int)e.Cache / 25) * 25);
+                if (bucket == target.LastBufferLogBucket) return;
+                target.LastBufferLogBucket = bucket;
+                Log("[VLC-BUFFER] " + bucket + "%");
+            };
+            target.EncounteredErrorLogHandler = (s, e) => Log("[VLC-ERROR] stream " + target.StreamLogUrl + " encountered error");
+            target.PlayingLogHandler = (s, e) => Log("[VLC] Playing started: " + target.StreamLogUrl);
+
+            target.VlcPlayer.Buffering += target.BufferingLogHandler;
+            target.VlcPlayer.EncounteredError += target.EncounteredErrorLogHandler;
+            target.VlcPlayer.Playing += target.PlayingLogHandler;
+        }
 
         public PlayerControlVideo()
         {
@@ -971,14 +1030,14 @@ namespace AirDirector.Controls
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
                 var media = new Media(_libVLC, fp, FromType.FromLocation);
-                // Video web stream (HLS/RTMP) needs a slightly longer startup buffer to stabilize A/V before on-air transition.
-                media.AddOption(":network-caching=2000");
-                media.AddOption(":live-caching=2000");
+                ApplyStreamOptions(media, fp, audioOnly: !item.IsVideoStream);
 
                 if (!item.IsVideoStream)
                 {
-                    media.AddOption(":no-video");
-                    target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
+                    target.VlcPlayer.Media = media;
+                    AttachStreamDiagnostics(target, fp);
+                    media.Dispose();
+                    target.VlcPlayer.Play();
                     _bufferShouldShow = true; _currentFileIsVideo = false;
                     if (string.IsNullOrEmpty(_bufferVideoPath))
                         Log("[PLAY] WebStream (audio-only): nessun buffer video configurato");
@@ -987,7 +1046,10 @@ namespace AirDirector.Controls
                 }
                 else
                 {
-                    target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
+                    target.VlcPlayer.Media = media;
+                    AttachStreamDiagnostics(target, fp);
+                    media.Dispose();
+                    target.VlcPlayer.Play();
                     _bufferShouldShow = false;
                     _currentFileIsVideo = true;
                     StopBufferDeck();
