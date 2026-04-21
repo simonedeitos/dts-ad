@@ -82,7 +82,6 @@ namespace AirDirector.Forms
         private Button _btnInsertCommand;
         private ComboBox _cmbPlaylistStreaming;
         private MaskedTextBox _txtPlaylistStreamDuration;
-        private Label _lblPlaylistStreamingBuffer;
         private TextBox _txtPlaylistStreamingBuffer;
         private Button _btnBrowsePlaylistStreamingBuffer;
         private Button _btnInsertStreaming;
@@ -695,7 +694,6 @@ namespace AirDirector.Forms
             grpStreaming.Controls.Add(new Label { Text = LanguageManager.GetString("ScheduleEditor.URLStreaming", "URL Streaming") + ":", Left = 12, Top = 28, Width = 85, ForeColor = Color.White });
             _cmbPlaylistStreaming = new ComboBox { Left = 100, Top = 24, Width = 290, DropDownStyle = ComboBoxStyle.DropDownList };
             foreach (var stream in _streamingEntries) _cmbPlaylistStreaming.Items.Add(stream);
-            _cmbPlaylistStreaming.SelectedIndexChanged += (s, e) => UpdateStreamingBufferControls();
             if (_cmbPlaylistStreaming.Items.Count > 0) _cmbPlaylistStreaming.SelectedIndex = 0;
             grpStreaming.Controls.Add(_cmbPlaylistStreaming);
             grpStreaming.Controls.Add(new Label { Text = LanguageManager.GetString("PlaylistEditor.StreamingDuration", "Durata:"), Left = 400, Top = 28, Width = 55, ForeColor = Color.White });
@@ -705,8 +703,7 @@ namespace AirDirector.Forms
             _txtPlaylistStreamingBuffer = new TextBox { Left = 130, Top = 57, Width = 410, Visible = _isRadioTVMode };
             _btnBrowsePlaylistStreamingBuffer = new Button { Text = "📁", Left = 545, Top = 56, Width = 30, Height = 24, Visible = _isRadioTVMode };
             _btnBrowsePlaylistStreamingBuffer.Click += (s, e) => BrowseFileInto(_txtPlaylistStreamingBuffer, LanguageManager.GetString("PlaylistEditor.SelectBufferFile", "Seleziona file buffer video"), "Video|*.mp4;*.mov;*.avi;*.mkv;*.wmv|All files|*.*");
-            _lblPlaylistStreamingBuffer = new Label { Text = "File Buffer Video:", Left = 12, Top = 60, Width = 115, ForeColor = Color.White, Visible = _isRadioTVMode };
-            grpStreaming.Controls.Add(_lblPlaylistStreamingBuffer);
+            grpStreaming.Controls.Add(new Label { Text = "File Buffer Video:", Left = 12, Top = 60, Width = 115, ForeColor = Color.White, Visible = _isRadioTVMode });
             grpStreaming.Controls.Add(_txtPlaylistStreamingBuffer);
             grpStreaming.Controls.Add(_btnBrowsePlaylistStreamingBuffer);
 
@@ -715,7 +712,6 @@ namespace AirDirector.Forms
             _btnInsertStreaming.Click += BtnInsertStreaming_Click;
             grpStreaming.Controls.Add(_btnInsertStreaming);
             page.Controls.Add(grpStreaming);
-            UpdateStreamingBufferControls();
             y += grpStreaming.Height + 10;
 
             GroupBox grpAudio = new GroupBox
@@ -1599,26 +1595,6 @@ namespace AirDirector.Forms
             if (_btnBrowseRuleVideoMp4 != null) _btnBrowseRuleVideoMp4.Visible = showVideo;
         }
 
-        private void UpdateStreamingBufferControls()
-        {
-            if (!_isRadioTVMode)
-                return;
-
-            bool showBuffer = true;
-            var selected = _cmbPlaylistStreaming?.SelectedItem as StreamingEntry;
-            if (selected != null && selected.IsVideoStream)
-                showBuffer = false;
-
-            if (_lblPlaylistStreamingBuffer != null) _lblPlaylistStreamingBuffer.Visible = showBuffer;
-            if (_txtPlaylistStreamingBuffer != null)
-            {
-                _txtPlaylistStreamingBuffer.Visible = showBuffer;
-                if (!showBuffer)
-                    _txtPlaylistStreamingBuffer.Text = string.Empty;
-            }
-            if (_btnBrowsePlaylistStreamingBuffer != null) _btnBrowsePlaylistStreamingBuffer.Visible = showBuffer;
-        }
-
         private void BtnInsertCommand_Click(object sender, EventArgs e)
         {
             var selectedCommand = _cmbRuleCommand?.SelectedItem as CommandEntry;
@@ -1664,8 +1640,7 @@ namespace AirDirector.Forms
                 FilePath = selected.URL,
                 StreamDuration = duration.ToString(@"hh\:mm\:ss"),
                 DurationSeconds = (int)duration.TotalSeconds,
-                AssociatedBufferPath = (_isRadioTVMode && !selected.IsVideoStream) ? (_txtPlaylistStreamingBuffer?.Text ?? "") : "",
-                IsVideoStream = _isRadioTVMode && selected.IsVideoStream
+                AssociatedBufferPath = _isRadioTVMode ? (_txtPlaylistStreamingBuffer?.Text ?? "") : ""
             };
             _playlist.Items.Add(item);
             MarkChanged();

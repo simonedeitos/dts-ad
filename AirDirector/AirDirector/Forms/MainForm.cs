@@ -959,7 +959,7 @@ namespace AirDirector.Forms
 
         private void MenuStreamingManager_Click(object sender, EventArgs e)
         {
-            using (var form = new StreamingManagerForm(_isRadioTVMode))
+            using (var form = new StreamingManagerForm())
             {
                 form.ShowDialog(this);
             }

@@ -896,9 +896,9 @@ namespace AirDirector.Controls
                         if (_vlcPlayer != null)
                         {
                             var media = new Media(_libVLC, new Uri(nextItem.FilePath));
-                            media.AddOption(":no-video");
-                            media.AddOption(":network-caching=3000");
-                            media.AddOption(":live-caching=3000");
+                            media.AddOption(": no-video");
+                            media.AddOption(": network-caching=10000");
+                            media.AddOption(": live-caching=10000");
 
                             _vlcPlayer.Media = media;
                             _vlcPlayer.Play();
@@ -1021,9 +1021,7 @@ namespace AirDirector.Controls
         private bool IsStreamUrl(string filePath)
         {
             return filePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase);
+                   filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
         }
 
         private void LoadTrackInfo(PlaylistQueueItem item)
@@ -2676,9 +2674,9 @@ namespace AirDirector.Controls
                     if (_vlcPlayer != null)
                     {
                         var media = new Media(_libVLC, new Uri(streamItem.FilePath));
-                        media.AddOption(":no-video");
-                        media.AddOption(":network-caching=3000");
-                        media.AddOption(":live-caching=3000");
+                        media.AddOption(": no-video");
+                        media.AddOption(": network-caching=10000");
+                        media.AddOption(": live-caching=10000");
 
                         _vlcPlayer.Media = media;
                         _vlcPlayer.Play();

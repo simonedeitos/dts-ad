@@ -554,8 +554,7 @@ namespace AirDirector.Forms
             {
                 _schedule.Type = "URLStreaming";
                 var selectedStreaming = _cmbStreamingArchive?.SelectedItem as StreamingEntry;
-                string streamTypeToken = (_isRadioTVMode && selectedStreaming?.IsVideoStream == true) ? "video" : "audio";
-                _schedule.ClockName = $"{selectedStreaming?.URL ?? ""}|{txtStreamDuration.Text}|{streamTypeToken}";
+                _schedule.ClockName = $"{selectedStreaming?.URL ?? ""}|{txtStreamDuration.Text}";
                 _schedule.AudioFilePath = "";
                 _schedule.MiniPLSID = 0;
             }
