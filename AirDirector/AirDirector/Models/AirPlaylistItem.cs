@@ -40,6 +40,7 @@ namespace AirDirector.Models
         public int YearTo { get; set; }
         public TimeSpan ScheduledTime { get; set; } // Orario calcolato
         public string StreamDuration { get; set; }
+        public bool IsVideoStream { get; set; }
         public string CommandValue { get; set; }
         public string AssociatedBufferPath { get; set; }
         public string AssociatedVideoPath { get; set; }
@@ -59,6 +60,7 @@ namespace AirDirector.Models
             YearTo = DateTime.Now.Year;
             ScheduledTime = TimeSpan.Zero;
             StreamDuration = "01:00:00";
+            IsVideoStream = false;
             CommandValue = string.Empty;
             AssociatedBufferPath = string.Empty;
             AssociatedVideoPath = string.Empty;

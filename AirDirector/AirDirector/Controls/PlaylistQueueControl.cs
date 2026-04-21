@@ -1359,9 +1359,19 @@ namespace AirDirector.Controls
 
 				string url = parts[0].Trim();
 				TimeSpan duration = TimeSpan.FromMinutes(60);
+				bool isVideoStream = false;
 
 				if (parts.Length >= 2 && TimeSpan.TryParse(parts[1].Trim(), out TimeSpan parsedDuration))
 					duration = parsedDuration;
+
+				try
+				{
+					var streams = DbcManager.LoadFromCsv<StreamingEntry>("Streaming.dbc");
+					var match = streams.FirstOrDefault(x =>
+						string.Equals(x.URL?.Trim(), url, StringComparison.OrdinalIgnoreCase));
+					if (match != null) isVideoStream = match.IsVideo;
+				}
+				catch { }
 
 				DateTime scheduledPlayTime = CalculateScheduledPlayTime();
 
@@ -1379,7 +1389,8 @@ namespace AirDirector.Controls
 					MarkerINTRO = 0,
 					MarkerMIX = 0,
 					MarkerOUT = 0,
-					IsScheduled = true
+					IsScheduled = true,
+					IsVideoStream = isVideoStream
 				};
 
 				int insertPosition = GetCorrectScheduleInsertPosition();
@@ -3974,6 +3985,7 @@ namespace AirDirector.Controls
                             MarkerINTRO = 0,
                             MarkerMIX = durMs,
                             MarkerOUT = durMs,
+                            IsVideoStream = pItem.IsVideoStream,
                             VideoFilePath = associatedVideo,
                             VideoSource = associatedVideoSource
                         };
@@ -4319,6 +4331,7 @@ namespace AirDirector.Controls
         public string VideoFilePath { get; set; }
         public string VideoSource { get; set; }      // "StaticVideo", "BufferVideo", "NDISource"
         public string NDISourceName { get; set; }
+		public bool IsVideoStream { get; set; }
 		public bool IsCommand { get; set; }
 		public string CommandType { get; set; }
 		public string CommandValue { get; set; }
@@ -4369,6 +4382,7 @@ namespace AirDirector.Controls
             VideoFilePath = string.Empty;
             VideoSource = string.Empty;
             NDISourceName = string.Empty;
+			IsVideoStream = false;
 			IsCommand = false;
 			CommandType = string.Empty;
 			CommandValue = string.Empty;

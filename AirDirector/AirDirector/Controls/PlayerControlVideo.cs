@@ -69,8 +69,9 @@ namespace AirDirector.Controls
             public int MarkerIN, MarkerINTRO, MarkerMIX, MarkerOUT;
             public int FileDurationMs;
             public bool IsScheduled = false;
+            public bool IsVideoStream = false;
             public static PlayItem FromQueueItem(PlaylistQueueItem qi) => new PlayItem
-            { FilePath = qi.FilePath ?? "", Artist = qi.Artist ?? "", Title = qi.Title ?? "", Intro = qi.Intro, MarkerIN = qi.MarkerIN, MarkerINTRO = qi.MarkerINTRO, MarkerMIX = qi.MarkerMIX, MarkerOUT = qi.MarkerOUT, ItemType = qi.ItemType ?? "Clip", VideoFilePath = qi.VideoFilePath ?? "", VideoSource = qi.VideoSource ?? "", NDISourceName = qi.NDISourceName ?? "", Duration = qi.Duration, FileDurationMs = qi.FileDurationMs, IsScheduled = qi.IsScheduled };
+            { FilePath = qi.FilePath ?? "", Artist = qi.Artist ?? "", Title = qi.Title ?? "", Intro = qi.Intro, MarkerIN = qi.MarkerIN, MarkerINTRO = qi.MarkerINTRO, MarkerMIX = qi.MarkerMIX, MarkerOUT = qi.MarkerOUT, ItemType = qi.ItemType ?? "Clip", VideoFilePath = qi.VideoFilePath ?? "", VideoSource = qi.VideoSource ?? "", NDISourceName = qi.NDISourceName ?? "", Duration = qi.Duration, FileDurationMs = qi.FileDurationMs, IsScheduled = qi.IsScheduled, IsVideoStream = qi.IsVideoStream };
         }
 
         private enum DeckType { VideoClip, AudioTrack, WebStream, Buffer }
@@ -98,6 +99,7 @@ namespace AirDirector.Controls
             public volatile bool IsPreBuffered, IsPendingActivation, PreBufferReady;
             public volatile int SessionId, StartPointMs;
             public int WebStreamRetryCount;
+            public bool IsVideoStream;
             public readonly System.Diagnostics.Stopwatch StreamClock = new System.Diagnostics.Stopwatch();
         }
         private Deck _deckA, _deckB, _bufferDeck, _activeDeck, _pendingDeck;
@@ -428,7 +430,7 @@ namespace AirDirector.Controls
                                     if (deck.SessionId != sid) return;
                                     try { deck.VlcPlayer.Stop(); } catch { }
                                     var m = new Media(_libVLC, retryUrl, FromType.FromLocation);
-                                    m.AddOption(":no-video");
+                                    if (!deck.IsVideoStream) m.AddOption(":no-video");
                                     m.AddOption(":network-caching=10000");
                                     m.AddOption(":live-caching=10000");
                                     m.AddOption(":http-reconnect");
@@ -512,6 +514,7 @@ namespace AirDirector.Controls
             d.FrameCount = 0; d.AudioStarted = false; d.WarmupDone = false;
             d.VlcTimeMs = 0; d.Ring.Reset(); d.CurrentItem = null; d.StartPointMs = 0;
             d.WebStreamRetryCount = 0;
+            d.IsVideoStream = false;
             d.StreamClock.Reset();
         }
 
@@ -1011,12 +1014,14 @@ namespace AirDirector.Controls
 
             if (isStream)
             {
+                bool isVideoStream = item.IsVideoStream;
                 if (_preBufferedDeck != null) { StopDeckInternal(_preBufferedDeck, true); _preBufferedDeck = null; _preBufferedFile = ""; }
                 target = _nextIsA ? _deckA : _deckB; if (target == _activeDeck) target = !_nextIsA ? _deckA : _deckB; _nextIsA = !_nextIsA;
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
+                target.IsVideoStream = isVideoStream;
                 var media = new Media(_libVLC, fp, FromType.FromLocation);
-                media.AddOption(":no-video");
+                if (!isVideoStream) media.AddOption(":no-video");
                 media.AddOption(":network-caching=10000");
                 media.AddOption(":live-caching=10000");
                 media.AddOption(":http-reconnect");
@@ -1028,10 +1033,18 @@ namespace AirDirector.Controls
                 bool looksLikeHls = fp.IndexOf(".m3u8", StringComparison.OrdinalIgnoreCase) >= 0;
                 if (!looksLikeHls) media.AddOption(":demux=any");
                 target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
-                _bufferShouldShow = true; _currentFileIsVideo = false;
-                EnsureBufferVideoPlaying();
+                if (isVideoStream)
+                {
+                    _bufferShouldShow = false; _currentFileIsVideo = true;
+                    StopBufferDeck();
+                }
+                else
+                {
+                    _bufferShouldShow = true; _currentFileIsVideo = false;
+                    EnsureBufferVideoPlaying();
+                }
                 target.Volume = 1.0f; target.IsPlaying = true; target.CurrentItem = item; target.IsPendingActivation = true; _pendingDeck = target;
-                Log("[PLAY] WebStream → " + target.Name);
+                Log("[PLAY] WebStream " + (isVideoStream ? "VIDEO" : "AUDIO") + " → " + target.Name);
                 int streamSid = sid;
                 var streamTarget = target;
                 ThreadPool.QueueUserWorkItem(_ =>

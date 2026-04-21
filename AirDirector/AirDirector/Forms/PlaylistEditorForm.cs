@@ -1640,6 +1640,7 @@ namespace AirDirector.Forms
                 FilePath = selected.URL,
                 StreamDuration = duration.ToString(@"hh\:mm\:ss"),
                 DurationSeconds = (int)duration.TotalSeconds,
+                IsVideoStream = selected.IsVideo,
                 AssociatedBufferPath = _isRadioTVMode ? (_txtPlaylistStreamingBuffer?.Text ?? "") : ""
             };
             _playlist.Items.Add(item);
