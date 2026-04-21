@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml.Serialization;
 using AirDirector.Services;
+using AirDirector.Services.Streaming;
 using AirDirector.Services.Localization;
 using AirDirector.Themes;
 using LibVLCSharp.Shared;
@@ -58,6 +59,7 @@ namespace AirDirector.Controls
         private string _ndiSourceName = "AirDirector Output", _bufferVideoPath = "";
 
         private LibVLC _libVLC; private Sender _ndiSender; private Thread _engineThread;
+        private HttpsPassthroughProxy _httpsProxy;
         private volatile bool _engineRunning, _engineReady, _isDisposed;
         private readonly ConcurrentQueue<Action> _commandQueue = new ConcurrentQueue<Action>();
 
@@ -255,6 +257,15 @@ namespace AirDirector.Controls
                 }
                 try
                 {
+                    _httpsProxy = HttpsPassthroughProxy.Start(msg => Log("[PROXY] " + msg));
+                    Log($"[INIT] HTTPS passthrough proxy on 127.0.0.1:{_httpsProxy.Port}");
+                }
+                catch (Exception ex)
+                {
+                    Log($"[INIT] ⚠️ Proxy start failed: {ex.Message}");
+                }
+                try
+                {
                     _libVLC.Log += (sender, args) =>
                     {
                         if (args.Level == LibVLCSharp.Shared.LogLevel.Warning || args.Level == LibVLCSharp.Shared.LogLevel.Error)
@@ -447,10 +458,15 @@ namespace AirDirector.Controls
                     {
                         deck.WebStreamRetryCount++;
                         int retryN = deck.WebStreamRetryCount;
-                        string retryUrl = url;
-                        if (retryN == 1 && retryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-                        {
+                        string originalUrl = deck.CurrentItem?.FilePath ?? url;
+                        string retryUrl = originalUrl;
+                        if (retryN == 2 && retryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                             retryUrl = "http://" + retryUrl.Substring("https://".Length);
+                        if (_httpsProxy != null && retryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string rewritten = _httpsProxy.Rewrite(retryUrl);
+                            Log("[VLC] ↻ Retry via proxy: " + rewritten);
+                            retryUrl = rewritten;
                         }
                         Log("[VLC] ↻ WebStream retry #" + retryN + " → " + retryUrl);
                         ThreadPool.QueueUserWorkItem(_ =>
@@ -1054,7 +1070,21 @@ namespace AirDirector.Controls
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
                 target.IsVideoStream = isVideoStream;
-                var media = new Media(_libVLC, fp, FromType.FromLocation);
+                string mediaUrl = fp;
+                if (_httpsProxy != null && !string.IsNullOrEmpty(fp) &&
+                    fp.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        mediaUrl = _httpsProxy.Rewrite(fp);
+                        Log("[STREAM] HTTPS → proxy: " + mediaUrl);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("[STREAM] ⚠️ Rewrite failed, using original: " + ex.Message);
+                    }
+                }
+                var media = new Media(_libVLC, mediaUrl, FromType.FromLocation);
                 if (!isVideoStream) media.AddOption(":no-video");
                 media.AddOption(":network-caching=10000");
                 media.AddOption(":live-caching=10000");
@@ -1066,7 +1096,7 @@ namespace AirDirector.Controls
                 media.AddOption(":adaptive-maxheight=1080");
                 // Evita autodetect problematico su estensioni non standard (.audio, ecc.)
                 // Non forzare il demux per gli HLS (.m3u8): VLC li gestisce bene da solo.
-                bool looksLikeHls = fp.IndexOf(".m3u8", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool looksLikeHls = mediaUrl.IndexOf(".m3u8", StringComparison.OrdinalIgnoreCase) >= 0;
                 if (!looksLikeHls) media.AddOption(":demux=any");
                 target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
                 if (isVideoStream)
@@ -1898,6 +1928,7 @@ namespace AirDirector.Controls
                 if (_bufferDeck != null) { StopDeckInternal(_bufferDeck, true); Marshal.FreeHGlobal(_bufferDeck.VideoBufferPtr); }
                 if (_compositedVideoHandle.IsAllocated) _compositedVideoHandle.Free();
                 _libVLC?.Dispose(); _ndiSender?.Dispose();
+                try { _httpsProxy?.Dispose(); } catch { }
                 try { _audioMirrorOutput?.Stop(); _audioMirrorOutput?.Dispose(); } catch { }
                 try { _dailyLogger?.Dispose(); } catch { }
             }
