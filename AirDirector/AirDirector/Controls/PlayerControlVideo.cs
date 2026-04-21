@@ -97,6 +97,7 @@ namespace AirDirector.Controls
             public volatile bool AudioStarted; public PlayItem CurrentItem;
             public volatile bool IsPreBuffered, IsPendingActivation, PreBufferReady;
             public volatile int SessionId, StartPointMs;
+            public volatile bool WebStreamRetried;
             public readonly System.Diagnostics.Stopwatch StreamClock = new System.Diagnostics.Stopwatch();
         }
         private Deck _deckA, _deckB, _bufferDeck, _activeDeck, _pendingDeck;
@@ -216,6 +217,17 @@ namespace AirDirector.Controls
                 Log("[INIT] Starting engine...");
                 LibVLCSharp.Shared.Core.Initialize();
                 _libVLC = new LibVLC("--no-osd", "--no-stats", "--quiet", "--avcodec-fast", "--avcodec-threads=4", "--avcodec-skiploopfilter=4", "--clock-jitter=0", "--clock-synchro=0", "--file-caching=500", "--network-caching=1000", "--avcodec-hw=any");
+                try
+                {
+                    _libVLC.Log += (sender, args) =>
+                    {
+                        if (args.Level == LibVLCSharp.Shared.LogLevel.Warning || args.Level == LibVLCSharp.Shared.LogLevel.Error)
+                        {
+                            try { Log("[libvlc:" + args.Level + "] " + (args.Module ?? "?") + ": " + (args.Message ?? "")); } catch { }
+                        }
+                    };
+                }
+                catch { }
                 if (!NDIlib.initialize()) throw new Exception("NDI init failed");
                 _ndiSender = new Sender(_ndiSourceName, true, false);
                 int fs = _ndiWidth * _ndiHeight * 4;
@@ -389,8 +401,53 @@ namespace AirDirector.Controls
                 deck.VlcPlayer.Playing += (s, e) => Log("[VLC] ▶ " + deck.Name + " Playing (type=" + deck.Type + ")");
                 deck.VlcPlayer.EncounteredError += (s, e) =>
                 {
-                    Log("[VLC] ❌ EncounteredError on " + deck.Name + " (type=" + deck.Type + ")");
+                    string url = "";
+                    try { url = deck.VlcPlayer.Media?.Mrl ?? ""; } catch { }
+                    Log("[VLC] ❌ EncounteredError on " + deck.Name + " (type=" + deck.Type + ") state=" + deck.VlcPlayer.State + " mrl=" + url);
                     int sid = deck.SessionId;
+
+                    bool isStreamDeck = deck.Type == DeckType.WebStream;
+                    bool alreadyRetried = deck.WebStreamRetried;
+                    bool looksLikeHls = !string.IsNullOrEmpty(url) && url.IndexOf(".m3u8", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                    if (isStreamDeck && !alreadyRetried && !string.IsNullOrEmpty(url))
+                    {
+                        deck.WebStreamRetried = true;
+                        Log("[VLC] ↻ Retry WebStream con demux alternativo: " + url);
+                        ThreadPool.QueueUserWorkItem(_ =>
+                        {
+                            Thread.Sleep(500);
+                            if (_isDisposed) return;
+                            _commandQueue.Enqueue(() =>
+                            {
+                                try
+                                {
+                                    if (deck.SessionId != sid) return;
+                                    try { deck.VlcPlayer.Stop(); } catch { }
+                                    var m = new Media(_libVLC, url, FromType.FromLocation);
+                                    m.AddOption(":no-video");
+                                    m.AddOption(":network-caching=10000");
+                                    m.AddOption(":live-caching=10000");
+                                    m.AddOption(":http-reconnect");
+                                    m.AddOption(":http-continuous");
+                                    m.AddOption(":http-forward-cookies");
+                                    m.AddOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                                    if (!looksLikeHls)
+                                    {
+                                        // Primo tentativo usa demux=any; al retry forziamo mpga per stream Icecast/MP3 con URL non standard (.audio).
+                                        m.AddOption(":demux=mpga");
+                                        m.AddOption(":codec=any");
+                                    }
+                                    deck.VlcPlayer.Media = m;
+                                    m.Dispose();
+                                    deck.VlcPlayer.Play();
+                                }
+                                catch (Exception ex) { LogErr("[VLC retry]", ex); }
+                            });
+                        });
+                        return;
+                    }
+
                     _commandQueue.Enqueue(() =>
                     {
                         try
@@ -447,6 +504,7 @@ namespace AirDirector.Controls
             d.PreBufferReady = false; d.Volume = 0f; d.IsReadyForVideo = false;
             d.FrameCount = 0; d.AudioStarted = false; d.WarmupDone = false;
             d.VlcTimeMs = 0; d.Ring.Reset(); d.CurrentItem = null; d.StartPointMs = 0;
+            d.WebStreamRetried = false;
             d.StreamClock.Reset();
         }
 
@@ -950,7 +1008,18 @@ namespace AirDirector.Controls
                 target = _nextIsA ? _deckA : _deckB; if (target == _activeDeck) target = !_nextIsA ? _deckA : _deckB; _nextIsA = !_nextIsA;
                 if (_pendingDeck != null && _pendingDeck != target && _pendingDeck != _activeDeck) { StopDeckInternal(_pendingDeck, true); _pendingDeck = null; }
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
-                var media = new Media(_libVLC, fp, FromType.FromLocation); media.AddOption(":no-video"); media.AddOption(":network-caching=10000"); media.AddOption(":live-caching=10000"); media.AddOption(":http-reconnect"); media.AddOption(":http-continuous");
+                var media = new Media(_libVLC, fp, FromType.FromLocation);
+                media.AddOption(":no-video");
+                media.AddOption(":network-caching=10000");
+                media.AddOption(":live-caching=10000");
+                media.AddOption(":http-reconnect");
+                media.AddOption(":http-continuous");
+                media.AddOption(":http-forward-cookies");
+                media.AddOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                // Evita autodetect problematico su estensioni non standard (.audio, ecc.)
+                // Non forzare il demux per gli HLS (.m3u8): VLC li gestisce bene da solo.
+                bool looksLikeHls = fp.IndexOf(".m3u8", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (!looksLikeHls) media.AddOption(":demux=any");
                 target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
                 _bufferShouldShow = true; _currentFileIsVideo = false;
                 EnsureBufferVideoPlaying();
