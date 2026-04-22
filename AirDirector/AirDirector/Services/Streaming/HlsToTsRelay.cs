@@ -46,7 +46,7 @@ namespace AirDirector.Services.Streaming
 
             while (true)
             {
-                string id = Guid.NewGuid().ToString("N").Substring(0, 4);
+                string id = Guid.NewGuid().ToString("N").Substring(0, 12);
                 string localUrl = $"http://127.0.0.1:{Port}/s/{id}.ts";
                 var registration = new RelayRegistration(id, localUrl, upstreamUri);
                 if (_registrations.TryAdd(id, registration))
@@ -439,6 +439,7 @@ namespace AirDirector.Services.Streaming
         {
             var handler = new HttpClientHandler
             {
+                // Richiesto per stream HLS con certificati non trusted lato libVLC/Windows.
                 ServerCertificateCustomValidationCallback = (_, _, _, _) => true,
                 AutomaticDecompression = DecompressionMethods.All,
                 AllowAutoRedirect = true,

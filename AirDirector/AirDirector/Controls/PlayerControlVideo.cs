@@ -1056,6 +1056,7 @@ namespace AirDirector.Controls
                 StopDeckInternal(target, true); target.SessionId = sid; target.Type = DeckType.WebStream;
                 target.IsVideoStream = isVideoStream;
                 string mediaUrl = fp;
+                string? relayUrl = null;
                 bool needsRelay = !string.IsNullOrEmpty(fp) &&
                     (fp.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                      fp.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
@@ -1064,6 +1065,7 @@ namespace AirDirector.Controls
                     try
                     {
                         mediaUrl = _hlsRelay.Register(fp);
+                        relayUrl = mediaUrl;
                         Log("[STREAM] relay: " + fp + " → " + mediaUrl);
                     }
                     catch (Exception ex)
@@ -1071,7 +1073,7 @@ namespace AirDirector.Controls
                         Log("[STREAM] ⚠️ Relay register failed, using original: " + ex.Message);
                     }
                 }
-                target.RelayUrl = mediaUrl;
+                target.RelayUrl = relayUrl;
                 var media = new Media(_libVLC, mediaUrl, FromType.FromLocation);
                 if (!isVideoStream) media.AddOption(":no-video");
                 media.AddOption(":network-caching=3000");
