@@ -212,6 +212,7 @@ namespace AirDirector.Services.Streaming
             var seenSegments = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
             string playlist = initialPlaylist;
             bool hasInitialPlaylist = true;
+            bool firstPoll = true;
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -226,6 +227,18 @@ namespace AirDirector.Services.Streaming
                 (mediaPlaylistUri, playlist) = await ResolveToMediaPlaylistAsync(id, mediaPlaylistUri, playlist, cancellationToken).ConfigureAwait(false);
 
                 ParseMediaPlaylist(playlist, mediaPlaylistUri, out var segments, out int targetDurationSeconds, out bool endList);
+
+                if (firstPoll && !endList)
+                {
+                    const int keepLastLiveSegmentsAtStartup = 1;
+                    int skip = Math.Max(0, segments.Count - keepLastLiveSegmentsAtStartup);
+                    for (int i = 0; i < skip; i++)
+                    {
+                        string staleKey = NormalizeSegmentKey(segments[i]);
+                        seenSegments[staleKey] = DateTime.UtcNow;
+                    }
+                    Log($"[RELAY] {id} live edge skip: {skip}/{segments.Count} segments skipped");
+                }
 
                 int newSegments = 0;
                 foreach (var segmentUri in segments)
@@ -248,6 +261,7 @@ namespace AirDirector.Services.Streaming
 
                 Log($"[RELAY] {id} playlist poll: {newSegments} new segments");
                 TrimSeenCache(seenSegments);
+                firstPoll = false;
 
                 if (endList)
                 {
