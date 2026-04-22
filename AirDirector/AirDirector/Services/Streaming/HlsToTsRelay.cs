@@ -310,6 +310,8 @@ namespace AirDirector.Services.Streaming
                     continue;
 
                 int currentBandwidth = ParseBandwidth(line);
+                if (currentBandwidth < 0)
+                    continue;
                 string? candidate = null;
 
                 for (int j = i + 1; j < lines.Count; j++)
@@ -331,8 +333,6 @@ namespace AirDirector.Services.Streaming
                 if (string.IsNullOrWhiteSpace(candidate))
                     continue;
                 if (!TryResolveHttpUri(playlistUri, candidate, out var resolved))
-                    continue;
-                if (currentBandwidth <= 0)
                     continue;
 
                 if (currentBandwidth >= bandwidth)
@@ -463,6 +463,7 @@ namespace AirDirector.Services.Streaming
             bool hasInitialConnection = initialResponse != null && initialUpstreamStream != null;
             HttpResponseMessage? response = initialResponse;
             Stream? upstreamStream = initialUpstreamStream;
+            bool ownsResponse = false;
             byte[]? prependBytes = initialBytes;
             int prependCount = initialBytesCount;
 
@@ -480,18 +481,25 @@ namespace AirDirector.Services.Streaming
                         }).ConfigureAwait(false);
 
                         upstreamStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                        ownsResponse = true;
                     }
+
+                    if (upstreamStream == null)
+                        throw new InvalidOperationException("Upstream stream not available");
 
                     try
                     {
-                        await CopyToClientAsync(clientStream, upstreamStream!, prependBytes, prependCount, cancellationToken).ConfigureAwait(false);
+                        await CopyToClientAsync(clientStream, upstreamStream, prependBytes, prependCount, cancellationToken).ConfigureAwait(false);
                         prependBytes = null;
                         prependCount = 0;
                     }
                     finally
                     {
-                        if (!hasInitialConnection)
+                        if (ownsResponse)
+                        {
                             response?.Dispose();
+                            ownsResponse = false;
+                        }
                     }
 
                     hasInitialConnection = false;
@@ -503,7 +511,8 @@ namespace AirDirector.Services.Streaming
             }
             finally
             {
-                response?.Dispose();
+                if (ownsResponse)
+                    response?.Dispose();
             }
         }
 

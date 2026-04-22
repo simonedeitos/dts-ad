@@ -455,8 +455,8 @@ namespace AirDirector.Controls
 
                     bool isStreamDeck = deck.Type == DeckType.WebStream;
                     bool isCurrentDeckSession = sid == _globalSessionId;
-                    bool canRetryRelay = string.IsNullOrEmpty(deck.RelayUrl) || (_hlsRelay?.IsRegistered(deck.RelayUrl) ?? false);
-                    if (isStreamDeck && isCurrentDeckSession && canRetryRelay && !string.IsNullOrEmpty(url) && deck.WebStreamRetryCount < 2)
+                    bool canRetryStream = string.IsNullOrEmpty(deck.RelayUrl) || (_hlsRelay?.IsRegistered(deck.RelayUrl) ?? false);
+                    if (isStreamDeck && isCurrentDeckSession && canRetryStream && !string.IsNullOrEmpty(url) && deck.WebStreamRetryCount < 2)
                     {
                         deck.WebStreamRetryCount++;
                         int retryN = deck.WebStreamRetryCount;
