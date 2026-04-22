@@ -454,7 +454,9 @@ namespace AirDirector.Controls
                     int sid = deck.SessionId;
 
                     bool isStreamDeck = deck.Type == DeckType.WebStream;
-                    if (isStreamDeck && !string.IsNullOrEmpty(url) && deck.WebStreamRetryCount < 2)
+                    bool isCurrentDeckSession = sid == _globalSessionId;
+                    bool canRetryRelay = string.IsNullOrEmpty(deck.RelayUrl) || (_hlsRelay?.IsRegistered(deck.RelayUrl) ?? false);
+                    if (isStreamDeck && isCurrentDeckSession && canRetryRelay && !string.IsNullOrEmpty(url) && deck.WebStreamRetryCount < 2)
                     {
                         deck.WebStreamRetryCount++;
                         int retryN = deck.WebStreamRetryCount;
@@ -469,7 +471,8 @@ namespace AirDirector.Controls
                             {
                                 try
                                 {
-                                    if (deck.SessionId != sid) return;
+                                    if (deck.SessionId != sid || sid != _globalSessionId) return;
+                                    if (!string.IsNullOrEmpty(deck.RelayUrl) && !(_hlsRelay?.IsRegistered(deck.RelayUrl) ?? false)) return;
                                     try { deck.VlcPlayer.Stop(); } catch { }
                                     var m = new Media(_libVLC, retryUrl, FromType.FromLocation);
                                     if (!deck.IsVideoStream) m.AddOption(":no-video");
@@ -978,6 +981,7 @@ namespace AirDirector.Controls
             target.VlcPlayer.Media = media;
             media.Dispose();
             target.VlcPlayer.Play();
+            target.WebStreamRetryCount = 0;
             target.CurrentItem = PlayItem.FromQueueItem(nextItem);
 
             Log("[PREBUF] Pre-buffering VideoClip: " + Path.GetFileName(nextFile) + " → " + target.Name);
@@ -1091,7 +1095,7 @@ namespace AirDirector.Controls
                     _bufferShouldShow = true; _currentFileIsVideo = false;
                     EnsureBufferVideoPlaying();
                 }
-                target.Volume = 1.0f; target.IsPlaying = true; target.CurrentItem = item; target.IsPendingActivation = true; _pendingDeck = target;
+                target.Volume = 1.0f; target.IsPlaying = true; target.WebStreamRetryCount = 0; target.CurrentItem = item; target.IsPendingActivation = true; _pendingDeck = target;
                 Log("[PLAY] WebStream " + (isVideoStream ? "VIDEO" : "AUDIO") + " → " + target.Name);
                 int streamSid = sid;
                 var streamTarget = target;
@@ -1117,7 +1121,7 @@ namespace AirDirector.Controls
             else if (_preBufferedDeck != null && _preBufferedFile == fp && _preBufferedDeck.PreBufferReady)
             {
                 target = _preBufferedDeck; _preBufferedDeck = null; _preBufferedFile = ""; usedPre = true;
-                target.SessionId = sid; target.IsPlaying = true; target.Volume = 1.0f; target.IsPendingActivation = true; target.CurrentItem = item; target.StartPointMs = item.MarkerIN;
+                target.SessionId = sid; target.IsPlaying = true; target.Volume = 1.0f; target.IsPendingActivation = true; target.WebStreamRetryCount = 0; target.CurrentItem = item; target.StartPointMs = item.MarkerIN;
                 _pendingDeck = target; _bufferShouldShow = false; _currentFileIsVideo = true;
                 Log("[PLAY] Using pre-buffer (VideoClip) → " + target.Name);
             }
@@ -1185,7 +1189,7 @@ namespace AirDirector.Controls
                     }
                 }
 
-                target.Volume = 1.0f; target.IsPlaying = true; target.CurrentItem = item;
+                target.Volume = 1.0f; target.IsPlaying = true; target.WebStreamRetryCount = 0; target.CurrentItem = item;
 
                 if (hasDedVid)
                 {

@@ -6,6 +6,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,6 +17,14 @@ namespace AirDirector.Services.Streaming
     {
         private static readonly Regex BandwidthRegex = new Regex(@"(?:^|,)BANDWIDTH=(\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly HttpClient Http = CreateHttpClient();
+        private static readonly HashSet<string> HlsContentTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "application/vnd.apple.mpegurl",
+            "application/x-mpegurl",
+            "audio/mpegurl",
+            "audio/x-mpegurl",
+            "application/mpegurl"
+        };
 
         private readonly HttpListener _listener;
         private readonly CancellationTokenSource _disposeCts = new CancellationTokenSource();
@@ -68,6 +77,13 @@ namespace AirDirector.Services.Streaming
                 registration.Dispose();
                 Log($"[RELAY] unregister {id}");
             }
+        }
+
+        public bool IsRegistered(string localUrl)
+        {
+            string? id = TryParseRelayId(localUrl);
+            if (string.IsNullOrEmpty(id)) return false;
+            return _registrations.ContainsKey(id);
         }
 
         public void Dispose()
@@ -165,12 +181,41 @@ namespace AirDirector.Services.Streaming
 
         private async Task RelayToClientAsync(string id, Uri upstreamUri, Stream clientStream, CancellationToken cancellationToken)
         {
-            Uri mediaPlaylistUri = upstreamUri;
+            await using var probe = await ProbeUpstreamAsync(id, upstreamUri, cancellationToken).ConfigureAwait(false);
+            if (probe.Mode == UpstreamMode.Hls)
+            {
+                if (probe.InitialPlaylist == null) throw new InvalidOperationException("HLS probe without playlist");
+                await RelayHlsAsync(id, probe.EffectiveUri, probe.InitialPlaylist, clientStream, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            Log($"[RELAY] {id} passthrough mode (non-HLS upstream)");
+            await PassthroughToClientAsync(
+                id,
+                probe.EffectiveUri,
+                clientStream,
+                cancellationToken,
+                probe.InitialResponse,
+                probe.InitialUpstreamStream,
+                probe.InitialBytes,
+                probe.InitialBytesCount).ConfigureAwait(false);
+        }
+
+        private async Task RelayHlsAsync(string id, Uri mediaPlaylistUri, string initialPlaylist, Stream clientStream, CancellationToken cancellationToken)
+        {
             var seenSegments = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+            string playlist = initialPlaylist;
+            bool hasInitialPlaylist = true;
 
             while (!cancellationToken.IsCancellationRequested)
             {
-                string playlist = await FetchTextWithRetryAsync(id, mediaPlaylistUri, cancellationToken).ConfigureAwait(false);
+                if (!hasInitialPlaylist)
+                {
+                    var fetched = await FetchTextWithRetryAsync(id, mediaPlaylistUri, cancellationToken).ConfigureAwait(false);
+                    playlist = fetched.Content;
+                    mediaPlaylistUri = fetched.FinalUri;
+                }
+                hasInitialPlaylist = false;
 
                 if (LooksLikeMasterPlaylist(playlist))
                 {
@@ -179,7 +224,9 @@ namespace AirDirector.Services.Streaming
 
                     mediaPlaylistUri = variantUri;
                     Log($"[RELAY] {id} master → variant BW={bandwidth / 1000}k");
-                    playlist = await FetchTextWithRetryAsync(id, mediaPlaylistUri, cancellationToken).ConfigureAwait(false);
+                    var fetchedVariant = await FetchTextWithRetryAsync(id, mediaPlaylistUri, cancellationToken).ConfigureAwait(false);
+                    playlist = fetchedVariant.Content;
+                    mediaPlaylistUri = fetchedVariant.FinalUri;
                 }
 
                 ParseMediaPlaylist(playlist, mediaPlaylistUri, out var segments, out int targetDurationSeconds, out bool endList);
@@ -195,9 +242,11 @@ namespace AirDirector.Services.Streaming
                         continue;
                     }
 
-                    long bytes = await PumpSegmentToClientAsync(id, segmentUri, clientStream, cancellationToken).ConfigureAwait(false);
+                    var segmentResult = await PumpSegmentToClientAsync(id, segmentUri, clientStream, cancellationToken).ConfigureAwait(false);
+                    var resolvedSegmentUri = segmentResult.FinalUri ?? segmentUri;
+                    key = NormalizeSegmentKey(resolvedSegmentUri);
                     seenSegments[key] = DateTime.UtcNow;
-                    Log($"[RELAY] {id} segment {key} ({bytes}B) sent");
+                    Log($"[RELAY] {id} segment {key} ({segmentResult.Bytes}B) sent");
                     newSegments++;
                 }
 
@@ -283,6 +332,8 @@ namespace AirDirector.Services.Streaming
                     continue;
                 if (!TryResolveHttpUri(playlistUri, candidate, out var resolved))
                     continue;
+                if (currentBandwidth <= 0)
+                    continue;
 
                 if (currentBandwidth >= bandwidth)
                 {
@@ -299,20 +350,22 @@ namespace AirDirector.Services.Streaming
             var match = BandwidthRegex.Match(streamInfLine);
             if (match.Success && int.TryParse(match.Groups[1].Value, out int parsed))
                 return parsed;
-            return 0;
+            return -1;
         }
 
-        private async Task<string> FetchTextWithRetryAsync(string id, Uri uri, CancellationToken cancellationToken)
+        private async Task<(string Content, Uri FinalUri)> FetchTextWithRetryAsync(string id, Uri uri, CancellationToken cancellationToken)
         {
             return await ExecuteWithRetryAsync(id, cancellationToken, async ct =>
             {
                 using var response = await Http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                string content = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                Uri finalUri = response.RequestMessage?.RequestUri ?? uri;
+                return (content, finalUri);
             }).ConfigureAwait(false);
         }
 
-        private async Task<long> PumpSegmentToClientAsync(string id, Uri segmentUri, Stream clientStream, CancellationToken cancellationToken)
+        private async Task<(long Bytes, Uri? FinalUri)> PumpSegmentToClientAsync(string id, Uri segmentUri, Stream clientStream, CancellationToken cancellationToken)
         {
             using var response = await ExecuteWithRetryAsync(id, cancellationToken, async ct =>
             {
@@ -340,7 +393,172 @@ namespace AirDirector.Services.Streaming
                 ArrayPool<byte>.Shared.Return(buffer);
             }
 
-            return total;
+            return (total, response.RequestMessage?.RequestUri);
+        }
+
+        private async Task<UpstreamProbeResult> ProbeUpstreamAsync(string id, Uri upstreamUri, CancellationToken cancellationToken)
+        {
+            var response = await ExecuteWithRetryAsync(id, cancellationToken, async ct =>
+            {
+                var res = await Http.GetAsync(upstreamUri, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                res.EnsureSuccessStatusCode();
+                return res;
+            }).ConfigureAwait(false);
+
+            try
+            {
+                Uri effectiveUri = response.RequestMessage?.RequestUri ?? upstreamUri;
+                string? contentType = response.Content.Headers.ContentType?.MediaType;
+                bool likelyHlsByHeaders = IsHlsContentType(contentType) || LooksLikePlaylistPath(effectiveUri);
+
+                var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                byte[] initialBytes = ArrayPool<byte>.Shared.Rent(256);
+                int initialCount = 0;
+                try
+                {
+                    initialCount = await stream.ReadAsync(initialBytes.AsMemory(0, 256), cancellationToken).ConfigureAwait(false);
+                    bool looksLikeHlsByBody = StartsWithExtM3u(initialBytes, initialCount);
+                    bool isHls = likelyHlsByHeaders || looksLikeHlsByBody;
+
+                    if (isHls)
+                    {
+                        var sb = new StringBuilder();
+                        if (initialCount > 0)
+                            sb.Append(Encoding.UTF8.GetString(initialBytes, 0, initialCount));
+
+                        using var reader = new StreamReader(stream, Encoding.UTF8, true, 4096, leaveOpen: true);
+                        sb.Append(await reader.ReadToEndAsync().ConfigureAwait(false));
+                        ArrayPool<byte>.Shared.Return(initialBytes);
+                        return UpstreamProbeResult.ForHls(effectiveUri, sb.ToString(), response);
+                    }
+
+                    string ctLabel = string.IsNullOrWhiteSpace(contentType) ? "unknown" : contentType!;
+                    Log($"[RELAY] {id} passthrough content-type={ctLabel}");
+                    return UpstreamProbeResult.ForPassthrough(effectiveUri, response, stream, initialBytes, initialCount);
+                }
+                catch
+                {
+                    ArrayPool<byte>.Shared.Return(initialBytes);
+                    throw;
+                }
+            }
+            catch
+            {
+                response.Dispose();
+                throw;
+            }
+        }
+
+        private async Task PassthroughToClientAsync(
+            string id,
+            Uri upstreamUri,
+            Stream clientStream,
+            CancellationToken cancellationToken,
+            HttpResponseMessage? initialResponse = null,
+            Stream? initialUpstreamStream = null,
+            byte[]? initialBytes = null,
+            int initialBytesCount = 0)
+        {
+            int reconnectDelayMs = 500;
+            bool hasInitialConnection = initialResponse != null && initialUpstreamStream != null;
+            HttpResponseMessage? response = initialResponse;
+            Stream? upstreamStream = initialUpstreamStream;
+            byte[]? prependBytes = initialBytes;
+            int prependCount = initialBytesCount;
+
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    if (!hasInitialConnection)
+                    {
+                        response = await ExecuteWithRetryAsync(id, cancellationToken, async ct =>
+                        {
+                            var res = await Http.GetAsync(upstreamUri, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                            res.EnsureSuccessStatusCode();
+                            return res;
+                        }).ConfigureAwait(false);
+
+                        upstreamStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                    }
+
+                    try
+                    {
+                        await CopyToClientAsync(clientStream, upstreamStream!, prependBytes, prependCount, cancellationToken).ConfigureAwait(false);
+                        prependBytes = null;
+                        prependCount = 0;
+                    }
+                    finally
+                    {
+                        if (!hasInitialConnection)
+                            response?.Dispose();
+                    }
+
+                    hasInitialConnection = false;
+                    response = null;
+                    upstreamStream = null;
+
+                    await Task.Delay(reconnectDelayMs, cancellationToken).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                response?.Dispose();
+            }
+        }
+
+        private static bool IsHlsContentType(string? mediaType)
+        {
+            if (string.IsNullOrWhiteSpace(mediaType)) return false;
+            return HlsContentTypes.Contains(mediaType.Trim());
+        }
+
+        private static bool LooksLikePlaylistPath(Uri uri)
+        {
+            string path = uri.AbsolutePath;
+            return path.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase) ||
+                   path.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool StartsWithExtM3u(byte[] buffer, int count)
+        {
+            if (count <= 0) return false;
+            int offset = 0;
+            if (count >= 3 && buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF)
+                offset = 3;
+            if (count - offset < 7) return false;
+            return buffer[offset] == (byte)'#' &&
+                   buffer[offset + 1] == (byte)'E' &&
+                   buffer[offset + 2] == (byte)'X' &&
+                   buffer[offset + 3] == (byte)'T' &&
+                   buffer[offset + 4] == (byte)'M' &&
+                   buffer[offset + 5] == (byte)'3' &&
+                   buffer[offset + 6] == (byte)'U';
+        }
+
+        private static async Task CopyToClientAsync(Stream clientStream, Stream upstreamStream, byte[]? prependBytes, int prependCount, CancellationToken cancellationToken)
+        {
+            if (prependBytes != null && prependCount > 0)
+            {
+                await clientStream.WriteAsync(prependBytes.AsMemory(0, prependCount), cancellationToken).ConfigureAwait(false);
+                await clientStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
+            try
+            {
+                while (true)
+                {
+                    int read = await upstreamStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false);
+                    if (read <= 0) break;
+                    await clientStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    await clientStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
 
         private async Task<T> ExecuteWithRetryAsync<T>(string id, CancellationToken cancellationToken, Func<CancellationToken, Task<T>> action)
@@ -507,6 +725,60 @@ namespace AirDirector.Services.Streaming
             {
                 try { Cancellation.Cancel(); } catch { }
                 Cancellation.Dispose();
+            }
+        }
+
+        private enum UpstreamMode
+        {
+            Hls,
+            Passthrough
+        }
+
+        private sealed class UpstreamProbeResult : IAsyncDisposable
+        {
+            private UpstreamProbeResult() { }
+
+            public UpstreamMode Mode { get; private set; }
+            public Uri EffectiveUri { get; private set; } = null!;
+            public string? InitialPlaylist { get; private set; }
+            public HttpResponseMessage? InitialResponse { get; private set; }
+            public Stream? InitialUpstreamStream { get; private set; }
+            public byte[]? InitialBytes { get; private set; }
+            public int InitialBytesCount { get; private set; }
+
+            public static UpstreamProbeResult ForHls(Uri effectiveUri, string initialPlaylist, HttpResponseMessage response)
+            {
+                response.Dispose();
+                return new UpstreamProbeResult
+                {
+                    Mode = UpstreamMode.Hls,
+                    EffectiveUri = effectiveUri,
+                    InitialPlaylist = initialPlaylist
+                };
+            }
+
+            public static UpstreamProbeResult ForPassthrough(Uri effectiveUri, HttpResponseMessage response, Stream upstreamStream, byte[] initialBytes, int initialBytesCount)
+            {
+                return new UpstreamProbeResult
+                {
+                    Mode = UpstreamMode.Passthrough,
+                    EffectiveUri = effectiveUri,
+                    InitialResponse = response,
+                    InitialUpstreamStream = upstreamStream,
+                    InitialBytes = initialBytes,
+                    InitialBytesCount = initialBytesCount
+                };
+            }
+
+            public ValueTask DisposeAsync()
+            {
+                InitialResponse?.Dispose();
+                if (InitialBytes != null)
+                {
+                    ArrayPool<byte>.Shared.Return(InitialBytes);
+                    InitialBytes = null;
+                }
+                return ValueTask.CompletedTask;
             }
         }
     }
