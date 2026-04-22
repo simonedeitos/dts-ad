@@ -15,6 +15,8 @@ namespace AirDirector.Services.Streaming
 {
     public sealed class HlsToTsRelay : IDisposable
     {
+        private const int MaxMasterPlaylistDepth = 6;
+        private const string DefaultPassthroughContentType = "application/octet-stream";
         private static readonly Regex BandwidthRegex = new Regex(@"(?:^|,)BANDWIDTH=(\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly HttpClient Http = CreateHttpClient();
         private static readonly HashSet<string> HlsContentTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -191,7 +193,7 @@ namespace AirDirector.Services.Streaming
 
             string? passthroughContentType = probe.UpstreamContentType;
             if (string.IsNullOrWhiteSpace(passthroughContentType))
-                passthroughContentType = "application/octet-stream";
+                passthroughContentType = DefaultPassthroughContentType;
             clientResponse.ContentType = passthroughContentType;
             Log($"[RELAY] {id} passthrough mode (non-HLS upstream)");
             await PassthroughToClientAsync(
@@ -615,8 +617,7 @@ namespace AirDirector.Services.Streaming
 
         private async Task<(Uri Uri, string Playlist)> ResolveToMediaPlaylistAsync(string id, Uri currentUri, string playlist, CancellationToken cancellationToken)
         {
-            const int maxMasterDepth = 6;
-            for (int depth = 0; depth < maxMasterDepth && LooksLikeMasterPlaylist(playlist); depth++)
+            for (int nestingLevel = 0; nestingLevel < MaxMasterPlaylistDepth && LooksLikeMasterPlaylist(playlist); nestingLevel++)
             {
                 if (!TrySelectBestVariant(playlist, currentUri, out var variantUri, out int bandwidth))
                     throw new InvalidDataException("Master playlist without valid variant");

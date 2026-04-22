@@ -1156,7 +1156,7 @@ namespace AirDirector.Controls
                 }
                 else
                 {
-                    Log("[STREAM] relay bypass (non-HLS): " + fp);
+                    Log($"[STREAM] relay bypass (non-HLS): {fp}");
                 }
                 target.RelayUrl = relayUrl;
                 var media = new Media(_libVLC, mediaUrl, FromType.FromLocation);
