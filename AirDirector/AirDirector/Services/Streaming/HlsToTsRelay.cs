@@ -143,7 +143,6 @@ namespace AirDirector.Services.Streaming
 
             var response = context.Response;
             response.StatusCode = 200;
-            response.ContentType = "video/mp2t";
             response.SendChunked = true;
             response.KeepAlive = false;
             response.Headers["Cache-Control"] = "no-cache, no-store";
@@ -153,7 +152,7 @@ namespace AirDirector.Services.Streaming
 
             try
             {
-                await RelayToClientAsync(id, registration.UpstreamUri, response.OutputStream, linkedCts.Token).ConfigureAwait(false);
+                await RelayToClientAsync(id, registration.UpstreamUri, response, response.OutputStream, linkedCts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (linkedCts.IsCancellationRequested) { }
             catch (IOException)
@@ -179,16 +178,21 @@ namespace AirDirector.Services.Streaming
             }
         }
 
-        private async Task RelayToClientAsync(string id, Uri upstreamUri, Stream clientStream, CancellationToken cancellationToken)
+        private async Task RelayToClientAsync(string id, Uri upstreamUri, HttpListenerResponse clientResponse, Stream clientStream, CancellationToken cancellationToken)
         {
             await using var probe = await ProbeUpstreamAsync(id, upstreamUri, cancellationToken).ConfigureAwait(false);
             if (probe.Mode == UpstreamMode.Hls)
             {
+                clientResponse.ContentType = "video/mp2t";
                 if (probe.InitialPlaylist == null) throw new InvalidOperationException("HLS probe without playlist");
                 await RelayHlsAsync(id, probe.EffectiveUri, probe.InitialPlaylist, clientStream, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
+            string? passthroughContentType = probe.UpstreamContentType;
+            if (string.IsNullOrWhiteSpace(passthroughContentType))
+                passthroughContentType = "application/octet-stream";
+            clientResponse.ContentType = passthroughContentType;
             Log($"[RELAY] {id} passthrough mode (non-HLS upstream)");
             await PassthroughToClientAsync(
                 id,
@@ -217,17 +221,7 @@ namespace AirDirector.Services.Streaming
                 }
                 hasInitialPlaylist = false;
 
-                if (LooksLikeMasterPlaylist(playlist))
-                {
-                    if (!TrySelectBestVariant(playlist, mediaPlaylistUri, out var variantUri, out int bandwidth))
-                        throw new InvalidDataException("Master playlist without valid variant");
-
-                    mediaPlaylistUri = variantUri;
-                    Log($"[RELAY] {id} master → variant BW={bandwidth / 1000}k");
-                    var fetchedVariant = await FetchTextWithRetryAsync(id, mediaPlaylistUri, cancellationToken).ConfigureAwait(false);
-                    playlist = fetchedVariant.Content;
-                    mediaPlaylistUri = fetchedVariant.FinalUri;
-                }
+                (mediaPlaylistUri, playlist) = await ResolveToMediaPlaylistAsync(id, mediaPlaylistUri, playlist, cancellationToken).ConfigureAwait(false);
 
                 ParseMediaPlaylist(playlist, mediaPlaylistUri, out var segments, out int targetDurationSeconds, out bool endList);
 
@@ -301,6 +295,8 @@ namespace AirDirector.Services.Streaming
         {
             variantUri = playlistUri;
             bandwidth = -1;
+            Uri? firstResolvedVariant = null;
+            bool foundAnyVariant = false;
 
             var lines = SplitLines(playlist);
             for (int i = 0; i < lines.Count; i++)
@@ -310,8 +306,6 @@ namespace AirDirector.Services.Streaming
                     continue;
 
                 int currentBandwidth = ParseBandwidth(line);
-                if (currentBandwidth < 0)
-                    continue;
                 string? candidate = null;
 
                 for (int j = i + 1; j < lines.Count; j++)
@@ -335,14 +329,29 @@ namespace AirDirector.Services.Streaming
                 if (!TryResolveHttpUri(playlistUri, candidate, out var resolved))
                     continue;
 
-                if (currentBandwidth >= bandwidth)
+                foundAnyVariant = true;
+                if (firstResolvedVariant == null)
+                    firstResolvedVariant = resolved;
+
+                int normalizedBandwidth = currentBandwidth > 0 ? currentBandwidth : 0;
+                if (normalizedBandwidth >= bandwidth)
                 {
-                    bandwidth = currentBandwidth;
+                    bandwidth = normalizedBandwidth;
                     variantUri = resolved;
                 }
             }
 
-            return bandwidth >= 0;
+            if (foundAnyVariant)
+            {
+                if (bandwidth < 0 && firstResolvedVariant != null)
+                {
+                    bandwidth = 0;
+                    variantUri = firstResolvedVariant;
+                }
+                return true;
+            }
+
+            return false;
         }
 
         private static int ParseBandwidth(string streamInfLine)
@@ -604,6 +613,27 @@ namespace AirDirector.Services.Streaming
             return playlist.IndexOf("#EXT-X-STREAM-INF", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        private async Task<(Uri Uri, string Playlist)> ResolveToMediaPlaylistAsync(string id, Uri currentUri, string playlist, CancellationToken cancellationToken)
+        {
+            const int maxMasterDepth = 6;
+            for (int depth = 0; depth < maxMasterDepth && LooksLikeMasterPlaylist(playlist); depth++)
+            {
+                if (!TrySelectBestVariant(playlist, currentUri, out var variantUri, out int bandwidth))
+                    throw new InvalidDataException("Master playlist without valid variant");
+
+                currentUri = variantUri;
+                Log($"[RELAY] {id} master → variant BW={Math.Max(0, bandwidth) / 1000}k");
+                var fetchedVariant = await FetchTextWithRetryAsync(id, currentUri, cancellationToken).ConfigureAwait(false);
+                playlist = fetchedVariant.Content;
+                currentUri = fetchedVariant.FinalUri;
+            }
+
+            if (LooksLikeMasterPlaylist(playlist))
+                throw new InvalidDataException("Nested master playlist depth exceeded");
+
+            return (currentUri, playlist);
+        }
+
         private static bool TryResolveHttpUri(Uri baseUri, string value, out Uri resolved)
         {
             if (Uri.TryCreate(value, UriKind.Absolute, out resolved))
@@ -754,6 +784,7 @@ namespace AirDirector.Services.Streaming
             public Stream? InitialUpstreamStream { get; private set; }
             public byte[]? InitialBytes { get; private set; }
             public int InitialBytesCount { get; private set; }
+            public string? UpstreamContentType { get; private set; }
 
             public static UpstreamProbeResult ForHls(Uri effectiveUri, string initialPlaylist, HttpResponseMessage response)
             {
@@ -775,7 +806,8 @@ namespace AirDirector.Services.Streaming
                     InitialResponse = response,
                     InitialUpstreamStream = upstreamStream,
                     InitialBytes = initialBytes,
-                    InitialBytesCount = initialBytesCount
+                    InitialBytesCount = initialBytesCount,
+                    UpstreamContentType = response.Content.Headers.ContentType?.ToString()
                 };
             }
 

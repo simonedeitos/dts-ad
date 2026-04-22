@@ -7,6 +7,9 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -46,6 +49,8 @@ namespace AirDirector.Controls
         private const int AUDIO_DELAY_MS = 40;
         private const int AUDIO_DELAY_SAMPLES = AUDIO_DELAY_MS * AUDIO_SAMPLE_RATE / 1000 * AUDIO_CHANNELS;
         private const float PROGRAM_PIP_SCALE = 0.75f;
+        private static readonly string[] HlsContentTypes = { "application/vnd.apple.mpegurl", "application/x-mpegurl", "audio/mpegurl", "audio/x-mpegurl", "application/mpegurl" };
+        private static readonly HttpClient _streamProbeHttp = CreateStreamProbeHttpClient();
 
         private sealed class AudioDelayLine
         {
@@ -204,6 +209,80 @@ namespace AirDirector.Controls
         private Services.Core.DailyLogger _dailyLogger;
         private static Font SafeFont(string f, float s, FontStyle st) { try { return new Font(new FontFamily(f), s, st); } catch { return new Font(SystemFonts.DefaultFont.FontFamily, s, st); } }
         private static bool IsWebStream(string path) { if (string.IsNullOrEmpty(path)) return false; return path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("mms://", StringComparison.OrdinalIgnoreCase); }
+        private static HttpClient CreateStreamProbeHttpClient()
+        {
+            var handler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (_, _, _, _) => true,
+                AutomaticDecompression = DecompressionMethods.All,
+                AllowAutoRedirect = true
+            };
+            var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(4) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36");
+            client.DefaultRequestHeaders.Accept.ParseAdd("*/*");
+            return client;
+        }
+
+        private static bool LooksLikeHlsPath(Uri uri)
+        {
+            string path = uri.AbsolutePath;
+            return path.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsHlsContentType(string? mediaType)
+        {
+            if (string.IsNullOrWhiteSpace(mediaType))
+                return false;
+            return HlsContentTypes.Any(t => string.Equals(t, mediaType.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool StartsWithExtM3u(byte[] buffer, int count)
+        {
+            if (count <= 0) return false;
+            int offset = 0;
+            if (count >= 3 && buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF)
+                offset = 3;
+            if (count - offset < 7) return false;
+            return buffer[offset] == (byte)'#' &&
+                   buffer[offset + 1] == (byte)'E' &&
+                   buffer[offset + 2] == (byte)'X' &&
+                   buffer[offset + 3] == (byte)'T' &&
+                   buffer[offset + 4] == (byte)'M' &&
+                   buffer[offset + 5] == (byte)'3' &&
+                   buffer[offset + 6] == (byte)'U';
+        }
+
+        private bool ShouldUseHlsRelay(string streamUrl)
+        {
+            if (string.IsNullOrWhiteSpace(streamUrl) || !Uri.TryCreate(streamUrl, UriKind.Absolute, out var uri))
+                return false;
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+                return false;
+            if (LooksLikeHlsPath(uri))
+                return true;
+
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, uri);
+                req.Headers.Range = new RangeHeaderValue(0, 255);
+                using var resp = _streamProbeHttp.Send(req, HttpCompletionOption.ResponseHeadersRead);
+                if (!resp.IsSuccessStatusCode)
+                    return false;
+
+                if (IsHlsContentType(resp.Content.Headers.ContentType?.MediaType))
+                    return true;
+
+                using var stream = resp.Content.ReadAsStream();
+                byte[] initial = new byte[256];
+                int read = stream.Read(initial, 0, initial.Length);
+                return StartsWithExtM3u(initial, read);
+            }
+            catch (Exception ex)
+            {
+                Log("[STREAM] probe failed, relay bypass: " + ex.Message);
+                return false;
+            }
+        }
 
         public PlayerControlVideo()
         {
@@ -479,7 +558,7 @@ namespace AirDirector.Controls
                                     m.AddOption(":network-caching=3000");
                                     m.AddOption(":clock-jitter=0");
                                     m.AddOption(":clock-synchro=0");
-                                    m.AddOption(":demux=ts");
+                                    if (!string.IsNullOrEmpty(deck.RelayUrl)) m.AddOption(":demux=ts");
                                     deck.VlcPlayer.Media = m;
                                     m.Dispose();
                                     deck.VlcPlayer.Play();
@@ -1061,9 +1140,7 @@ namespace AirDirector.Controls
                 target.IsVideoStream = isVideoStream;
                 string mediaUrl = fp;
                 string? relayUrl = null;
-                bool needsRelay = !string.IsNullOrEmpty(fp) &&
-                    (fp.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                     fp.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+                bool needsRelay = ShouldUseHlsRelay(fp);
                 if (needsRelay && _hlsRelay != null)
                 {
                     try
@@ -1077,13 +1154,17 @@ namespace AirDirector.Controls
                         Log("[STREAM] ⚠️ Relay register failed, using original: " + ex.Message);
                     }
                 }
+                else
+                {
+                    Log("[STREAM] relay bypass (non-HLS): " + fp);
+                }
                 target.RelayUrl = relayUrl;
                 var media = new Media(_libVLC, mediaUrl, FromType.FromLocation);
                 if (!isVideoStream) media.AddOption(":no-video");
                 media.AddOption(":network-caching=3000");
                 media.AddOption(":clock-jitter=0");
                 media.AddOption(":clock-synchro=0");
-                media.AddOption(":demux=ts");
+                if (!string.IsNullOrEmpty(relayUrl)) media.AddOption(":demux=ts");
                 target.VlcPlayer.Media = media; media.Dispose(); target.VlcPlayer.Play();
                 if (isVideoStream)
                 {
