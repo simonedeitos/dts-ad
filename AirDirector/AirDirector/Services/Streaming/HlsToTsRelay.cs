@@ -230,8 +230,8 @@ namespace AirDirector.Services.Streaming
 
                 if (firstPoll && !endList)
                 {
-                    const int keepLastSegments = 1;
-                    int skip = Math.Max(0, segments.Count - keepLastSegments);
+                    const int keepLastLiveSegmentsAtStartup = 1;
+                    int skip = Math.Max(0, segments.Count - keepLastLiveSegmentsAtStartup);
                     for (int i = 0; i < skip; i++)
                     {
                         string staleKey = NormalizeSegmentKey(segments[i]);
